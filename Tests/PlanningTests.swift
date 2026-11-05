@@ -16,6 +16,37 @@ struct PlanningTests {
         try test(directory)
     }
 
+    @Test func confirmFutureSwapKeepsFullSetCountAndChecksOriginal() throws {
+        try withDirectory { dir in
+            let store = PlanningStore(directory: dir)
+            try store.load()
+            let plan = routine()
+            let day = plan.days[0]
+            let original = day.exercises[0]
+            try store.begin(plan, step: "review")
+            try store.confirm(plan)
+            let swap = PlanExercise(name: "Cable variation", sets: 1)
+            try store.replaceFutureExercise(planID: plan.id, dayID: day.id, original: original, replacement: swap)
+            #expect(store.plans[0].days[0].exercises[0].sets == original.sets)
+            #expect(store.plans[0].days[0].exercises[0].variantID == swap.id)
+            #expect(store.plans[0].days[0].exercises[0].id != original.id)
+            #expect(throws: PlanningError.self) {
+                try store.replaceFutureExercise(planID: plan.id, dayID: day.id, original: original, replacement: swap)
+            }
+        }
+    }
+
+    @Test func legacyDayDecodesAndCardioHasAnExplicitGoal() throws {
+        let data = Data("{\"id\":\"5013DF4E-2000-4B79-BF8B-103F89D0C401\",\"name\":\"\",\"exercises\":[]}".utf8)
+        let legacy = try JSONDecoder().decode(PlanDay.self, from: data)
+        #expect(!legacy.isWorkout)
+        var plan = WeekPlan(name: "Cardio week")
+        plan.days[0] = PlanDay(name: "Cycling", cardioGoalSeconds: 900)
+        #expect(plan.validationMessage == nil)
+        plan.days[0].cardioGoalSeconds = 0
+        #expect(plan.validationMessage != nil)
+    }
+
     @Test func aDifferentExerciseNeedsItsOwnStartingLoad() {
         var exercise = PlanExercise(name: "Example barbell", convention: "Total barbell weight")
         exercise.startingLoad = 20
@@ -141,6 +172,7 @@ struct PlanningTests {
             #expect(copy.id != first.id)
             #expect(copy.days[0].id != first.days[0].id)
             #expect(copy.days[0].exercises[0].id != first.days[0].exercises[0].id)
+            #expect(copy.days[0].exercises[0].variantID == first.days[0].exercises[0].id)
             try store.activate(copy.id)
             try store.archive(copy.id)
             try store.archive(replay.id)

@@ -98,14 +98,14 @@ final class WeekformUITests: XCTestCase {
         try XCTSkipUnless(local.exists, "This checkout has no local development starter.")
         tap(local)
         tap(app.buttons["reviewWeek"])
-        let alert = app.alerts["Check your routine"]
-        tap(alert.buttons["OK"])
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        XCTAssertTrue(app.buttons["resolveVariants"].exists)
 
         let variants = app.buttons["chooseVariants"]
         let countString = try XCTUnwrap(variants.value as? String)
         let count = try XCTUnwrap(countString.split(whereSeparator: { !$0.isNumber }).first.flatMap { Int($0) })
         XCTAssertGreaterThan(count, 0)
-        tap(variants)
+        tap(app.buttons["resolveVariants"])
         let unresolved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'variant' AND value == 'Unresolved'"))
         for _ in 0..<count {
             let next = unresolved.firstMatch

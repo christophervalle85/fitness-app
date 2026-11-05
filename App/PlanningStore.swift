@@ -185,6 +185,26 @@ final class PlanningStore {
         routines.append(row)
     }
 
+    func replaceFutureExercise(planID: UUID, dayID: UUID, original: PlanExercise, replacement: PlanExercise) throws {
+        guard let i = plans.firstIndex(where: { $0.id == planID && !$0.archived }),
+              let d = plans[i].days.firstIndex(where: { $0.id == dayID }),
+              let e = plans[i].days[d].exercises.firstIndex(where: { $0 == original }),
+              draft?.id != planID else {
+            throw PlanningError("This routine has changed. Open Routines to edit the current week.")
+        }
+        var plan = plans[i]
+        var future = replacement
+        future.variantID = replacement.variantID ?? replacement.id
+        future.id = UUID()
+        // A session replacement contains only the remaining sets. Future weeks keep the full prescription.
+        future.sets = original.sets
+        plan.days[d].exercises[e] = future
+        if let issue = plan.validationMessage { throw PlanningError(issue) }
+        let data = try JSONEncoder().encode(plan)
+        try save { _, _ in routines[i].plan = data }
+        plans[i] = plan
+    }
+
     func archive(_ id: UUID) throws {
         guard let index = plans.firstIndex(where: { $0.id == id }) else {
             throw PlanningError("This routine could not be found.")
@@ -208,7 +228,6 @@ final class PlanningStore {
     func reset() throws {
         try save { context, profile in
             for row in routines { context.delete(row) }
-            profile.id = UUID()
             profile.activeID = nil
             profile.draft = nil
             profile.step = "welcome"

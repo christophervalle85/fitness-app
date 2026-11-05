@@ -113,7 +113,9 @@ struct ReviewWeek: View {
             }
             ForEach(Array(plan.days.enumerated()), id: \.element.id) { index, day in
                 Section(PlannerStyle.weekdays[index]) {
-                    if day.exercises.isEmpty {
+                    if let seconds = day.cardioGoalSeconds {
+                        LabeledContent(day.name, value: "\(seconds / 60) min cardio")
+                    } else if day.exercises.isEmpty {
                         Text("Rest day").foregroundStyle(.secondary)
                     } else {
                         DisclosureGroup(day.name) {

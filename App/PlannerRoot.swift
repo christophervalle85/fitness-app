@@ -8,6 +8,8 @@ enum PlannerStyle {
 
 struct PlannerRoot: View {
     @State private var store = PlanningStore()
+    @State private var training = TrainingStore()
+    @State private var workoutOpen = false
     @State private var editing = WeekPlan()
     @State private var loaded = false
     @State private var loadFailed = false
@@ -39,6 +41,7 @@ struct PlannerRoot: View {
                     Tab("Today", systemImage: "calendar", value: "Today") {
                         NavigationStack {
                             TodayScreen(plan: store.plans.first { $0.id == store.activeID },
+                                        training: training, openWorkout: { workoutOpen = true },
                                         showRoutines: { tab = "Routines" })
                                 .toolbar { developerButton }
                         }
@@ -53,6 +56,19 @@ struct PlannerRoot: View {
                                            archive: { id in perform { try store.archive(id) } })
                                 .toolbar { developerButton }
                         }
+                    }
+                }
+                .tabViewBottomAccessory(isEnabled: training.active != nil) {
+                    if let session = training.active {
+                        Button { workoutOpen = true } label: {
+                            HStack {
+                                Image(systemName: "figure.strengthtraining.traditional")
+                                Text(session.name).lineLimit(1)
+                                Spacer()
+                                Text("Resume").fontWeight(.semibold)
+                            }.padding(.horizontal)
+                        }
+                        .accessibilityIdentifier("resumeAccessory")
                     }
                 }
             } else {
@@ -90,14 +106,28 @@ struct PlannerRoot: View {
                 }
             }
         }
+        .sheet(isPresented: $workoutOpen) {
+            NavigationStack {
+                ActiveWorkout(store: training, onClose: { workoutOpen = false }, applyToRoutine: futureReplacement,
+                              routineExercises: store.plans.first { $0.id == store.activeID }?.days.flatMap(\.exercises) ?? [])
+            }
+        }
         .tint(PlannerStyle.blue)
         .task { if !loaded { load() } }
-        .alert("Couldn’t save or open your routine", isPresented: Binding(
-            get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
-        )) {
-            Button("Retry") { retry?() }
-            Button("Close", role: .cancel) {}
-        } message: { Text(errorMessage ?? "") }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let errorMessage {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(errorMessage, systemImage: "exclamationmark.circle")
+                        .font(.subheadline)
+                    HStack {
+                        Button("Retry") { retry?() }
+                        Button("Dismiss") { self.errorMessage = nil }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding().background(.regularMaterial)
+            }
+        }
         .confirmationDialog("Discard this draft?", isPresented: $discardAlert, titleVisibility: .visible) {
             Button("Discard draft", role: .destructive, action: discard)
             Button("Keep editing", role: .cancel) {}
@@ -118,7 +148,7 @@ struct PlannerRoot: View {
                 .confirmationDialog("Erase this planner’s routines and setup draft?", isPresented: $resetAlert, titleVisibility: .visible) {
                     Button("Erase planner data", role: .destructive) {
                         developer = false
-                        perform { try store.reset(); editing = WeekPlan(); tab = "Today" }
+                        perform { try store.reset(); loaded = false; load(); editing = WeekPlan(); tab = "Today" }
                     }
                 }
             }
@@ -135,10 +165,22 @@ struct PlannerRoot: View {
         }
     }
 
+    private var futureReplacement: ((PlanExercise, PlanExercise) throws -> Void)? {
+        guard let id = training.active?.occurrenceID,
+              let occurrence = training.occurrences.first(where: { $0.id == id }),
+              let planID = occurrence.planID, let day = occurrence.day else { return nil }
+        return { original, replacement in
+            try store.replaceFutureExercise(planID: planID, dayID: day.id, original: original, replacement: replacement)
+        }
+    }
+
     private func load() {
         loadFailed = false
         perform {
             do { try store.load() } catch { loadFailed = true; throw error }
+            if let owner = store.profileID {
+                do { try training.load(profileID: owner) } catch { loadFailed = true; throw error }
+            }
             if let draft = store.draft { editing = draft }
             loaded = true
         }
@@ -165,6 +207,7 @@ struct PlannerRoot: View {
     private func perform(_ action: @escaping () throws -> Void) {
         do {
             try action()
+            errorMessage = nil
             retry = nil
         } catch {
             errorMessage = error.localizedDescription

@@ -2,6 +2,7 @@ import Foundation
 
 struct PlanExercise: Identifiable, Codable, Equatable {
     var id = UUID()
+    var variantID: UUID?
     var name = ""
     var choices: [String] = []
     var sets = 3
@@ -18,6 +19,9 @@ struct PlanDay: Identifiable, Codable, Equatable {
     var id = UUID()
     var name = ""
     var exercises: [PlanExercise] = []
+    var cardioGoalSeconds: Int?
+
+    var isWorkout: Bool { cardioGoalSeconds != nil || !exercises.isEmpty }
 }
 
 struct WeekPlan: Identifiable, Codable, Equatable {
@@ -35,6 +39,8 @@ struct WeekPlan: Identifiable, Codable, Equatable {
         for day in copy.days.indices {
             copy.days[day].id = UUID()
             for exercise in copy.days[day].exercises.indices {
+                let source = days[day].exercises[exercise]
+                copy.days[day].exercises[exercise].variantID = source.variantID ?? source.id
                 copy.days[day].exercises[exercise].id = UUID()
             }
         }
@@ -45,14 +51,15 @@ struct WeekPlan: Identifiable, Codable, Equatable {
         guard !name.trimmed.isEmpty else { return "Give your routine a name." }
         guard days.count == 7 else { return "Schedule seven days, including rest days." }
         if let restSeconds, restSeconds < 1 { return "Choose a positive rest duration or turn off the timer." }
-        guard days.contains(where: { !$0.exercises.isEmpty }) else { return "Add at least one workout to your week." }
+        guard days.contains(where: \.isWorkout) else { return "Add at least one workout to your week." }
 
         var identifiers = Set<UUID>()
         for (index, day) in days.enumerated() {
             let weekday = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][index]
             guard identifiers.insert(day.id).inserted else { return "Each scheduled day needs its own identity." }
-            if day.exercises.isEmpty && !day.name.trimmed.isEmpty { return "Add an exercise to \(weekday) or clear its workout name for a rest day." }
-            if !day.exercises.isEmpty && day.name.trimmed.isEmpty { return "Name the workout on \(weekday)." }
+            if let seconds = day.cardioGoalSeconds, seconds <= 0 || !day.exercises.isEmpty { return "Give cardio a positive duration and its own workout day." }
+            if !day.isWorkout && !day.name.trimmed.isEmpty { return "Add an exercise to \(weekday) or clear its workout name for a rest day." }
+            if day.isWorkout && day.name.trimmed.isEmpty { return "Name the workout on \(weekday)." }
             for (offset, exercise) in day.exercises.enumerated() {
                 guard identifiers.insert(exercise.id).inserted else { return "Each scheduled exercise needs its own identity." }
                 guard !exercise.name.trimmed.isEmpty else {

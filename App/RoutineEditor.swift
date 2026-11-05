@@ -15,7 +15,7 @@ struct RoutineEditor: View {
     let onCancel: () -> Void
 
     @State private var showingVariants = false
-    @State private var validation: String?
+    @State private var attemptedReview = false
     @FocusState private var nameFocused: Bool
 
     private var unresolved: Int {
@@ -61,7 +61,7 @@ struct RoutineEditor: View {
                             Text(PlannerStyle.weekdays[index])
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
-                            Text(day.name.isEmpty ? (day.exercises.isEmpty ? "Rest day" : "Unnamed workout") : day.name)
+                            Text(day.name.isEmpty ? (day.isWorkout ? "Unnamed workout" : "Rest day") : day.name)
                                 .font(.body.weight(day.name.isEmpty ? .regular : .semibold))
                                 .foregroundStyle(day.name.isEmpty ? .secondary : .primary)
                         }
@@ -80,15 +80,26 @@ struct RoutineEditor: View {
         .modifier(EditorPaper())
         .navigationTitle("Edit your week")
         .safeAreaInset(edge: .bottom) {
-            Button {
-                nameFocused = false
-                if let message = plan.validationMessage { validation = message } else { onReview() }
-            } label: {
-                Text("Review week").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 3)
+            VStack(alignment: .leading, spacing: 8) {
+                if attemptedReview, let issue = plan.validationMessage {
+                    Label(issue, systemImage: "info.circle")
+                        .font(.subheadline).accessibilityIdentifier("routineGuidance")
+                    if unresolved > 0 {
+                        Button("Choose remaining variants") { showingVariants = true }
+                            .accessibilityIdentifier("resolveVariants")
+                    }
+                }
+                Button {
+                    nameFocused = false
+                    attemptedReview = true
+                    if plan.validationMessage == nil { onReview() }
+                } label: {
+                    Text("Review week").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 3)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .accessibilityIdentifier("reviewWeek")
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .accessibilityIdentifier("reviewWeek")
             .padding(.horizontal, 20)
             .padding(.vertical, 8)
             .background(.bar)
@@ -101,9 +112,6 @@ struct RoutineEditor: View {
         .sheet(isPresented: $showingVariants) {
             NavigationStack { VariantChoices(plan: $plan) }
         }
-        .alert("Check your routine", isPresented: Binding(get: { validation != nil }, set: { if !$0 { validation = nil } })) {
-            Button("OK") { validation = nil }
-        } message: { Text(validation ?? "") }
     }
 }
 
@@ -154,6 +162,7 @@ private struct VariantChoices: View {
 func selectVariant(_ choice: String, for exercise: inout PlanExercise) {
     guard choice != exercise.name else { return }
     exercise.startingLoad = nil
+    exercise.variantID = nil
     if inferredConvention(for: exercise.name) == exercise.convention || exercise.convention.isEmpty {
         exercise.convention = inferredConvention(for: choice)
     }
@@ -221,6 +230,25 @@ private struct DayEditor: View {
                     .submitLabel(.done)
                     .accessibilityIdentifier("workoutName")
             }
+            if day.exercises.isEmpty {
+                Section("Workout type") {
+                    Picker("Workout type", selection: Binding(
+                        get: { day.cardioGoalSeconds != nil },
+                        set: { plan.days[index].cardioGoalSeconds = $0 ? 1200 : nil }
+                    )) {
+                        Text("Strength").tag(false)
+                        Text("Cardio").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    if day.cardioGoalSeconds != nil {
+                        Stepper("Duration · \((day.cardioGoalSeconds ?? 1200) / 60) min", value: Binding(
+                            get: { (day.cardioGoalSeconds ?? 1200) / 60 },
+                            set: { plan.days[index].cardioGoalSeconds = $0 * 60 }
+                        ), in: 1...1440)
+                    }
+                }
+            }
+            if day.cardioGoalSeconds == nil {
             Section("Exercises") {
                 ForEach(day.exercises) { exercise in
                     Button {
@@ -246,7 +274,8 @@ private struct DayEditor: View {
                 } label: { Label("Add exercise", systemImage: "plus") }
                     .accessibilityIdentifier("addExercise")
             }
-            if !day.name.isEmpty || !day.exercises.isEmpty {
+            }
+            if !day.name.isEmpty || day.isWorkout {
                 Section {
                     Button("Move to another weekday") { moving = true }
                     Button("Make rest day", role: .destructive) { clearing = true }
