@@ -3,7 +3,8 @@ import Foundation
 struct WorkoutBackup: Codable, Equatable {
     static let byteLimit = 32 * 1024 * 1024
     var format = "Weekform"
-    var version = 1
+    var version = 2
+    var library: PersonalCatalog?
     var owner: UUID
     var unit: String
     var step: String
@@ -16,6 +17,7 @@ struct WorkoutBackup: Codable, Equatable {
     @MainActor init(_ planner: PlanningStore, _ training: TrainingStore) throws {
         guard let owner = planner.profileID else { throw PlanningError("Open your profile first.") }
         self.owner = owner
+        library = PersonalCatalog(favorites: planner.favoriteExerciseIDs, exercises: planner.customExercises)
         unit = planner.weightUnit
         step = planner.step
         activeID = planner.activeID
@@ -58,7 +60,9 @@ struct WorkoutBackup: Codable, Equatable {
             for e in value.exercises { try exercise(e) }
             if let goal = value.cardioGoalSeconds { try check(goal > 0) }
         }
-        try check(format == "Weekform" && version == 1 && ["kg","lb"].contains(unit))
+        try check(format == "Weekform" && (1...2).contains(version) && ["kg","lb"].contains(unit))
+        try check(version == 1 || library != nil)
+        try library?.validate()
         try check(["home","edit","starters","review","welcome"].contains(step))
         try check(!["edit","review"].contains(step) || draft != nil)
         try check(unique(plans) && unique(sessions) && unique(occurrences) && sessions.filter { $0.finishedAt == nil }.count <= 1)
@@ -206,7 +210,10 @@ struct RecoveryPaths {
         let p = PlanningStore(directory: paths.planning), t = TrainingStore(directory: paths.training)
         try p.load(); try t.load(profileID: backup.owner)
         let reopened = try WorkoutBackup(p, t)
-        guard reopened == backup else { throw PlanningError("The restored copy could not be verified.") }
+        var normalized = backup
+        normalized.version = 2
+        normalized.library = backup.library ?? PersonalCatalog()
+        guard reopened == normalized else { throw PlanningError("The restored copy could not be verified.") }
         try beforeSwitch()
         try JSONEncoder().encode(id).write(to: root.appending(path: "active"), options: .atomic)
         switched = true

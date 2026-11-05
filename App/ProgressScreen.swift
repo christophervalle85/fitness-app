@@ -82,6 +82,7 @@ struct ProgressScreen<Recovery: View>: View {
                     Text("kg").tag("kg")
                 }.pickerStyle(.segmented).accessibilityIdentifier("weightUnit")
                 if let issue { Text(issue) }
+                NavigationLink("Lock Screen privacy") { WorkoutPrivacySettings() }
                 NavigationLink { recovery() } label: { Label("Backup and export", systemImage: "externaldrive") }
                     .accessibilityIdentifier("backupRecovery")
             }

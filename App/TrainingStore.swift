@@ -38,7 +38,12 @@ final class TrainingStore {
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let beforeSave: () throws -> Void
     @ObservationIgnored private var directory: URL?
-    @ObservationIgnored private var revision = 0
+    private var revision = 0
+    var liveRevision: Int { revision }
+
+    func isOpen(at root: URL, owner: UUID) -> Bool {
+        directory?.standardizedFileURL.path == root.appending(path: owner.uuidString).standardizedFileURL.path
+    }
 
     convenience init() {
         var directory = URL.applicationSupportDirectory.appending(path: "Training")

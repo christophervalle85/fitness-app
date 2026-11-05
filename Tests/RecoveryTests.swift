@@ -15,7 +15,11 @@ import Testing
         plan.days[0] = PlanDay(name: "Strength", exercises: [PlanExercise(name: "Row")])
         try p.begin(plan, step: "review"); try p.confirm(plan)
         try t.startPlanned(plan: plan, date: CivilTrainingDay(Date()).date.addingTimeInterval(Double(-CivilTrainingDay(Date()).mondayIndex) * 86400))
+        let custom = PlanExercise(name: "Local row")
+        try p.saveCustomExercise(custom)
+        try p.setExerciseFavorite(custom.id, favorite: true)
         let before = try WorkoutBackup(p, t)
+        #expect(before.library?.favorites.contains(custom.id) == true)
         var next = before
         next.unit = "kg"
         next.sessions[0].notes = "Restored workout"
@@ -42,5 +46,14 @@ import Testing
         try restored.load(); try logged.load(profileID: before.owner)
         #expect(try WorkoutBackup(restored, logged) == next)
         #expect(try WorkoutBackup.read(#require(switched.previous)) == before)
+        var legacy = next
+        legacy.version = 1
+        legacy.library = nil
+        try RecoveryPaths.replace(with: legacy, planner: restored, training: logged, at: root)
+        let legacyPath = try RecoveryPaths.current(at: root)
+        let oldStyle = PlanningStore(directory: legacyPath.planning)
+        try oldStyle.load()
+        #expect(oldStyle.customExercises.isEmpty && oldStyle.favoriteExerciseIDs.isEmpty)
+        #expect(oldStyle.plans == p.plans)
     }
 }

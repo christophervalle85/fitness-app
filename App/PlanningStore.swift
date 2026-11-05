@@ -13,6 +13,7 @@ enum PlanningSchemaV1: VersionedSchema {
         var draft: Data?
         var step: String
         var displayUnit: String?
+        var catalogData: Data?
 
         init() {
             id = UUID()
@@ -42,6 +43,8 @@ struct PlanningError: LocalizedError {
 
 @MainActor @Observable
 final class PlanningStore {
+    private(set) var favoriteExerciseIDs = Set<UUID>()
+    private(set) var customExercises = [PlanExercise]()
     private var unitRevision = 0
     private(set) var plans: [WeekPlan] = []
     private(set) var activeID: UUID?
@@ -96,6 +99,9 @@ final class PlanningStore {
         }
         let draft = try profile.draft.map { try decoder.decode(WeekPlan.self, from: $0) }
 
+        let library = try profile.catalogData.map { try decoder.decode(PersonalCatalog.self, from: $0) } ?? PersonalCatalog()
+        favoriteExerciseIDs = library.favorites
+        customExercises = library.exercises
         self.container = container
         self.context = context
         self.profile = profile
@@ -279,6 +285,7 @@ extension PlanningStore {
             profile.activeID = backup.activeID
             profile.step = backup.step
             profile.displayUnit = backup.unit
+            profile.catalogData = try JSONEncoder().encode(backup.library ?? PersonalCatalog())
             profile.draft = try backup.draft.map { try JSONEncoder().encode($0) }
             for (index, plan) in backup.plans.enumerated() {
                 let row = try PlanningSchemaV1.Routine(id: plan.id, plan: JSONEncoder().encode(plan))
@@ -286,5 +293,39 @@ extension PlanningStore {
                 context.insert(row)
             }
         }
+    }
+}
+
+struct PersonalCatalog: Codable, Equatable {
+    var favorites = Set<UUID>()
+    var exercises = [PlanExercise]()
+    func validate() throws {
+        guard Set(exercises.map(\.id)).count == exercises.count,
+              exercises.allSatisfy({ $0.variantID == $0.id && !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.sets > 0 && $0.sets <= 1000 && $0.low > 0 && $0.high >= $0.low }) else {
+            throw PlanningError("Check the names and prescriptions in your exercise library.")
+        }
+    }
+}
+
+extension PlanningStore {
+    func setExerciseFavorite(_ id: UUID, favorite: Bool) throws {
+        var favorites = favoriteExerciseIDs
+        if favorite { favorites.insert(id) } else { favorites.remove(id) }
+        try saveLibrary(PersonalCatalog(favorites: favorites, exercises: customExercises))
+    }
+    func saveCustomExercise(_ exercise: PlanExercise) throws {
+        var copy = exercise
+        copy.variantID = copy.id
+        copy.name = copy.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        var items = customExercises
+        if let i = items.firstIndex(where: { $0.id == copy.id }) { items[i] = copy } else { items.append(copy) }
+        try saveLibrary(PersonalCatalog(favorites: favoriteExerciseIDs, exercises: items))
+    }
+    private func saveLibrary(_ library: PersonalCatalog) throws {
+        try library.validate()
+        let data = try JSONEncoder().encode(library)
+        try save { _, profile in profile.catalogData = data }
+        favoriteExerciseIDs = library.favorites
+        customExercises = library.exercises
     }
 }

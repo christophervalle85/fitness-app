@@ -1,0 +1,1001 @@
+[
+  {
+    "id": "79677105-bd3a-5edc-96da-3e7b613be38e",
+    "name": "Barbell bench press",
+    "primary": [
+      "Chest"
+    ],
+    "secondary": [
+      "Shoulders",
+      "Triceps"
+    ],
+    "equipment": [
+      "Barbell",
+      "Bench"
+    ],
+    "movement": "Horizontal press",
+    "convention": "Barbell, total weight including bar",
+    "instructions": [
+      "Lie on a flat bench with your feet planted. Hold the bar over your chest.",
+      "Lower the bar toward your chest, then press it back up."
+    ],
+    "media": [
+      {
+        "file": "wger-73-68.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/68/",
+        "original": "https://wger.de/media/exercise-images/192/Bench-press-1.png",
+        "providerImageID": 68,
+        "providerImageUUID": "08517378-bc36-4f6b-9952-1f45a02d936e",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/192/Bench-press-1.png.400x400_q85.png",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-73-70.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/70/",
+        "original": "https://wger.de/media/exercise-images/192/Bench-press-2.png",
+        "providerImageID": 70,
+        "providerImageUUID": "41e5c58e-0325-4620-8d96-7372cc4dae8c",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/192/Bench-press-2.png.400x400_q85.png",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/73/",
+    "version": "2026-10-24T15:57:25.065560+02:00",
+    "providerID": "73",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/192/",
+      "authors": [
+        "sistab2"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "c3708a85-e14b-5d5b-bd21-609c85831182",
+    "name": "Barbell curl",
+    "primary": [
+      "Biceps"
+    ],
+    "secondary": [
+      "Brachialis"
+    ],
+    "equipment": [
+      "Barbell"
+    ],
+    "movement": "Elbow flexion",
+    "convention": "Barbell, total weight including bar",
+    "instructions": [
+      "Hold a barbell in front of your thighs with your palms forward.",
+      "Bend your elbows to raise the bar. Keep your torso still as you lower it."
+    ],
+    "media": [
+      {
+        "file": "wger-91-27.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/27/",
+        "original": "https://wger.de/media/exercise-images/74/Bicep-curls-1.png",
+        "providerImageID": 27,
+        "providerImageUUID": "7276a19e-06d0-45ae-a2a3-569bed75686b",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/74/Bicep-curls-1.png.400x400_q85.png",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-91-28.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/28/",
+        "original": "https://wger.de/media/exercise-images/74/Bicep-curls-2.png",
+        "providerImageID": 28,
+        "providerImageUUID": "c9fee9d3-0b0e-40ae-a9c7-a4033781ea3b",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/74/Bicep-curls-2.png.400x400_q85.png",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/91/",
+    "version": "2026-10-31T00:05:55.845058+01:00",
+    "providerID": "91",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/74/",
+      "authors": [
+        "wger.de"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "78b99ef5-b13b-5ad5-bed4-d1eb6ea495bc",
+    "name": "Barbell front squat",
+    "primary": [
+      "Quads",
+      "Glutes"
+    ],
+    "secondary": [
+      "Abs"
+    ],
+    "equipment": [
+      "Barbell"
+    ],
+    "movement": "Squat",
+    "convention": "Barbell, total weight including bar",
+    "instructions": [
+      "Support the bar across the front of your shoulders with your elbows lifted.",
+      "Bend at the hips and knees, keeping your chest up. Stand back up with the bar over your feet."
+    ],
+    "media": [
+      {
+        "file": "wger-257-149.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/149/",
+        "original": "https://wger.de/media/exercise-images/191/Front-squat-1-857x1024.png",
+        "providerImageID": 149,
+        "providerImageUUID": "deeecd20-53f7-4494-a531-e6ff8cd79045",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/191/Front-squat-1-857x1024.png.400x400_q85.png",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-257-150.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/150/",
+        "original": "https://wger.de/media/exercise-images/191/Front-squat-2-857x1024.png",
+        "providerImageID": 150,
+        "providerImageUUID": "bec83f17-2060-4bee-8a02-78db230568bf",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/191/Front-squat-2-857x1024.png.400x400_q85.png",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/257/",
+    "version": "2026-10-24T15:57:43.330247+02:00",
+    "providerID": "257",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/2731/",
+      "authors": [
+        "wgerjhn"
+      ],
+      "license": "CC-BY-SA 4",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "e2b0c0fc-bba9-57b2-832d-f0426dcc63fe",
+    "name": "Barbell row",
+    "primary": [
+      "Lats"
+    ],
+    "secondary": [
+      "Shoulders",
+      "Biceps"
+    ],
+    "equipment": [
+      "Barbell"
+    ],
+    "movement": "Horizontal pull",
+    "convention": "Barbell, total weight including bar",
+    "instructions": [
+      "Hold the bar with an overhand grip. Bend your knees slightly and hinge forward so the bar hangs below your shoulders.",
+      "Keep your torso steady as you draw the bar toward your lower ribs. Lower it under control."
+    ],
+    "media": [
+      {
+        "file": "wger-83-84.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/84/",
+        "original": "https://wger.de/media/exercise-images/109/Barbell-rear-delt-row-1.png",
+        "providerImageID": 84,
+        "providerImageUUID": "63da5c54-7f1d-4a09-9867-2bdda2a6ddeb",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/109/Barbell-rear-delt-row-1.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-83-90.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/90/",
+        "original": "https://wger.de/media/exercise-images/109/Barbell-rear-delt-row-2.png",
+        "providerImageID": 90,
+        "providerImageUUID": "492ce9c7-12cf-4378-aca4-fe008dea5dd4",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/109/Barbell-rear-delt-row-2.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/83/",
+    "version": "2026-10-14T19:54:59.446738+02:00",
+    "providerID": "83",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/109/",
+      "authors": [
+        "warchildmd",
+        "wger.de"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "a886c380-568a-5035-a1f3-9e76b9351977",
+    "name": "Dumbbell bench press",
+    "primary": [
+      "Chest"
+    ],
+    "secondary": [
+      "Shoulders",
+      "Triceps"
+    ],
+    "equipment": [
+      "Bench",
+      "Dumbbell"
+    ],
+    "movement": "Horizontal press",
+    "convention": "Weight per dumbbell",
+    "instructions": [
+      "Lie on a flat bench with a dumbbell in each hand and your feet on the floor.",
+      "Lower the dumbbells beside your chest, then press them up together."
+    ],
+    "media": [
+      {
+        "file": "wger-75-113.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/113/",
+        "original": "https://wger.de/media/exercise-images/97/Dumbbell-bench-press-1.png",
+        "providerImageID": 113,
+        "providerImageUUID": "87a312b7-d01e-4f69-9bda-1ed2f1fcd9ab",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/97/Dumbbell-bench-press-1.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-75-114.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/114/",
+        "original": "https://wger.de/media/exercise-images/97/Dumbbell-bench-press-2.png",
+        "providerImageID": 114,
+        "providerImageUUID": "3c765b1e-eab9-4b61-8e2e-7d7591cb6ccb",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/97/Dumbbell-bench-press-2.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/75/",
+    "version": "2026-10-10T19:12:50.716009+02:00",
+    "providerID": "75",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/97/",
+      "authors": [
+        "wger.de"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "d45db793-ee17-53da-9725-110a2321e2b4",
+    "name": "Dumbbell curl",
+    "primary": [
+      "Biceps"
+    ],
+    "secondary": [
+      "Brachialis"
+    ],
+    "equipment": [
+      "Dumbbell"
+    ],
+    "movement": "Elbow flexion",
+    "convention": "Weight per dumbbell",
+    "instructions": [
+      "Stand with a dumbbell at each side.",
+      "Turn your palms upward as you curl the weights. Slowly return them to your sides."
+    ],
+    "media": [
+      {
+        "file": "wger-92-23.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/23/",
+        "original": "https://wger.de/media/exercise-images/81/Biceps-curl-1.png",
+        "providerImageID": 23,
+        "providerImageUUID": "ca71df8e-a6d6-453f-a25a-f4cebae3b970",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/81/Biceps-curl-1.png.400x400_q85.png",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-92-24.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/24/",
+        "original": "https://wger.de/media/exercise-images/81/Biceps-curl-2.png",
+        "providerImageID": 24,
+        "providerImageUUID": "13fbda16-5ef6-4f48-b58c-954c3078001c",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/81/Biceps-curl-2.png.400x400_q85.png",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/92/",
+    "version": "2026-10-24T15:57:27.756232+02:00",
+    "providerID": "92",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/81/",
+      "authors": [
+        "wger.de"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "2df38aa2-a5a1-550f-b813-4af299c1183a",
+    "name": "Dumbbell lateral raise",
+    "primary": [
+      "Shoulders"
+    ],
+    "secondary": [],
+    "equipment": [
+      "Dumbbell"
+    ],
+    "movement": "Shoulder abduction",
+    "convention": "Weight per dumbbell",
+    "instructions": [
+      "Stand with dumbbells by your sides and a slight bend at your elbows.",
+      "Raise your arms out to the sides to about shoulder height, then lower slowly."
+    ],
+    "media": [
+      {
+        "file": "wger-348-177.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/177/",
+        "original": "https://wger.de/media/exercise-images/148/lateral-dumbbell-raises-large-2.png",
+        "providerImageID": 177,
+        "providerImageUUID": "4371e111-5b1f-4679-968e-bb5d9a48ebe2",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/148/lateral-dumbbell-raises-large-2.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-348-178.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/178/",
+        "original": "https://wger.de/media/exercise-images/148/lateral-dumbbell-raises-large-1.png",
+        "providerImageID": 178,
+        "providerImageUUID": "239d43a2-b86f-4dc7-aab2-27c8c2f7de47",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/148/lateral-dumbbell-raises-large-1.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/348/",
+    "version": "2026-10-10T18:40:01.180423+02:00",
+    "providerID": "348",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/148/",
+      "authors": [
+        "BFad07",
+        "wger.de"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "421d7ed7-4add-568f-89c6-780a7a48f7b5",
+    "name": "Hammer curl",
+    "primary": [
+      "Biceps"
+    ],
+    "secondary": [],
+    "equipment": [
+      "Dumbbell"
+    ],
+    "movement": "Elbow flexion",
+    "convention": "Weight per dumbbell",
+    "instructions": [
+      "Stand with a dumbbell at each side and your palms facing inward.",
+      "Keep that grip as you bend your elbows. Lower the dumbbells to the starting position."
+    ],
+    "media": [
+      {
+        "file": "wger-272-47.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/47/",
+        "original": "https://wger.de/media/exercise-images/86/Bicep-hammer-curl-1.png",
+        "providerImageID": 47,
+        "providerImageUUID": "aa574839-4a7e-4c0d-ac72-2f7448478a1c",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/86/Bicep-hammer-curl-1.png.400x400_q85.png",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-272-48.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/48/",
+        "original": "https://wger.de/media/exercise-images/86/Bicep-hammer-curl-2.png",
+        "providerImageID": 48,
+        "providerImageUUID": "75382eaf-468f-4c21-8710-6bf475d8ecc2",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/86/Bicep-hammer-curl-2.png.400x400_q85.png",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/272/",
+    "version": "2026-10-31T00:06:16.395200+01:00",
+    "providerID": "272",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/86/",
+      "authors": [
+        "wger.de"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "371eb65c-29df-515e-a4c3-7484b25d9fad",
+    "name": "Incline barbell bench press",
+    "primary": [
+      "Chest"
+    ],
+    "secondary": [
+      "Shoulders",
+      "Triceps"
+    ],
+    "equipment": [
+      "Barbell",
+      "Incline bench"
+    ],
+    "movement": "Incline press",
+    "convention": "Barbell, total weight including bar",
+    "instructions": [
+      "Lie back on an inclined bench, plant your feet and hold the bar above your chest.",
+      "Lower the bar toward your upper chest, then press it upward."
+    ],
+    "media": [
+      {
+        "file": "wger-538-129.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/129/",
+        "original": "https://wger.de/media/exercise-images/41/Incline-bench-press-1.png",
+        "providerImageID": 129,
+        "providerImageUUID": "3cc89c05-19fe-4598-bb0c-24d36ef9c1d6",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/41/Incline-bench-press-1.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-538-130.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/130/",
+        "original": "https://wger.de/media/exercise-images/41/Incline-bench-press-2.png",
+        "providerImageID": 130,
+        "providerImageUUID": "dc2cf50c-6452-4a8f-91e2-6114fcc425ff",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/41/Incline-bench-press-2.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/538/",
+    "version": "2026-10-24T15:57:58.301572+02:00",
+    "providerID": "538",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/41/",
+      "authors": [
+        "wger.de"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "27a2932f-e464-53b9-8790-537a3aeb1a26",
+    "name": "Incline dumbbell bench press",
+    "primary": [
+      "Chest"
+    ],
+    "secondary": [
+      "Shoulders",
+      "Triceps"
+    ],
+    "equipment": [
+      "Dumbbell",
+      "Incline bench"
+    ],
+    "movement": "Incline press",
+    "convention": "Weight per dumbbell",
+    "instructions": [
+      "Sit against an inclined bench with a dumbbell at each shoulder and your feet planted.",
+      "Press both weights upward, then lower them beside your upper chest."
+    ],
+    "media": [
+      {
+        "file": "wger-537-105.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/105/",
+        "original": "https://wger.de/media/exercise-images/16/Incline-press-1.png",
+        "providerImageID": 105,
+        "providerImageUUID": "285943a6-e0ce-47cc-b244-ba698377af93",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/16/Incline-press-1.png.400x400_q85.png",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-537-106.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/106/",
+        "original": "https://wger.de/media/exercise-images/16/Incline-press-2.png",
+        "providerImageID": 106,
+        "providerImageUUID": "cb9267bb-f561-49a2-94ad-fa4adebf1e27",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/16/Incline-press-2.png.400x400_q85.png",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/537/",
+    "version": "2026-10-14T17:27:08.875348+02:00",
+    "providerID": "537",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/210/",
+      "authors": [
+        "tuckerm",
+        "wger.de"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "19bcd2e8-ab4b-54f2-97ef-0980d9d67f77",
+    "name": "Lying leg curl",
+    "primary": [
+      "Hamstrings"
+    ],
+    "secondary": [],
+    "equipment": [
+      "Lying leg curl machine"
+    ],
+    "movement": "Knee flexion",
+    "convention": "Machine setting",
+    "instructions": [
+      "Lie face down on the machine with the roller against the backs of your lower legs. Hold the handles.",
+      "Bend your knees to raise the roller, then lower it while keeping your hips on the pad."
+    ],
+    "media": [
+      {
+        "file": "wger-365-179.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/179/",
+        "original": "https://wger.de/media/exercise-images/154/lying-leg-curl-machine-large-1.png",
+        "providerImageID": 179,
+        "providerImageUUID": "fd35994a-70b4-4ca4-b236-12c178062996",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/154/lying-leg-curl-machine-large-1.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-365-180.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/180/",
+        "original": "https://wger.de/media/exercise-images/154/lying-leg-curl-machine-large-2.png",
+        "providerImageID": 180,
+        "providerImageUUID": "f8d23bc0-4b42-40fb-aa01-970fb573a212",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/154/lying-leg-curl-machine-large-2.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/365/",
+    "version": "2026-10-10T19:17:59.899020+02:00",
+    "providerID": "365",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/154/",
+      "authors": [
+        "wger.de"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "6e48f336-905c-5403-9547-db9f01b6165c",
+    "name": "Pec deck fly",
+    "primary": [
+      "Chest"
+    ],
+    "secondary": [
+      "Shoulders"
+    ],
+    "equipment": [
+      "Pec deck machine"
+    ],
+    "movement": "Horizontal fly",
+    "convention": "Machine setting",
+    "instructions": [
+      "Sit against the back pad with your feet planted and your forearms on the pads.",
+      "Bring the pads toward each other in front of your chest, then guide them apart."
+    ],
+    "media": [
+      {
+        "file": "wger-135-111.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/111/",
+        "original": "https://wger.de/media/exercise-images/98/Butterfly-machine-2.png",
+        "providerImageID": 111,
+        "providerImageUUID": "40212645-0278-4c1d-9f7a-a00ee4d12314",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/98/Butterfly-machine-2.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-135-112.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/112/",
+        "original": "https://wger.de/media/exercise-images/98/Butterfly-machine-1.png",
+        "providerImageID": 112,
+        "providerImageUUID": "3e255a5f-b058-4a09-b0b0-70044285528a",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/98/Butterfly-machine-1.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/135/",
+    "version": "2026-10-10T19:14:19.456311+02:00",
+    "providerID": "135",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/98/",
+      "authors": [
+        "wger.de"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "691fb9ff-8e40-5538-afbf-c1447fe85d3b",
+    "name": "Seated cable row",
+    "primary": [
+      "Lats"
+    ],
+    "secondary": [
+      "Biceps",
+      "Brachialis"
+    ],
+    "equipment": [
+      "Cable machine"
+    ],
+    "movement": "Horizontal pull",
+    "convention": "Cable machine setting",
+    "instructions": [
+      "Sit facing the low cable with your feet braced. Take the handle in both hands.",
+      "Pull the handle toward your waist with your elbows near your sides. Guide it forward until your arms extend."
+    ],
+    "media": [
+      {
+        "file": "wger-394-143.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/143/",
+        "original": "https://wger.de/media/exercise-images/143/Cable-seated-rows-2.png",
+        "providerImageID": 143,
+        "providerImageUUID": "c0e334a0-25f4-4057-8dee-c6efeeabcf13",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/143/Cable-seated-rows-2.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-394-144.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/144/",
+        "original": "https://wger.de/media/exercise-images/143/Cable-seated-rows-1.png",
+        "providerImageID": 144,
+        "providerImageUUID": "9d5d511e-d0a1-45e7-b656-07b0b86541d4",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/143/Cable-seated-rows-1.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/394/",
+    "version": "2026-10-31T00:07:14.588854+01:00",
+    "providerID": "394",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/143/",
+      "authors": [
+        "wger.de"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "bd0ec34a-919b-5966-9e44-ccd6a3cfb754",
+    "name": "Seated dumbbell shoulder press",
+    "primary": [
+      "Shoulders"
+    ],
+    "secondary": [],
+    "equipment": [
+      "Dumbbell",
+      "Bench"
+    ],
+    "movement": "Overhead press",
+    "convention": "Weight per dumbbell",
+    "instructions": [
+      "Sit on a bench with the back support nearly upright. Hold the dumbbells at shoulder height.",
+      "Press them overhead, then guide them back to shoulder height."
+    ],
+    "media": [
+      {
+        "file": "wger-567-173.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/173/",
+        "original": "https://wger.de/media/exercise-images/123/dumbbell-shoulder-press-large-1.png",
+        "providerImageID": 173,
+        "providerImageUUID": "0aecd2f4-3016-4813-b3c0-6a708ae7069a",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/123/dumbbell-shoulder-press-large-1.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-567-174.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/174/",
+        "original": "https://wger.de/media/exercise-images/123/dumbbell-shoulder-press-large-2.png",
+        "providerImageID": 174,
+        "providerImageUUID": "1983b6be-1784-4ad3-a05c-7e4b34d9878f",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/123/dumbbell-shoulder-press-large-2.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/567/",
+    "version": "2026-10-10T16:54:05.623451+02:00",
+    "providerID": "567",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/123/",
+      "authors": [
+        "wger.de"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "7d145431-bd0b-528d-ae0d-ebec050d96d4",
+    "name": "Seated leg curl",
+    "primary": [
+      "Hamstrings"
+    ],
+    "secondary": [],
+    "equipment": [
+      "Seated leg curl machine"
+    ],
+    "movement": "Knee flexion",
+    "convention": "Machine setting",
+    "instructions": [
+      "Sit against the back pad with the roller behind your lower legs. Adjust the thigh restraint and hold the handles.",
+      "Bend your knees to draw the roller downward. Return it slowly."
+    ],
+    "media": [
+      {
+        "file": "wger-366-181.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/181/",
+        "original": "https://wger.de/media/exercise-images/117/seated-leg-curl-large-1.png",
+        "providerImageID": 181,
+        "providerImageUUID": "1fbfbec9-2431-45db-8ca7-a8e477add80f",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/117/seated-leg-curl-large-1.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-366-182.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/182/",
+        "original": "https://wger.de/media/exercise-images/117/seated-leg-curl-large-2.png",
+        "providerImageID": 182,
+        "providerImageUUID": "d7c5c697-8a93-4d69-8c9d-a919cb4e1f77",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/117/seated-leg-curl-large-2.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/366/",
+    "version": "2026-10-10T17:38:04.735862+02:00",
+    "providerID": "366",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/2637/",
+      "authors": [
+        "admin"
+      ],
+      "license": "CC-BY-SA 4",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "02391032-5fe5-56eb-b5a5-b78cd343f6c6",
+    "name": "Underhand barbell row",
+    "primary": [
+      "Lats"
+    ],
+    "secondary": [
+      "Shoulders",
+      "Biceps"
+    ],
+    "equipment": [
+      "Barbell"
+    ],
+    "movement": "Horizontal pull",
+    "convention": "Barbell, total weight including bar",
+    "instructions": [
+      "Take an underhand grip on the bar. Hinge forward with your knees slightly bent.",
+      "Draw your elbows back and pull the bar toward your waist. Lower it with control."
+    ],
+    "media": [
+      {
+        "file": "wger-84-91.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/91/",
+        "original": "https://wger.de/media/exercise-images/110/Reverse-grip-bent-over-rows-1.png",
+        "providerImageID": 91,
+        "providerImageUUID": "c74c43a5-da29-443d-895c-2900b5591cd2",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/110/Reverse-grip-bent-over-rows-1.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-84-92.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/92/",
+        "original": "https://wger.de/media/exercise-images/110/Reverse-grip-bent-over-rows-2.png",
+        "providerImageID": 92,
+        "providerImageUUID": "3c774680-b68c-4b1c-a150-4858783661c7",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/110/Reverse-grip-bent-over-rows-2.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/84/",
+    "version": "2026-10-24T15:57:27.339276+02:00",
+    "providerID": "84",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/110/",
+      "authors": [
+        "wger.de"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "70919e33-b881-535e-8bcb-51492e61c92d",
+    "name": "Walking dumbbell lunge",
+    "primary": [
+      "Quads"
+    ],
+    "secondary": [
+      "Glutes"
+    ],
+    "equipment": [
+      "Dumbbell"
+    ],
+    "movement": "Lunge",
+    "convention": "Per side, weight per dumbbell",
+    "instructions": [
+      "Stand with a dumbbell in each hand. Step forward and bend both knees.",
+      "Rise through the front leg, then step forward into the next lunge on the other side."
+    ],
+    "media": [
+      {
+        "file": "wger-206-121.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/121/",
+        "original": "https://wger.de/media/exercise-images/113/Walking-lunges-1.png",
+        "providerImageID": 121,
+        "providerImageUUID": "b0e8b77a-97c2-470f-9fc0-928ffb2aae89",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/113/Walking-lunges-1.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-206-122.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/122/",
+        "original": "https://wger.de/media/exercise-images/113/Walking-lunges-2.png",
+        "providerImageID": 122,
+        "providerImageUUID": "52c4434e-b5a2-4fce-af61-d997b510438a",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/113/Walking-lunges-2.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-206-123.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/123/",
+        "original": "https://wger.de/media/exercise-images/113/Walking-lunges-3.png",
+        "providerImageID": 123,
+        "providerImageUUID": "3d311933-e073-409b-92d3-41f3d75e8c94",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/113/Walking-lunges-3.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      },
+      {
+        "file": "wger-206-124.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 3.0 · https://creativecommons.org/licenses/by-sa/3.0/",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+        "source": "https://wger.de/api/v2/exerciseimage/124/",
+        "original": "https://wger.de/media/exercise-images/113/Walking-lunges-4.png",
+        "providerImageID": 124,
+        "providerImageUUID": "c0dff0d5-618d-4739-94f9-7d3cd76bc8a1",
+        "sourceThumbnail": "https://wger.de/media/exercise-images/113/Walking-lunges-4.png.400x400_q85.jpg",
+        "modifications": "White background and JPEG encoding."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/206/",
+    "version": "2026-10-24T15:57:40.638675+02:00",
+    "providerID": "206",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/113/",
+      "authors": [
+        "wger.de"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  }
+]

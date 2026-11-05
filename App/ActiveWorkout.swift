@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ActiveWorkout: View {
     let store: TrainingStore
+    var planner: PlanningStore? = nil
+    var route: WorkoutLiveRoute? = nil
     let onClose: () -> Void
     var applyToRoutine: ((PlanExercise, PlanExercise) throws -> Void)? = nil
     var routineExercises: [PlanExercise] = []
@@ -25,6 +27,7 @@ struct ActiveWorkout: View {
     var body: some View {
         Group {
             if let session {
+                ScrollViewReader { scroll in
                 List {
                     if session.isCardio {
                         CardioLog(session: session, store: store)
@@ -44,7 +47,7 @@ struct ActiveWorkout: View {
                             }
                             Section {
                                 ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { index, row in
-                                    WorkoutSetRow(sessionID: session.id, exercise: exercise, row: row, index: index, store: store)
+                                    WorkoutSetRow(sessionID: session.id, exercise: exercise, row: row, index: index, store: store).id(row.id)
                                 }
                             } header: {
                                 HStack {
@@ -108,6 +111,11 @@ struct ActiveWorkout: View {
                 .scrollContentBackground(.hidden)
                 .background(PlannerStyle.paper)
                 .scrollDismissesKeyboard(.interactively)
+                .task(id: route?.url) {
+                    if route?.review == true { panel = .summary }
+                    else if let setID = route?.setID { scroll.scrollTo(setID, anchor: .center) }
+                }
+                }
                 .navigationTitle(session.isCardio ? "Cardio" : "Workout")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -136,7 +144,7 @@ struct ActiveWorkout: View {
                             }
                         case .add, .swap:
                             let swapping = panel == .swap
-                            WorkoutExercisePicker(known: availableExercises,
+                            WorkoutExercisePicker(planner: planner, known: availableExercises,
                                                   replacing: swapping ? exercise : nil) { prescription, basis in
                                 if swapping, let exercise {
                                     try store.substitute(sessionID: session.id, exerciseID: exercise.id, prescription: prescription, basis: basis)
@@ -694,6 +702,8 @@ extension PlanExercise {
 }
 
 private struct WorkoutExercisePicker: View {
+    let planner: PlanningStore?
+    @State private var browsing = false
     let known: [PlanExercise]
     let replacing: TrainingExercise?
     let save: (PlanExercise, LoadBasis) throws -> Void
@@ -707,6 +717,20 @@ private struct WorkoutExercisePicker: View {
 
     var body: some View {
         Form {
+            if let planner {
+                Button("Browse exercises") { browsing = true }.accessibilityIdentifier("browseCatalog")
+                    .fullScreenCover(isPresented: $browsing) {
+                        NavigationStack {
+                        CatalogPicker(planner: planner, replacing: replacing?.prescription) { choice in
+                            selected = choice
+                            basis = LoadBasis(choice)
+                            pickedExisting = true
+                            browsing = false
+                        }
+                        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close library") { browsing = false } } }
+                        }
+                    }
+            }
             if !known.isEmpty {
                 Section {
                     Menu("Choose a saved exercise") {

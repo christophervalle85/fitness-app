@@ -23,6 +23,7 @@ targets:
       - Shared
     settings:
       base:
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) WEEKFORM_APP"
         TARGETED_DEVICE_FAMILY: '1'
         PRODUCT_BUNDLE_IDENTIFIER: com.christophervalle.weekform
         CODE_SIGN_ENTITLEMENTS: Config/Weekform.entitlements

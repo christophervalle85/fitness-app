@@ -18,6 +18,16 @@ For repeating cardio, set a duration goal on the weekday in the routine editor. 
 
 Extra workouts count toward a plan only when you assign them. Open the saved entry under **Sessions performed**, choose **Assign to planned work**, and select the date and a matching uncredited set or cardio goal. One confirmed set can fulfill one planned set.
 
+## Exercise catalog
+
+**Exercises** includes 17 offline entries with setup cues and 36 illustrated frames. Search by exercise, movement or equipment. Open an exercise to see the demonstration, recording method and related movements. For example, the flat barbell and dumbbell bench presses share a movement and target muscle, but use different load conventions. You can keep a text-only custom exercise when the catalog lacks the variant you train.
+
+The included illustrations are by Everkinetic. Each wger image record identifies Everkinetic as the author, specifies CC BY-SA 3.0 and marks the image as non-AI. The bundled copies use white backgrounds and JPEG encoding and retain that license. [Illustrator’s source collection](https://github.com/everkinetic/data) · [Illustration license](https://creativecommons.org/licenses/by-sa/3.0/)
+
+The catalog retains the source record, version, author credits, license links and modifications for each exercise or image. The rewritten instructions retain the license of the referenced translation. These records credit the contributing wger authors alongside each source. [Catalog and attribution records](App/CatalogResources/catalog.json)
+
+For this development snapshot, each frame was checked visually against its named movement and the provider’s credit record. Public content acceptance still requires checking every required routine variant and useful alternative against a coverage list, securing any missing demonstrations, and signing off on form, instructions and redistribution terms. Several machine variants and timed holds still need coverage.
+
 ## Progress and recovery
 
 Open **Progress** to see how many scheduled workouts you fulfilled this week. Activity totals count finished sessions and cardio separately. In **Workout history**, select a session to correct its date, adjust a cardio result, or correct or undo a confirmed set. Records and schedule credit reflect the saved corrections.
@@ -36,6 +46,8 @@ The following workout changes are deferred.
 - Provide consistent, dedicated icon controls for adding an exercise, adjusting rest time and swapping the remaining sets.
 - Return to Today on finish and mark the calendar entry complete with an accessible animation that respects Reduce Motion.
 - When a partial workout resumes, keep every set visible, including completed sets. Highlight the current row and show the completed count as it advances, for example from 0/3 to 2/3.
+- Refine how Progress presents workout history and records.
+- Remove the duplicate exercise display on Today after resuming a partial workout. Keep genuinely separate sessions visible when they contribute to the same planned workout.
 
 ## Local development
 
@@ -43,11 +55,25 @@ For an optional private starter, put a local JSON file matching the `WeekPlan` m
 
 Open **Developer tools** from the Debug welcome screen, Today or Routines. **Replay onboarding** starts a new draft and keeps saved routines. **Reset planner test data** asks for confirmation before clearing the routines and draft for this installation. Use reset only with disposable test data. Release builds open the same weekly planner and omit the developer tools.
 
-## Try the development Lock Screen test
+## Use the workout Live Activity
 
-The current Live Activity exercises a single synthetic set. Use the in-app workout screen to log regular training sessions.
+Starting a workout in Today requests a Live Activity. The Lock Screen and expanded Dynamic Island can show actions for the current set when iOS allows them. The in-app workout remains available if the activity is dismissed or the device cannot show it.
+
+Under **Progress → Lock Screen privacy**, **Show exercise name** and **Show set values** both default to off. Turn on both to confirm a set from the activity when its full actual values are visible and valid. If they are missing, hidden or too long to display, open the app to check and edit them.
+
+**Confirm & rest** saves the displayed set and starts the configured rest interval. With **No timer**, **Confirm set** just saves the result. Elapsed rest can pass its target without logging a set. **Start set** ends that interval, and **Resume** continues paused rest. **Log final set** finishes the current exercise’s last set. **Next exercise** selects the next unfinished exercise. **Review workout** opens the summary, where finishing the session ends the activity. Repeated or outdated controls cannot credit the next set.
+
+### Check on a signed iPhone
 
 Use a dedicated test iPhone with Live Activities enabled. The project has no signing team selected. Before installing on the phone, configure authorized signing for both `Weekform` and `WeekformActivity`. Their provisioning profiles must allow the same App Group, `group.com.christophervalle.weekform`.
+
+1. Using disposable data, start a workout with two exercises and at least two sets each. Set a short rest for the first exercise and **No timer** for the second. Leave both privacy switches off, enter the first set’s actual values in the app, then lock the phone. Check that the activity hides the exercise and values and directs you to Weekform for confirmation.
+2. Enable both privacy switches, return to the workout, and lock the phone. When iOS shows the full result, tap **Confirm & rest**. Let rest run past its target and reopen the app. Check that exactly one set is saved. Repeat a stale tap if the old control is still visible and verify the count again.
+3. Enter the remaining actuals as needed. Try **Log final set**, then **Next exercise**. On the second exercise, check that **Confirm set** saves without starting rest. Use **Review workout** to finish in the app and verify the activity ends. Record device, OS, lock state and any authentication or presentation limits. Dynamic Island checks require a compatible iPhone.
+
+### Separate development probe
+
+The **Foundation workout** development test exercises a single synthetic set independently of regular training sessions.
 
 1. In Debug, open **Developer tools → Foundation workout**. This separate one-set test uses eight synthetic reps. Check that **Status** reads **Ready**, tap **Start Live Activity**, then lock the phone.
 2. On the Lock Screen, tap **Confirm 8 test reps**. Look for **Test set saved**. Unlock the phone and check that the app shows **Saved**. If Live Activities are disabled, you can exercise the in-app path with **Confirm 8 reps**.

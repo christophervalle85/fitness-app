@@ -9,6 +9,9 @@ enum PlannerStyle {
 struct PlannerRoot: View {
     @State private var store = PlanningStore()
     @State private var training = TrainingStore()
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var pendingURL: URL?
+    @State private var workoutRoute: WorkoutLiveRoute?
     @State private var workoutOpen = false
     @State private var editing = WeekPlan()
     @State private var loaded = false
@@ -57,6 +60,9 @@ struct PlannerRoot: View {
                                            archive: { id in perform { try store.archive(id) } })
                                 .toolbar { developerButton }
                         }
+                    }
+                    Tab("Exercises", systemImage: "dumbbell", value: "Exercises") {
+                        NavigationStack { ExercisesScreen(planner: store, training: training) }
                     }
                     Tab("Progress", systemImage: "chart.xyaxis.line", value: "Progress") {
                         NavigationStack {
@@ -126,14 +132,24 @@ struct PlannerRoot: View {
             }
         }
         .id(restoreGeneration)
-        .sheet(isPresented: $workoutOpen) {
+        .sheet(isPresented: $workoutOpen, onDismiss: { workoutRoute = nil }) {
             NavigationStack {
-                ActiveWorkout(store: training, onClose: { workoutOpen = false }, applyToRoutine: futureReplacement,
+                ActiveWorkout(store: training, planner: store, route: workoutRoute, onClose: { workoutOpen = false }, applyToRoutine: futureReplacement,
                               routineExercises: store.plans.first { $0.id == store.activeID }?.days.flatMap(\.exercises) ?? [])
             }
         }
         .tint(PlannerStyle.blue)
         .task { if !loaded { load() } }
+        .task(id: "\(loaded)-\(restoreGeneration)-\(training.liveRevision)") {
+            if loaded { await WorkoutLiveCoordinator.sync(training: training, owner: store.profileID) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .workoutLiveDidCommit)) { _ in refreshTraining() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active, refreshTraining() {
+                Task { await WorkoutLiveCoordinator.sync(training: training, owner: store.profileID) }
+            }
+        }
+        .onOpenURL { url in pendingURL = url; openPendingRoute() }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let errorMessage {
                 VStack(alignment: .leading, spacing: 8) {
@@ -205,6 +221,31 @@ struct PlannerRoot: View {
         })
     }
 
+    @discardableResult private func refreshTraining() -> Bool {
+        guard loaded, let owner = store.profileID else { return false }
+        do {
+            try training.load(profileID: owner)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    private func openPendingRoute() {
+        guard loaded, let url = pendingURL else { return }
+        pendingURL = nil
+        guard let route = WorkoutLiveRoute.parse(url),
+              WorkoutLiveCoordinator.isCurrent(route, training: training, owner: store.profileID) else { return }
+        perform {
+            if let exerciseID = route.exerciseID, training.active?.currentExerciseID != exerciseID {
+                try training.select(sessionID: route.sessionID, exerciseID: exerciseID)
+            }
+            workoutRoute = route
+            workoutOpen = true
+        }
+    }
+
     private func load() {
         loaded = false
         loadFailed = false
@@ -220,6 +261,7 @@ struct PlannerRoot: View {
             }
             if let draft = store.draft { editing = draft }
             loaded = true
+            openPendingRoute()
         }
     }
 
