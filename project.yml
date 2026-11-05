@@ -1,0 +1,87 @@
+name: Weekform
+options:
+  minimumXcodeGenVersion: 2.46.0
+  deploymentTarget:
+    iOS: '26.2'
+configs:
+  Debug: debug
+  Release: release
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: '0.1'
+  configs:
+    Debug:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) DEBUG WEEKFORM_DEVELOPMENT"
+targets:
+  Weekform:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Shared
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: '1'
+        PRODUCT_BUNDLE_IDENTIFIER: com.christophervalle.weekform
+        CODE_SIGN_ENTITLEMENTS: Config/Weekform.entitlements
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: Config/App-Info.plist
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+    dependencies:
+      - target: WeekformActivity
+  WeekformActivity:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Activity
+      - Shared
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: '1'
+        PRODUCT_BUNDLE_IDENTIFIER: com.christophervalle.weekform.activity
+        INFOPLIST_FILE: Config/Activity-Info.plist
+        CODE_SIGN_ENTITLEMENTS: Config/Weekform.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+  WeekformTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: '1'
+        PRODUCT_BUNDLE_IDENTIFIER: com.christophervalle.weekform.tests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: Weekform
+  WeekformUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: '1'
+        PRODUCT_BUNDLE_IDENTIFIER: com.christophervalle.weekform.uitests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: Weekform
+schemes:
+  Weekform:
+    build:
+      targets:
+        Weekform: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - WeekformTests
+        - WeekformUITests
+    archive:
+      config: Release

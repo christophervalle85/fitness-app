@@ -1,0 +1,626 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0520FFE4187B866250546644 /* FoundationActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31153E788178A9CC815E9D89 /* FoundationActivity.swift */; };
+		37F16327F588F85BF310E9F1 /* FoundationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFBFB63B51D46EE000B57F94 /* FoundationStore.swift */; };
+		68C134C565EBCA7413C22319 /* WeekformUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7FEB2C1FD1E1195F5196E8 /* WeekformUITests.swift */; };
+		6C911B95A5E41C645D17CB63 /* WeekformWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F53EA0B02855D3559C340A5 /* WeekformWidget.swift */; };
+		B9DE527C4D6E39688A4BC058 /* FoundationStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51A93CE5C876BFB699CC0100 /* FoundationStoreTests.swift */; };
+		BDEE165550CEC1D0DC4CAA36 /* WeekformActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CF396634B4DF54A26F4762F6 /* WeekformActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E7F2C0E13DF1D90EC5008F1B /* FoundationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFBFB63B51D46EE000B57F94 /* FoundationStore.swift */; };
+		F0F294430B70E45397ED0088 /* WeekformApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FC9E98EFAFA0C8CFF35AC6C /* WeekformApp.swift */; };
+		FE5BBA576CE6AD1A41DAC67D /* FoundationActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31153E788178A9CC815E9D89 /* FoundationActivity.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		5BBFEB9AC06B2689DBE7A1DF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 71336ED655E3B3FF1D1CF296 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BC4293A2F9E1FEBB132A6FE7;
+			remoteInfo = Weekform;
+		};
+		79F061EC0F284E1BB74EB5A3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 71336ED655E3B3FF1D1CF296 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D1606F4A4F055DC6D328B9B9;
+			remoteInfo = WeekformActivity;
+		};
+		A763142FC8F4510B8EBF11B0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 71336ED655E3B3FF1D1CF296 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BC4293A2F9E1FEBB132A6FE7;
+			remoteInfo = Weekform;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		7B2F9F0B11BCE9017EE5F6B0 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				BDEE165550CEC1D0DC4CAA36 /* WeekformActivity.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		2E9604BCAD23CCFC917D3CA7 /* WeekformTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WeekformTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		31153E788178A9CC815E9D89 /* FoundationActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoundationActivity.swift; sourceTree = "<group>"; };
+		37E736224B0DBDA4B2A67846 /* Weekform.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Weekform.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		51A93CE5C876BFB699CC0100 /* FoundationStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoundationStoreTests.swift; sourceTree = "<group>"; };
+		5FC9E98EFAFA0C8CFF35AC6C /* WeekformApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekformApp.swift; sourceTree = "<group>"; };
+		7F53EA0B02855D3559C340A5 /* WeekformWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekformWidget.swift; sourceTree = "<group>"; };
+		C0E6DB7F62DD777EC78BF7CF /* WeekformUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WeekformUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CF396634B4DF54A26F4762F6 /* WeekformActivity.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = WeekformActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		EC7FEB2C1FD1E1195F5196E8 /* WeekformUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekformUITests.swift; sourceTree = "<group>"; };
+		EFBFB63B51D46EE000B57F94 /* FoundationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoundationStore.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0D93A771C094527A283C591B /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				EC7FEB2C1FD1E1195F5196E8 /* WeekformUITests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+		211D0A3450C3CCD5EBAC78F2 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				51A93CE5C876BFB699CC0100 /* FoundationStoreTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		6AB2F6588F84427B48211410 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				31153E788178A9CC815E9D89 /* FoundationActivity.swift */,
+				EFBFB63B51D46EE000B57F94 /* FoundationStore.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		94C69401C3C46C26871F5E04 /* Activity */ = {
+			isa = PBXGroup;
+			children = (
+				7F53EA0B02855D3559C340A5 /* WeekformWidget.swift */,
+			);
+			path = Activity;
+			sourceTree = "<group>";
+		};
+		9E42DA78B3D4510BF31E643D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				37E736224B0DBDA4B2A67846 /* Weekform.app */,
+				CF396634B4DF54A26F4762F6 /* WeekformActivity.appex */,
+				2E9604BCAD23CCFC917D3CA7 /* WeekformTests.xctest */,
+				C0E6DB7F62DD777EC78BF7CF /* WeekformUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		BFAA50E10385DEC64952F223 = {
+			isa = PBXGroup;
+			children = (
+				94C69401C3C46C26871F5E04 /* Activity */,
+				EB129E76DE8C4D86F0A7D59F /* App */,
+				6AB2F6588F84427B48211410 /* Shared */,
+				211D0A3450C3CCD5EBAC78F2 /* Tests */,
+				0D93A771C094527A283C591B /* UITests */,
+				9E42DA78B3D4510BF31E643D /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		EB129E76DE8C4D86F0A7D59F /* App */ = {
+			isa = PBXGroup;
+			children = (
+				5FC9E98EFAFA0C8CFF35AC6C /* WeekformApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		409D9C4FAB88C0D0897130C3 /* WeekformTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 30F444464F0C3E061625F7E3 /* Build configuration list for PBXNativeTarget "WeekformTests" */;
+			buildPhases = (
+				071F5E995BBAE2B90BC06102 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C22641CCA231BADDD5D64581 /* PBXTargetDependency */,
+			);
+			name = WeekformTests;
+			packageProductDependencies = (
+			);
+			productName = WeekformTests;
+			productReference = 2E9604BCAD23CCFC917D3CA7 /* WeekformTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		BC4293A2F9E1FEBB132A6FE7 /* Weekform */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 25926C970DFB4FEA769BDE92 /* Build configuration list for PBXNativeTarget "Weekform" */;
+			buildPhases = (
+				854843C7FB4AB2ADB67BCEA0 /* Sources */,
+				7B2F9F0B11BCE9017EE5F6B0 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3946B712BD255D07DA8BA010 /* PBXTargetDependency */,
+			);
+			name = Weekform;
+			packageProductDependencies = (
+			);
+			productName = Weekform;
+			productReference = 37E736224B0DBDA4B2A67846 /* Weekform.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D06DFDEDF149D7F2B1DC92D2 /* WeekformUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2EF76ECFAF9F02D25794D360 /* Build configuration list for PBXNativeTarget "WeekformUITests" */;
+			buildPhases = (
+				70E724A9CED2A53F92E4C0F2 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				01EE9873D0EA9017BA93E023 /* PBXTargetDependency */,
+			);
+			name = WeekformUITests;
+			packageProductDependencies = (
+			);
+			productName = WeekformUITests;
+			productReference = C0E6DB7F62DD777EC78BF7CF /* WeekformUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		D1606F4A4F055DC6D328B9B9 /* WeekformActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5C9FD74BFC3366D102B5F023 /* Build configuration list for PBXNativeTarget "WeekformActivity" */;
+			buildPhases = (
+				896015FD4CE881F5444E5354 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WeekformActivity;
+			packageProductDependencies = (
+			);
+			productName = WeekformActivity;
+			productReference = CF396634B4DF54A26F4762F6 /* WeekformActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		71336ED655E3B3FF1D1CF296 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					D06DFDEDF149D7F2B1DC92D2 = {
+						TestTargetID = BC4293A2F9E1FEBB132A6FE7;
+					};
+				};
+			};
+			buildConfigurationList = D99EADA370B5F2EE5DC2E0AC /* Build configuration list for PBXProject "Weekform" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = BFAA50E10385DEC64952F223;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 9E42DA78B3D4510BF31E643D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				BC4293A2F9E1FEBB132A6FE7 /* Weekform */,
+				D1606F4A4F055DC6D328B9B9 /* WeekformActivity */,
+				409D9C4FAB88C0D0897130C3 /* WeekformTests */,
+				D06DFDEDF149D7F2B1DC92D2 /* WeekformUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		071F5E995BBAE2B90BC06102 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B9DE527C4D6E39688A4BC058 /* FoundationStoreTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		70E724A9CED2A53F92E4C0F2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				68C134C565EBCA7413C22319 /* WeekformUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		854843C7FB4AB2ADB67BCEA0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0520FFE4187B866250546644 /* FoundationActivity.swift in Sources */,
+				37F16327F588F85BF310E9F1 /* FoundationStore.swift in Sources */,
+				F0F294430B70E45397ED0088 /* WeekformApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		896015FD4CE881F5444E5354 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FE5BBA576CE6AD1A41DAC67D /* FoundationActivity.swift in Sources */,
+				E7F2C0E13DF1D90EC5008F1B /* FoundationStore.swift in Sources */,
+				6C911B95A5E41C645D17CB63 /* WeekformWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		01EE9873D0EA9017BA93E023 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BC4293A2F9E1FEBB132A6FE7 /* Weekform */;
+			targetProxy = A763142FC8F4510B8EBF11B0 /* PBXContainerItemProxy */;
+		};
+		3946B712BD255D07DA8BA010 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D1606F4A4F055DC6D328B9B9 /* WeekformActivity */;
+			targetProxy = 79F061EC0F284E1BB74EB5A3 /* PBXContainerItemProxy */;
+		};
+		C22641CCA231BADDD5D64581 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BC4293A2F9E1FEBB132A6FE7 /* Weekform */;
+			targetProxy = 5BBFEB9AC06B2689DBE7A1DF /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		002084D242F3EED43E837266 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Config/Weekform.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/App-Info.plist";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.christophervalle.weekform;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		1512335D8873C4D0886E0F01 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 0.1;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		34ABE64857A2C4C4D2133B49 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.christophervalle.weekform.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = Weekform;
+			};
+			name = Debug;
+		};
+		3CBA7B5E94AB06077B106CBB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.christophervalle.weekform.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Weekform.app/Weekform";
+			};
+			name = Release;
+		};
+		517683F21BE0805AEC79A335 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.christophervalle.weekform.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = Weekform;
+			};
+			name = Release;
+		};
+		7B2EA7FD0BCFACA650D978A2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.christophervalle.weekform.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Weekform.app/Weekform";
+			};
+			name = Debug;
+		};
+		C056C7B86D81CA568E9CEDC0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/Weekform.entitlements;
+				INFOPLIST_FILE = "Config/Activity-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.christophervalle.weekform.activity;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		DCF30013140400661CE25369 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/Weekform.entitlements;
+				INFOPLIST_FILE = "Config/Activity-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.christophervalle.weekform.activity;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		E19DB27FADF3085003C50363 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Config/Weekform.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/App-Info.plist";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.christophervalle.weekform;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		F2F928602A4F3DF57492E0FC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 0.1;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG WEEKFORM_DEVELOPMENT";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		25926C970DFB4FEA769BDE92 /* Build configuration list for PBXNativeTarget "Weekform" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				002084D242F3EED43E837266 /* Debug */,
+				E19DB27FADF3085003C50363 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		2EF76ECFAF9F02D25794D360 /* Build configuration list for PBXNativeTarget "WeekformUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				34ABE64857A2C4C4D2133B49 /* Debug */,
+				517683F21BE0805AEC79A335 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		30F444464F0C3E061625F7E3 /* Build configuration list for PBXNativeTarget "WeekformTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7B2EA7FD0BCFACA650D978A2 /* Debug */,
+				3CBA7B5E94AB06077B106CBB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5C9FD74BFC3366D102B5F023 /* Build configuration list for PBXNativeTarget "WeekformActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C056C7B86D81CA568E9CEDC0 /* Debug */,
+				DCF30013140400661CE25369 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D99EADA370B5F2EE5DC2E0AC /* Build configuration list for PBXProject "Weekform" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F2F928602A4F3DF57492E0FC /* Debug */,
+				1512335D8873C4D0886E0F01 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 71336ED655E3B3FF1D1CF296 /* Project object */;
+}
