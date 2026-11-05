@@ -21,9 +21,10 @@ private struct WeekMark: View {
     }
 }
 
-struct WelcomeScreen: View {
+struct WelcomeScreen<Recovery: View>: View {
     let manual: () -> Void
     let starters: () -> Void
+    @ViewBuilder var recovery: () -> Recovery
 
     var body: some View {
         ScrollView {
@@ -45,6 +46,9 @@ struct WelcomeScreen: View {
                         Label("Choose a starter", systemImage: "rectangle.stack").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered).controlSize(.large).accessibilityIdentifier("chooseStarter")
+                    NavigationLink("Restore a backup", destination: recovery)
+                        .padding(.vertical, 6)
+                        .accessibilityIdentifier("welcomeRecovery")
                 }
             }
             .padding(.horizontal, 26).padding(.vertical, 22)

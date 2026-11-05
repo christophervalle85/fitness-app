@@ -17,6 +17,7 @@ struct PlannerRoot: View {
     @State private var retry: (() -> Void)?
     @State private var discardAlert = false
     @State private var tab = "Today"
+    @State private var restoreGeneration = UUID()
     #if WEEKFORM_DEVELOPMENT
     @State private var developer = false
     @State private var resetAlert = false
@@ -57,6 +58,14 @@ struct PlannerRoot: View {
                                 .toolbar { developerButton }
                         }
                     }
+                    Tab("Progress", systemImage: "chart.xyaxis.line", value: "Progress") {
+                        NavigationStack {
+                            ProgressScreen(store: training, activePlan: store.plans.first { $0.id == store.activeID },
+                                           unit: store.weightUnit, setUnit: { try store.setWeightUnit($0) }) {
+                                recoveryScreen
+                            }
+                        }
+                    }
                 }
                 .tabViewBottomAccessory(isEnabled: training.active != nil) {
                     if let session = training.active {
@@ -73,6 +82,7 @@ struct PlannerRoot: View {
                 }
             } else {
                 NavigationStack {
+                    Group {
                     switch store.step {
                     case "edit":
                         RoutineEditor(plan: Binding(get: { editing }, set: { value in
@@ -93,7 +103,7 @@ struct PlannerRoot: View {
                         StarterPicker(select: { begin($0, "edit") }, back: { changeStep("welcome") })
                     default:
                         WelcomeScreen(manual: { begin(WeekPlan(), "edit") },
-                                      starters: { begin(WeekPlan(), "starters") })
+                                      starters: { begin(WeekPlan(), "starters") }, recovery: { recoveryScreen })
                             .toolbar {
                                 if !store.plans.isEmpty {
                                     ToolbarItem(placement: .cancellationAction) {
@@ -103,9 +113,19 @@ struct PlannerRoot: View {
                                 developerButton
                             }
                     }
+                    }
+                    .toolbar {
+                        if ["edit", "review", "starters"].contains(store.step) {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                NavigationLink { recoveryScreen } label: { Label("Backup and restore", systemImage: "externaldrive") }
+                                    .accessibilityIdentifier("setupRecovery")
+                            }
+                        }
+                    }
                 }
             }
         }
+        .id(restoreGeneration)
         .sheet(isPresented: $workoutOpen) {
             NavigationStack {
                 ActiveWorkout(store: training, onClose: { workoutOpen = false }, applyToRoutine: futureReplacement,
@@ -174,10 +194,27 @@ struct PlannerRoot: View {
         }
     }
 
+    private var recoveryScreen: some View {
+        RecoveryScreen(planner: store, training: training, onRestore: {
+            tab = "Today"
+            workoutOpen = false
+            errorMessage = nil
+            retry = nil
+            restoreGeneration = UUID()
+            load()
+        })
+    }
+
     private func load() {
+        loaded = false
         loadFailed = false
         perform {
-            do { try store.load() } catch { loadFailed = true; throw error }
+            do {
+                let paths = try RecoveryPaths.current()
+                store = PlanningStore(directory: paths.planning)
+                training = TrainingStore(directory: paths.training)
+                try store.load()
+            } catch { loadFailed = true; throw error }
             if let owner = store.profileID {
                 do { try training.load(profileID: owner) } catch { loadFailed = true; throw error }
             }

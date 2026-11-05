@@ -190,7 +190,7 @@ final class TrainingStore {
                 throw TrainingError("This result or planned set already has a credit.")
             }
             session.exercises[i].sets[j].plannedID = plannedSetID
-            session.exercises[i].sets[j].revision += 1
+            session.exercises[i].sets[j].revision = try increment(session.exercises[i].sets[j].revision)
         }
         session.occurrenceID = occurrence.id
         try commit(session: session, occurrence: occurrence)
@@ -263,17 +263,22 @@ final class TrainingStore {
     }
 
     private func makeExercise(_ prescription: PlanExercise, basis: LoadBasis, slots: [UUID?], rest: Int?, ordinals: [Int]? = nil) -> TrainingExercise {
-        let match = sessions.flatMap(\.exercises).filter {
-            ($0.prescription.variantID ?? $0.prescription.id) == (prescription.variantID ?? prescription.id) &&
-            $0.basis == basis && $0.prescription.name == prescription.name && $0.prescription.convention == prescription.convention
-        }.flatMap(\.sets).filter { $0.confirmedAt != nil && $0.warmup != true && $0.actual.unit == prescription.loadUnit }
+        let target = TrainingExercise(prescription: prescription, basis: basis, sets: [], restSeconds: rest)
+        let identity = RecordIdentity(target)
+        let match = sessions.flatMap(\.exercises).filter { RecordIdentity($0) == identity }
+            .flatMap(\.sets).filter { $0.confirmedAt != nil && $0.warmup != true }
         let latest = match.max { ($0.confirmedAt ?? .distantPast) < ($1.confirmedAt ?? .distantPast) }
         let starting = SetActual(load: basis == .bodyweight ? nil : prescription.startingLoad, unit: prescription.loadUnit)
         let sets = slots.enumerated().map { index, slot in
             TrainingSet(plannedID: slot, ordinal: ordinals?[index] ?? index + 1,
-                        actual: latest?.actual ?? starting, previousAt: latest?.confirmedAt)
+                        actual: latest?.actual.converted(to: prescription.loadUnit) ?? starting, previousAt: latest?.confirmedAt)
         }
         return TrainingExercise(prescription: prescription, basis: basis, sets: sets, restSeconds: rest)
+    }
+
+    private func increment(_ value: Int) throws -> Int {
+        guard value >= 0, value < Int.max - 1 else { throw TrainingError("This saved workout counter is outside the supported range.") }
+        return value + 1
     }
 
     private func nonempty(_ name: String) throws -> String {
@@ -307,7 +312,54 @@ final class TrainingStore {
             guard actual != set.actual else { return }
             session.exercises[i].sets[j].actual = actual
             session.exercises[i].sets[j].previousAt = nil
-            session.exercises[i].sets[j].revision += 1
+            session.exercises[i].sets[j].revision = try increment(session.exercises[i].sets[j].revision)
+        }
+    }
+
+    func correct(sessionID: UUID, setID: UUID, actual: SetActual, performedAt: Date, revision: Int) throws {
+        try withSession(sessionID, allowFinished: true) { session in
+            let (i, j) = try location(setID, session)
+            let row = session.exercises[i].sets[j]
+            guard row.revision == revision, row.confirmedAt != nil else { throw TrainingError("Review the latest saved set.") }
+            guard performedAt >= session.startedAt, performedAt <= (session.finishedAt ?? now()) else {
+                throw TrainingError("Choose a time within this workout, or change the workout date first.")
+            }
+            try actual.validate(for: session.exercises[i].basis)
+            if row.actual == actual, row.confirmedAt == performedAt { return }
+            session.exercises[i].sets[j].actual = actual
+            session.exercises[i].sets[j].confirmedAt = performedAt
+            session.exercises[i].sets[j].previousAt = nil
+            session.exercises[i].sets[j].revision = try increment(session.exercises[i].sets[j].revision)
+        }
+    }
+
+    func redate(sessionID: UUID, startedAt: Date) throws {
+        try withSession(sessionID, allowFinished: true) { session in
+            guard let finish = session.finishedAt else { throw TrainingError("Finish the workout before changing its date.") }
+            let delta = startedAt.timeIntervalSince(session.startedAt)
+            let newFinish = finish.addingTimeInterval(delta)
+            guard startedAt.timeIntervalSinceReferenceDate.isFinite, newFinish <= now() else {
+                throw TrainingError("Choose a date that keeps the completed workout in the past.")
+            }
+            guard delta != 0 else { return }
+            session.startedAt = startedAt
+            session.performedDay = CivilTrainingDay(startedAt)
+            session.finishedAt = newFinish
+            for i in session.exercises.indices {
+                for j in session.exercises[i].sets.indices {
+                    if let old = session.exercises[i].sets[j].confirmedAt {
+                        session.exercises[i].sets[j].confirmedAt = old.addingTimeInterval(delta)
+                        session.exercises[i].sets[j].revision = try increment(session.exercises[i].sets[j].revision)
+                    }
+                }
+            }
+            session.restHistory = session.restHistory.map { item in
+                var interval = item.interval
+                interval.startedAt = interval.startedAt.addingTimeInterval(delta)
+                interval.pausedAt = interval.pausedAt?.addingTimeInterval(delta)
+                return RestMeasurement(id: item.id, interval: interval, endedAt: item.endedAt.addingTimeInterval(delta),
+                                       precise: item.precise)
+            }
         }
     }
 
@@ -330,7 +382,7 @@ final class TrainingStore {
             session.exercises[i].sets[j].actual = actual
             session.exercises[i].sets[j].confirmedAt = instant
             session.exercises[i].sets[j].previousAt = nil
-            session.exercises[i].sets[j].revision += 1
+            session.exercises[i].sets[j].revision = try increment(session.exercises[i].sets[j].revision)
             session.receipts[commandID] = receipt
             let measurement = session.rest.map { RestMeasurement(interval: $0, endedAt: instant, precise: false) }
             if let measurement { session.restHistory.append(measurement) }
@@ -350,7 +402,7 @@ final class TrainingStore {
             let set = session.exercises[i].sets[j]
             guard set.revision == revision, set.confirmedAt != nil else { throw TrainingError("Review the latest set before undoing it.") }
             session.exercises[i].sets[j].confirmedAt = nil
-            session.exercises[i].sets[j].revision += 1
+            session.exercises[i].sets[j].revision = try increment(session.exercises[i].sets[j].revision)
             if let undo = session.timerUndo, undo.setID == setID {
                 if let measurementID = undo.measurementID { session.restHistory.removeAll { $0.id == measurementID } }
                 session.rest = undo.previous
@@ -394,7 +446,7 @@ final class TrainingStore {
         try withSession(sessionID) { session in
             guard let i = session.exercises.firstIndex(where: { $0.id == exerciseID }) else { throw TrainingError("Choose an exercise.") }
             let exercise = session.exercises[i]
-            var set = TrainingSet(ordinal: (exercise.sets.compactMap(\.ordinal).max() ?? 0) + 1,
+            var set = TrainingSet(ordinal: try increment(exercise.sets.compactMap(\.ordinal).max() ?? 0),
                                   warmup: warmup, optional: true, actual: SetActual(unit: exercise.prescription.loadUnit))
             if !warmup {
                 let suggested = makeExercise(exercise.prescription, basis: exercise.basis, slots: [nil], rest: exercise.restSeconds)
@@ -450,7 +502,7 @@ final class TrainingStore {
             for j in session.exercises[i].sets.indices {
                 session.exercises[i].sets[j].actual = SetActual(unit: session.exercises[i].prescription.loadUnit)
                 session.exercises[i].sets[j].previousAt = nil
-                session.exercises[i].sets[j].revision += 1
+                session.exercises[i].sets[j].revision = try increment(session.exercises[i].sets[j].revision)
             }
         }
     }
@@ -489,7 +541,7 @@ final class TrainingStore {
             guard session.isCardio, revision == session.cardioRevision else { throw TrainingError("Review the latest activity.") }
             session.cardioDraft = result
             session.cardio = result
-            session.cardioVersion = revision + 1
+            session.cardioVersion = try increment(revision)
             var receipts = session.cardioReceipts ?? [:]
             receipts[commandID] = receipt
             session.cardioReceipts = receipts
@@ -579,7 +631,7 @@ final class TrainingStore {
             if let session { try write(session, kind: "session", context: context) }
             if let occurrence { try write(occurrence, kind: "occurrence", context: context) }
             if let deletingSession, let row = try fetch(deletingSession, context) { context.delete(row) }
-            head.revision += 1
+            head.revision = try increment(head.revision)
             try beforeSave()
             try context.save()
             revision = head.revision
@@ -628,5 +680,20 @@ final class TrainingStore {
             context.insert(head)
         }
         return try action(context, head)
+    }
+}
+
+extension TrainingStore {
+    func stage(_ backup: WorkoutBackup) throws {
+        let target = root.appending(path: backup.owner.uuidString)
+        try withDatabase(target) { context, head in
+            guard try context.fetchCount(FetchDescriptor<TrainingSchemaV1.Entry>()) == 0 else {
+                throw TrainingError("Choose an empty restore destination.")
+            }
+            for session in backup.sessions { try write(session, kind: "session", context: context) }
+            for occurrence in backup.occurrences { try write(occurrence, kind: "occurrence", context: context) }
+            head.revision = 1
+            try context.save()
+        }
     }
 }

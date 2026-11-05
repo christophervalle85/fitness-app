@@ -18,15 +18,30 @@ For repeating cardio, set a duration goal on the weekday in the routine editor. 
 
 Extra workouts count toward a plan only when you assign them. Open the saved entry under **Sessions performed**, choose **Assign to planned work**, and select the date and a matching uncredited set or cardio goal. One confirmed set can fulfill one planned set.
 
-## Setup follow-ups
+## Progress and recovery
 
-The editor shows inline guidance when a routine needs a correction before review. Planned improvements include a calendar-style review of the full week and catalog suggestions that resolve exercise variants with fewer selections.
+Open **Progress** to see how many scheduled workouts you fulfilled this week. Activity totals count finished sessions and cardio separately. In **Workout history**, select a session to correct its date, adjust a cardio result, or correct or undo a confirmed set. Records and schedule credit reflect the saved corrections.
+
+**Exercise records** shows comparable working sets over time, with rep-count bests where applicable. You can switch between pounds and kilograms for display. When every prescribed working set in an eligible exercise reaches the upper rep target at the same load in one session, Progress suggests choosing the next increment. You decide the new weight.
+
+Use **Progress → Backup and export** to save a CSV for inspection or a versioned Weekform JSON backup for recovery. Keep a copy of the JSON somewhere you can access if you lose the phone. Restoring a backup replaces the current local profile after confirmation. Weekform validates the backup, reopens the staged data to check it, and keeps a copy of the profile from before the replacement. Use **Review pre-restore copy** to inspect that copy before deciding whether to switch back.
+
+## Planned interface improvements
+
+The editor shows inline guidance when a routine needs a correction before review. Upcoming setup work includes a calendar-style review of the full week and catalog suggestions that resolve exercise variants with fewer selections.
+
+The following workout changes are deferred.
+
+- Give the active workout and its summary full-screen views with a smooth transition between them.
+- Provide consistent, dedicated icon controls for adding an exercise, adjusting rest time and swapping the remaining sets.
+- Return to Today on finish and mark the calendar entry complete with an accessible animation that respects Reduce Motion.
+- When a partial workout resumes, keep every set visible, including completed sets. Highlight the current row and show the completed count as it advances, for example from 0/3 to 2/3.
 
 ## Local development
 
 For an optional private starter, put a local JSON file matching the `WeekPlan` model in `DevelopmentPrivate/LocalStarter.json` and rebuild in Debug. Give it seven ordered days, starting with Monday. It appears under **Choose a starter**. Git ignores JSON files in that directory. The build copies the file into the Debug app when present and excludes it from Release. Keep Debug builds containing a private starter for personal testing.
 
-Open **Developer tools** from the Debug welcome screen or either tab. **Replay onboarding** starts a new draft and keeps saved routines. **Reset planner test data** asks for confirmation before clearing the routines and draft for this installation. Use reset only with disposable test data. Release builds open the same weekly planner and omit the developer tools.
+Open **Developer tools** from the Debug welcome screen, Today or Routines. **Replay onboarding** starts a new draft and keeps saved routines. **Reset planner test data** asks for confirmation before clearing the routines and draft for this installation. Use reset only with disposable test data. Release builds open the same weekly planner and omit the developer tools.
 
 ## Try the development Lock Screen test
 

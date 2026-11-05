@@ -12,6 +12,7 @@ enum PlanningSchemaV1: VersionedSchema {
         var activeID: UUID?
         var draft: Data?
         var step: String
+        var displayUnit: String?
 
         init() {
             id = UUID()
@@ -41,6 +42,7 @@ struct PlanningError: LocalizedError {
 
 @MainActor @Observable
 final class PlanningStore {
+    private var unitRevision = 0
     private(set) var plans: [WeekPlan] = []
     private(set) var activeID: UUID?
     private(set) var draft: WeekPlan?
@@ -257,5 +259,32 @@ final class PlanningStore {
         profileID = profile.id
         activeID = profile.activeID
         step = profile.step
+    }
+}
+
+extension PlanningStore {
+    var weightUnit: String { _ = unitRevision; return profile?.displayUnit ?? "lb" }
+
+    func setWeightUnit(_ raw: String) throws {
+        guard ["kg", "lb"].contains(raw) else { throw PlanningError("Choose kilograms or pounds.") }
+        try save { _, profile in profile.displayUnit = raw }
+        unitRevision += 1
+    }
+
+    func stage(_ backup: WorkoutBackup) throws {
+        try load()
+        guard routines.isEmpty else { throw PlanningError("Choose an empty restore destination.") }
+        try save { context, profile in
+            profile.id = backup.owner
+            profile.activeID = backup.activeID
+            profile.step = backup.step
+            profile.displayUnit = backup.unit
+            profile.draft = try backup.draft.map { try JSONEncoder().encode($0) }
+            for (index, plan) in backup.plans.enumerated() {
+                let row = try PlanningSchemaV1.Routine(id: plan.id, plan: JSONEncoder().encode(plan))
+                row.created = Date(timeIntervalSinceReferenceDate: Double(index))
+                context.insert(row)
+            }
+        }
     }
 }
