@@ -8,11 +8,19 @@
 
 /* Begin PBXBuildFile section */
 		0520FFE4187B866250546644 /* FoundationActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31153E788178A9CC815E9D89 /* FoundationActivity.swift */; };
+		18C8CFF98EE11A6529DD8D4F /* RoutineEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38F855F2CBE3685D62111215 /* RoutineEditor.swift */; };
 		37F16327F588F85BF310E9F1 /* FoundationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFBFB63B51D46EE000B57F94 /* FoundationStore.swift */; };
+		4909FD8911B5DE28D08906EF /* PlannerRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2099E7EB1AD8B7723138B8 /* PlannerRoot.swift */; };
 		68C134C565EBCA7413C22319 /* WeekformUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7FEB2C1FD1E1195F5196E8 /* WeekformUITests.swift */; };
 		6C911B95A5E41C645D17CB63 /* WeekformWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F53EA0B02855D3559C340A5 /* WeekformWidget.swift */; };
+		6D000EAB29CC394FC6397F56 /* PlanningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D7AFCA8422BE860551E6820 /* PlanningTests.swift */; };
+		71BCD41C05B82E72C4642FEC /* SetupScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48847A3745516FDF03C5F99C /* SetupScreens.swift */; };
+		8396E688DD716F0DED81664D /* Starters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A509E492B6026301F842213 /* Starters.swift */; };
+		88D5FF5798F30BFC7EDA24BC /* PlanningStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDFD1AC2D17183E133568331 /* PlanningStore.swift */; };
+		A632B6616F133F049D57FCDA /* PlannerTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301CD797935D1B7DDBE4326F /* PlannerTabs.swift */; };
 		B9DE527C4D6E39688A4BC058 /* FoundationStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51A93CE5C876BFB699CC0100 /* FoundationStoreTests.swift */; };
 		BDEE165550CEC1D0DC4CAA36 /* WeekformActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CF396634B4DF54A26F4762F6 /* WeekformActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C2B0E303A52D40A5026B071A /* PlanningModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C275C5D71778085E57C718EF /* PlanningModel.swift */; };
 		E7F2C0E13DF1D90EC5008F1B /* FoundationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFBFB63B51D46EE000B57F94 /* FoundationStore.swift */; };
 		F0F294430B70E45397ED0088 /* WeekformApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FC9E98EFAFA0C8CFF35AC6C /* WeekformApp.swift */; };
 		FE5BBA576CE6AD1A41DAC67D /* FoundationActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31153E788178A9CC815E9D89 /* FoundationActivity.swift */; };
@@ -57,16 +65,24 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0A509E492B6026301F842213 /* Starters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Starters.swift; sourceTree = "<group>"; };
 		2E9604BCAD23CCFC917D3CA7 /* WeekformTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WeekformTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		301CD797935D1B7DDBE4326F /* PlannerTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerTabs.swift; sourceTree = "<group>"; };
 		31153E788178A9CC815E9D89 /* FoundationActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoundationActivity.swift; sourceTree = "<group>"; };
 		37E736224B0DBDA4B2A67846 /* Weekform.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Weekform.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		38F855F2CBE3685D62111215 /* RoutineEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineEditor.swift; sourceTree = "<group>"; };
+		48847A3745516FDF03C5F99C /* SetupScreens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupScreens.swift; sourceTree = "<group>"; };
 		51A93CE5C876BFB699CC0100 /* FoundationStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoundationStoreTests.swift; sourceTree = "<group>"; };
 		5FC9E98EFAFA0C8CFF35AC6C /* WeekformApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekformApp.swift; sourceTree = "<group>"; };
+		7D7AFCA8422BE860551E6820 /* PlanningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningTests.swift; sourceTree = "<group>"; };
 		7F53EA0B02855D3559C340A5 /* WeekformWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekformWidget.swift; sourceTree = "<group>"; };
+		BDFD1AC2D17183E133568331 /* PlanningStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningStore.swift; sourceTree = "<group>"; };
 		C0E6DB7F62DD777EC78BF7CF /* WeekformUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WeekformUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C275C5D71778085E57C718EF /* PlanningModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningModel.swift; sourceTree = "<group>"; };
 		CF396634B4DF54A26F4762F6 /* WeekformActivity.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = WeekformActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		EC7FEB2C1FD1E1195F5196E8 /* WeekformUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekformUITests.swift; sourceTree = "<group>"; };
 		EFBFB63B51D46EE000B57F94 /* FoundationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoundationStore.swift; sourceTree = "<group>"; };
+		FC2099E7EB1AD8B7723138B8 /* PlannerRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerRoot.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -82,6 +98,7 @@
 			isa = PBXGroup;
 			children = (
 				51A93CE5C876BFB699CC0100 /* FoundationStoreTests.swift */,
+				7D7AFCA8422BE860551E6820 /* PlanningTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -129,6 +146,13 @@
 		EB129E76DE8C4D86F0A7D59F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				FC2099E7EB1AD8B7723138B8 /* PlannerRoot.swift */,
+				301CD797935D1B7DDBE4326F /* PlannerTabs.swift */,
+				C275C5D71778085E57C718EF /* PlanningModel.swift */,
+				BDFD1AC2D17183E133568331 /* PlanningStore.swift */,
+				38F855F2CBE3685D62111215 /* RoutineEditor.swift */,
+				48847A3745516FDF03C5F99C /* SetupScreens.swift */,
+				0A509E492B6026301F842213 /* Starters.swift */,
 				5FC9E98EFAFA0C8CFF35AC6C /* WeekformApp.swift */,
 			);
 			path = App;
@@ -161,6 +185,7 @@
 			buildPhases = (
 				854843C7FB4AB2ADB67BCEA0 /* Sources */,
 				7B2F9F0B11BCE9017EE5F6B0 /* Embed Foundation Extensions */,
+				C5825B532D93DBBF95B1550E /* Bundle optional development starter */,
 			);
 			buildRules = (
 			);
@@ -245,12 +270,37 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		C5825B532D93DBBF95B1550E /* Bundle optional development starter */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/DevelopmentPrivate",
+			);
+			name = "Bundle optional development starter";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LocalStarter.json",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\nsource_file=\"$SRCROOT/DevelopmentPrivate/LocalStarter.json\"\ndestination=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/LocalStarter.json\"\nif [ \"$CONFIGURATION\" = Debug ] && [ -f \"$source_file\" ]; then\n  /bin/cp \"$source_file\" \"$destination\"\nelif [ -f \"$destination\" ]; then\n  /bin/rm \"$destination\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		071F5E995BBAE2B90BC06102 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				B9DE527C4D6E39688A4BC058 /* FoundationStoreTests.swift in Sources */,
+				6D000EAB29CC394FC6397F56 /* PlanningTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -268,6 +318,13 @@
 			files = (
 				0520FFE4187B866250546644 /* FoundationActivity.swift in Sources */,
 				37F16327F588F85BF310E9F1 /* FoundationStore.swift in Sources */,
+				4909FD8911B5DE28D08906EF /* PlannerRoot.swift in Sources */,
+				A632B6616F133F049D57FCDA /* PlannerTabs.swift in Sources */,
+				C2B0E303A52D40A5026B071A /* PlanningModel.swift in Sources */,
+				88D5FF5798F30BFC7EDA24BC /* PlanningStore.swift in Sources */,
+				18C8CFF98EE11A6529DD8D4F /* RoutineEditor.swift in Sources */,
+				71BCD41C05B82E72C4642FEC /* SetupScreens.swift in Sources */,
+				8396E688DD716F0DED81664D /* Starters.swift in Sources */,
 				F0F294430B70E45397ED0088 /* WeekformApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
