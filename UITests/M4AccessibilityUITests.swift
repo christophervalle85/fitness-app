@@ -63,9 +63,7 @@ final class M4AccessibilityUITests: XCTestCase {
                 if app.buttons["finishPartial"].exists { app.buttons["finishPartial"].tap() }
             }
         }
-        let rest = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Rest between sets")).firstMatch
-        for _ in 0..<6 where !rest.isHittable { app.swipeUp() }
-        tap(rest)
+        tap(app.buttons["workoutRest"])
         tap(app.buttons["90 seconds"])
         let reps = app.textFields["actualReps0"]
         for _ in 0..<6 where !reps.isHittable { app.swipeDown() }
@@ -85,8 +83,10 @@ final class M4AccessibilityUITests: XCTestCase {
 
         captureScreen("Home screen with confirmed rest")
         let elements = springboard.descendants(matching: .any)
-        let candidates = elements.matching(NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS[c] %@ OR label CONTAINS[c] %@ OR identifier CONTAINS[c] %@",
-                                                       "Weekform", "Workout active", "Elapsed rest", "DynamicIsland"))
+        // Wait for the committed rest snapshot and target its timer. A preceding
+        // workout's capsule may briefly remain on SpringBoard while dismissing.
+        let candidates = elements.matching(NSPredicate(format: "label CONTAINS[c] %@", "Elapsed rest"))
+        _ = candidates.firstMatch.waitForExistence(timeout: 8)
         let island = candidates.allElementsBoundByIndex.first { item in
             let frame = item.frame
             return item.elementType != .icon && frame.minY >= 0 && frame.maxY < 90 && frame.width > 0 && item.isHittable
@@ -154,7 +154,9 @@ final class M4AccessibilityUITests: XCTestCase {
         if detail {
             tap(row)
             XCTAssertTrue(app.buttons["favoriteExercise"].waitForExistence(timeout: 5))
-            XCTAssertTrue(app.images["Barbell bench press demonstration, image 1"].exists)
+            let frame = app.buttons["catalogFrame1"]
+            XCTAssertTrue(frame.waitForExistence(timeout: 5))
+            XCTAssertEqual(frame.label, "Enlarge Barbell bench press demonstration, frame 1")
         } else if searchCurl {
             // Audit the same row that can sit beneath the system's translucent
             // tabs in the unfiltered list. The unfiltered tests remain separate.
@@ -162,6 +164,7 @@ final class M4AccessibilityUITests: XCTestCase {
             tap(searchField)
             searchField.typeText("Barbell curl\n")
             let curl = app.buttons["catalogRow-Barbell curl"]
+            for _ in 0..<5 where !curl.isHittable { app.swipeUp() }
             XCTAssertTrue(curl.waitForExistence(timeout: 5))
             XCTAssertTrue(curl.isHittable)
             XCTAssertLessThan(curl.frame.maxY, app.tabBars.firstMatch.frame.minY)

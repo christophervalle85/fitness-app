@@ -119,8 +119,56 @@ private struct VariantChoices: View {
     @Binding var plan: WeekPlan
     @Environment(\.dismiss) private var dismiss
 
+    @State private var library: [CatalogEntry] = []
+    private struct Match {
+        var entryKey: String { "\(day)-\(row)" }
+        let day: Int
+        let row: Int
+        let entry: CatalogEntry
+    }
+    private var matches: [Match] {
+        plan.days.enumerated().flatMap { day, workout in
+            workout.exercises.enumerated().compactMap { row, exercise in
+                guard exercise.name.isEmpty else { return nil }
+                for choice in exercise.choices {
+                    let candidates = library.filter { $0.name.localizedCaseInsensitiveCompare(choice) == .orderedSame }
+                    if candidates.count == 1, let entry = candidates.first, entry.prescription.timed == exercise.timed {
+                        return Match(day: day, row: row, entry: entry)
+                    }
+                }
+                return nil
+            }
+        }
+    }
+
     var body: some View {
         List {
+            if !matches.isEmpty {
+                NavigationLink {
+                    List {
+                        ForEach(matches, id: \.entryKey) { match in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(PlannerStyle.weekdays[match.day]).font(.caption.bold()).foregroundStyle(PlannerStyle.moss)
+                                Text(match.entry.name).font(.headline)
+                            }
+                        }
+                        Button("Use these choices") {
+                            var edited = plan
+                            for match in matches {
+                                var row = edited.days[match.day].exercises[match.row]
+                                selectVariant(match.entry.name, for: &row)
+                                row.variantID = match.entry.id
+                                row.convention = match.entry.convention
+                                edited.days[match.day].exercises[match.row] = row
+                            }
+                            plan = edited
+                            dismiss()
+                        }.buttonStyle(.borderedProminent).accessibilityIdentifier("useCatalogMatches")
+                    }.navigationTitle("Suggested choices")
+                } label: { Label("Review library matches (\(matches.count))", systemImage: "books.vertical") }
+                    .accessibilityIdentifier("reviewCatalogMatches")
+            }
+
             ForEach(plan.days.indices, id: \.self) { d in
                 let day = plan.days[d]
                 if day.exercises.contains(where: { !$0.choices.isEmpty }) {
@@ -154,6 +202,7 @@ private struct VariantChoices: View {
             }
         }
         .modifier(EditorPaper())
+        .task { library = (try? ExerciseCatalog.bundled().entries) ?? [] }
         .navigationTitle("Choose variants")
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
     }
@@ -306,6 +355,8 @@ private struct DayEditor: View {
 }
 
 private struct ExerciseEditor: View {
+    @Environment(PlanningStore.self) private var planner
+    @State private var browseCatalog = false
     @Binding var exercise: PlanExercise
     @Environment(\.dismiss) private var dismiss
     @FocusState private var focused: Bool
@@ -313,6 +364,28 @@ private struct ExerciseEditor: View {
     var body: some View {
         Form {
             Section("Exercise") {
+                Button { browseCatalog = true } label: { Label("Choose from exercise library", systemImage: "books.vertical") }
+                    .fullScreenCover(isPresented: $browseCatalog) {
+                        NavigationStack {
+                            CatalogPicker(planner: planner) { choice in
+                                var updated = exercise
+                                if exercise.variantID != choice.variantID || exercise.convention != choice.convention {
+                                    updated.startingLoad = nil
+                                }
+                                if updated.timed != choice.timed {
+                                    updated.low = choice.low
+                                    updated.high = choice.high
+                                }
+                                updated.name = choice.name
+                                updated.variantID = choice.variantID ?? choice.id
+                                updated.convention = choice.convention
+                                updated.timed = choice.timed
+                                exercise = updated
+                                browseCatalog = false
+                            }.toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { browseCatalog = false } } }
+                        }
+                    }
+
                 if !exercise.choices.isEmpty {
                     ForEach(exercise.choices, id: \.self) { choice in
                         Button {

@@ -22,7 +22,16 @@ struct RoutinesScreen: View {
                             Label("Active routine", systemImage: "checkmark.circle.fill")
                                 .font(.caption.weight(.semibold)).foregroundStyle(PlannerStyle.blue)
                         }
-                        Text(plan.name).font(.title3.bold())
+                        Text(plan.name).font(.system(.title, design: .serif, weight: .medium))
+                        HStack(spacing: 4) {
+                            ForEach(Array(plan.days.enumerated()), id: \.element.id) { index, day in
+                                VStack(spacing: 4) {
+                                    Text(String(PlannerStyle.weekdays[index].prefix(1))).font(.caption2)
+                                    Capsule().fill(day.isWorkout ? PlannerStyle.moss : PlannerStyle.rule).frame(height: 5)
+                                }.frame(maxWidth: .infinity)
+                            }
+                        }.accessibilityElement(children: .ignore)
+                            .accessibilityLabel(plan.days.enumerated().compactMap { $0.element.isWorkout ? PlannerStyle.weekdays[$0.offset] : nil }.joined(separator: ", "))
                         Text("\(plan.days.filter(\.isWorkout).count) training days per week")
                             .font(.subheadline).foregroundStyle(.secondary)
                     }.padding(.vertical, 4)

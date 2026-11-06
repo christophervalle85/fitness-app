@@ -1,26 +1,5 @@
 import SwiftUI
 
-// An abstract folded training sheet, drawn with the system's scalable paths.
-private struct WeekMark: View {
-    var body: some View {
-        Canvas { context, size in
-            let unit = min(size.width / 306, size.height / 118)
-            for index in 0..<7 {
-                let x = CGFloat(index) * 40 * unit
-                let y = CGFloat(abs(3 - index)) * 8 * unit
-                var page = Path()
-                page.move(to: .init(x: x, y: y + 24 * unit))
-                page.addLine(to: .init(x: x + 40 * unit, y: y))
-                page.addLine(to: .init(x: x + 40 * unit, y: y + 72 * unit))
-                page.addLine(to: .init(x: x, y: y + 96 * unit))
-                page.closeSubpath()
-                context.fill(page, with: .color(PlannerStyle.blue.opacity(index == 3 ? 1 : 0.18 + Double(index % 3) * 0.12)))
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}
-
 struct WelcomeScreen<Recovery: View>: View {
     let manual: () -> Void
     let starters: () -> Void
@@ -29,11 +8,13 @@ struct WelcomeScreen<Recovery: View>: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                Label("Weekform", systemImage: "square.stack.3d.up.fill")
+                Text("Weekform")
                     .font(.headline).foregroundStyle(PlannerStyle.blue)
-                WeekMark().frame(height: 124).padding(.vertical, 24)
+                Image("WeekformMark").resizable().aspectRatio(contentMode: .fit)
+                    .frame(width: 96, height: 96).clipShape(RoundedRectangle(cornerRadius: 20))
+                    .accessibilityHidden(true).padding(.vertical, 12)
                 Text("Plan your\ntraining week.")
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .font(.system(.largeTitle, design: .serif, weight: .medium))
                     .accessibilityAddTraits(.isHeader)
                 Text("Choose your workout days, exercises, and rest days. You can adjust your week as you train.")
                     .font(.body).foregroundStyle(.secondary)
@@ -109,32 +90,55 @@ struct ReviewWeek: View {
     let goBack: () -> Void
     let save: () -> Void
 
+    @State private var selection = 0
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
-        List {
-            Section {
-                Text(plan.name).font(.title2.bold())
-                LabeledContent("Rest between sets", value: plan.restSeconds.map { "\($0) seconds" } ?? "No timer")
-            }
-            ForEach(Array(plan.days.enumerated()), id: \.element.id) { index, day in
-                Section(PlannerStyle.weekdays[index]) {
-                    if let seconds = day.cardioGoalSeconds {
-                        LabeledContent(day.name, value: "\(seconds / 60) min cardio")
-                    } else if day.exercises.isEmpty {
-                        Text("Rest day").foregroundStyle(.secondary)
-                    } else {
-                        DisclosureGroup(day.name) {
-                            ForEach(day.exercises) { row in
-                                VStack(alignment: .leading) {
-                                    Text(row.name)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text(plan.name).font(.system(.largeTitle, design: .serif, weight: .medium))
+                Text("\(plan.days.filter(\.isWorkout).count) training days per week")
+                    .font(.headline).foregroundStyle(PlannerStyle.moss)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: typeSize.isAccessibilitySize ? 4 : 7)) {
+                    ForEach(plan.days.indices, id: \.self) { index in
+                        let day = plan.days[index]
+                        Button { selection = index } label: {
+                            VStack(spacing: 7) {
+                                Text(String(PlannerStyle.weekdays[index].prefix(2))).font(.caption.bold())
+                                Image(systemName: day.cardioGoalSeconds != nil ? "figure.run" : (day.isWorkout ? "dumbbell.fill" : "minus"))
+                                    .font(.subheadline)
+                            }.frame(maxWidth: .infinity).padding(.vertical, 12)
+                                .foregroundStyle(index == selection ? Color(uiColor: .systemBackground) : PlannerStyle.moss)
+                                .background(index == selection ? PlannerStyle.moss : PlannerStyle.moss.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                        }.buttonStyle(.plain).accessibilityIdentifier("reviewDay\(index)")
+                        .accessibilityLabel(PlannerStyle.weekdays[index] + ", " + (day.isWorkout ? day.name : "Rest day"))
+                        .accessibilityAddTraits(index == selection ? .isSelected : [])
+                    }
+                }
+                if plan.days.indices.contains(selection) {
+                    let day = plan.days[selection]
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text(PlannerStyle.weekdays[selection]).font(.subheadline.weight(.semibold)).foregroundStyle(PlannerStyle.moss)
+                        Text(day.isWorkout ? day.name : "Rest day").font(.system(.title2, design: .serif, weight: .medium))
+                        if let seconds = day.cardioGoalSeconds { Label("\(seconds / 60) min cardio", systemImage: "figure.run") }
+                        ForEach(Array(day.exercises.enumerated()), id: \.element.id) { offset, row in
+                            Divider()
+                            HStack(alignment: .top, spacing: 12) {
+                                Text("\(offset + 1)").font(.headline.monospacedDigit()).foregroundStyle(PlannerStyle.ochre)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(row.name).font(.headline)
                                     Text(prescription(row)).font(.subheadline).foregroundStyle(.secondary)
                                 }
                             }
                         }
-                    }
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(18)
+                        .background(PlannerStyle.surface, in: RoundedRectangle(cornerRadius: 18))
                 }
-            }
+                Label(plan.restSeconds.map { "\($0)s between sets" } ?? "Rest timer off", systemImage: "timer")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }.padding(20).frame(maxWidth: 600).frame(maxWidth: .infinity)
         }
-        .scrollContentBackground(.hidden).background(PlannerStyle.paper)
+        .background(PlannerStyle.paper)
         .navigationTitle("Review your week")
         .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Back", action: goBack) } }
         .safeAreaInset(edge: .bottom) {

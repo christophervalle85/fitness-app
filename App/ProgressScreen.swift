@@ -7,21 +7,50 @@ struct ProgressScreen<Recovery: View>: View {
     let unit: String
     let setUnit: (String) throws -> Void
     @ViewBuilder var recovery: () -> Recovery
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var issue: String?
 
     var body: some View {
         let metrics = ProgressMetrics(sessions: store.sessions, occurrences: store.occurrences, activePlan: activePlan)
         List {
             Section {
-                LabeledContent("Planned workouts fulfilled", value: "\(metrics.adherence.fulfilled) of \(metrics.adherence.scheduled)")
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("This week’s schedule").font(.headline)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text("\(metrics.adherence.fulfilled)").font(.system(.largeTitle, design: .rounded, weight: .heavy)).monospacedDigit()
+                        Text("of \(metrics.adherence.scheduled) fulfilled").font(.headline)
+                    }
+                    ProgressView(value: Double(metrics.adherence.fulfilled), total: Double(max(1, metrics.adherence.scheduled)))
+                        .tint(Color.white)
+                }.foregroundStyle(Color.white).padding(.vertical, 8)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Planned workouts fulfilled this week")
+                    .accessibilityValue("\(metrics.adherence.fulfilled) of \(metrics.adherence.scheduled)")
                     .accessibilityIdentifier("adherence")
-            } header: { Text("This week’s schedule") } footer: {
-                Text("Includes dated workouts and upcoming days in your current routine.")
-            }
-            Section("Activity totals") {
-                LabeledContent("Finished workouts", value: "\(metrics.sessionCount)")
-                LabeledContent("Cardio activities", value: "\(metrics.cardioCount)")
-                LabeledContent("Cardio duration", value: elapsedString(TimeInterval(metrics.cardioSeconds)))
+            } footer: { Text("Includes dated workouts and upcoming days in your current routine.") }
+            .listRowBackground(PlannerStyle.forest)
+            Section("Training activity") {
+                TrainingActivityChart(sessions: metrics.history)
+                let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 14)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+                layout {
+                    total("Workouts", value: String(metrics.sessionCount))
+                    total("Cardio sessions", value: String(metrics.cardioCount))
+                    total("Cardio time", value: elapsedString(TimeInterval(metrics.cardioSeconds)))
+                }.padding(.vertical, 6)
+
+            }.listRowBackground(PlannerStyle.surface)
+            if let latest = metrics.history.first {
+                Section("Last workout") {
+                    NavigationLink {
+                        ProgressSession(store: store, id: latest.id, unit: unit)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(latest.name).font(.title3.bold())
+                            Text(latest.startedAt.formatted(date: .abbreviated, time: .shortened) + (latest.partial ? " · Partial" : ""))
+                                .font(.subheadline)
+                        }.padding(.vertical, 4)
+                    }
+                }.listRowBackground(PlannerStyle.surface)
             }
             Section {
                 NavigationLink {
@@ -90,6 +119,47 @@ struct ProgressScreen<Recovery: View>: View {
         .scrollContentBackground(.hidden).background(PlannerStyle.paper)
         .navigationTitle("Progress")
     }
+    private func total(_ label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(value).font(.system(.title3, design: .rounded, weight: .bold)).monospacedDigit()
+            Text(label).font(.caption).foregroundStyle(.secondary)
+        }.frame(maxWidth: .infinity, alignment: .leading).accessibilityElement(children: .combine)
+    }
+
+}
+
+private struct TrainingActivityChart: View {
+    let sessions: [TrainingSession]
+    private struct DayCount: Identifiable {
+        let date: Date
+        let count: Int
+        var id: Date { date }
+    }
+
+    var body: some View {
+        let calendar = Calendar.autoupdatingCurrent
+        let today = calendar.startOfDay(for: .now)
+        let days = (0..<7).compactMap { offset -> DayCount? in
+            guard let day = calendar.date(byAdding: .day, value: offset - 6, to: today) else { return nil }
+            return DayCount(date: day, count: sessions.filter { $0.performedDay == CivilTrainingDay(day) }.count)
+        }
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Last 7 days").font(.headline)
+            if days.contains(where: { $0.count > 0 }) {
+                Chart(days) { day in
+                    BarMark(x: .value("Day", day.date, unit: .day), y: .value("Finished workouts", day.count), width: .ratio(0.55))
+                        .cornerRadius(3).foregroundStyle(calendar.isDate(day.date, inSameDayAs: today) ? PlannerStyle.ochre : PlannerStyle.moss)
+                        .accessibilityLabel(day.date.formatted(date: .complete, time: .omitted))
+                        .accessibilityValue("\(day.count) workouts")
+                }
+                .chartXAxis { AxisMarks(values: days.map(\.date)) { _ in AxisValueLabel(format: .dateTime.weekday(.narrow)) } }
+                .chartYAxis { AxisMarks(position: .leading, values: .stride(by: max(1, Double(days.map(\.count).max() ?? 1) / 3).rounded(.up))) }
+                .frame(height: 104)
+            } else {
+                Text("No finished workouts in the last seven days.").font(.subheadline)
+            }
+        }.padding(.vertical, 6)
+    }
 }
 
 private func weightText(_ kg: Double, _ unit: String) -> String {
@@ -150,7 +220,7 @@ private struct RecordDetail: View {
                             PointMark(x: .value("Performed", point.date), y: .value(axis, value))
                         }
                     }
-                    .chartYAxisLabel(axis).frame(height: 150).accessibilityLabel(axis + " over time")
+                    .foregroundStyle(PlannerStyle.moss).chartYAxisLabel(axis).frame(height: 150).accessibilityLabel(axis + " over time")
                 }
                 ForEach(record.trend.reversed(), id: \.id) { point in
                     LabeledContent(point.date.formatted(date: .abbreviated, time: .shortened), value: result(point))

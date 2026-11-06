@@ -23,6 +23,8 @@ private struct CatalogBrowser: View {
     @State private var issue: String?
     @State private var filter = CatalogFilter()
     @State private var showAll = false
+    @FocusState private var searchFocused: Bool
+    @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .body) private var searchHeight: CGFloat = 38
 
     var body: some View {
@@ -44,7 +46,14 @@ private struct CatalogBrowser: View {
                     .foregroundStyle(.primary)
                     .accessibilityHidden(true)
                 HStack(spacing: 4) {
-                    TextField("", text: $filter.text, axis: .vertical)
+                    TextField("", text: Binding(get: { filter.text }, set: { value in
+                        if value.contains(where: \.isNewline) {
+                            filter.text = value.split(whereSeparator: \.isNewline).joined(separator: " ")
+                            searchFocused = false
+                        } else { filter.text = value }
+                    }), axis: .vertical)
+                        .focused($searchFocused)
+                        .onSubmit { searchFocused = false }
                         .font(.body)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -62,6 +71,13 @@ private struct CatalogBrowser: View {
                 .overlay { RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.5), lineWidth: 1) }
             }
             .padding(.vertical, 3)
+            .listRowBackground(PlannerStyle.paper)
+            .listRowSeparator(.hidden)
+            if base == nil {
+                let filterLayout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
+                filterLayout { libraryFilters }
+                .listRowSeparator(.hidden).listRowBackground(PlannerStyle.paper)
+            }
             if let issue { Text(issue).foregroundStyle(.secondary) }
             if base != nil {
                 Picker("Exercise selection", selection: $showAll) {
@@ -75,10 +91,16 @@ private struct CatalogBrowser: View {
                     row(alternative.entry, reason: alternative.reason, all: all)
                 }
             } else {
+                Section {
                 if visible.isEmpty { ContentUnavailableView("No matching exercises", systemImage: "magnifyingglass") }
                 ForEach(visible) { row($0, reason: nil, all: all) }
+                } header: {
+                    Text(filter.favoritesOnly ? "Saved exercises" : "Exercise library")
+                        .font(.headline).textCase(nil).foregroundStyle(PlannerStyle.moss)
+                }
             }
         }
+        .listStyle(.plain)
         .navigationTitle(select == nil ? "Exercises" : "Choose an exercise")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -100,6 +122,31 @@ private struct CatalogBrowser: View {
             do { entries = try ExerciseCatalog.bundled().entries }
             catch { issue = "The bundled catalog could not be opened. Your custom exercises are available below." }
         }
+    }
+
+    @ViewBuilder private var libraryFilters: some View {
+        filterButton("All exercises", favorites: false)
+        filterButton("Favorites", favorites: true)
+    }
+
+    private func filterButton(_ title: String, favorites: Bool) -> some View {
+        let selected = filter.favoritesOnly == favorites
+        return Button {
+            filter.favoritesOnly = favorites
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                if selected { Image(systemName: "checkmark").accessibilityHidden(true) }
+                Text(title).font(.body.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 7)
+            .frame(minHeight: 44)
+            .foregroundStyle(PlannerStyle.ink)
+            .background(selected ? PlannerStyle.moss.opacity(0.16) : PlannerStyle.surface, in: Capsule())
+            .overlay { Capsule().stroke(selected ? PlannerStyle.moss : PlannerStyle.rule, lineWidth: 1) }
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func selector(_ label: String, values: [String], binding: Binding<String>) -> some View {
@@ -127,6 +174,8 @@ private struct CatalogBrowser: View {
                 }
             }.padding(.vertical, 2)
         }
+        .listRowBackground(PlannerStyle.surface)
+        .listRowSeparatorTint(PlannerStyle.rule)
         .accessibilityIdentifier("catalogRow-" + entry.name)
     }
 }
@@ -138,7 +187,8 @@ private struct CatalogThumbnail: View {
     var body: some View {
         ZStack {
             if let thumbnail {
-                Image(uiImage: thumbnail).resizable().scaledToFit().frame(width: 56, height: 56)
+                Image(uiImage: thumbnail).resizable().scaledToFit().padding(5)
+                    .frame(width: 68, height: 68).background(.white, in: RoundedRectangle(cornerRadius: 9))
                     .accessibilityHidden(true)
             }
         }.task(id: media.file) {
@@ -158,14 +208,18 @@ private struct CatalogDetail: View {
     let planner: PlanningStore
     let training: TrainingStore?
     let select: ((PlanExercise) -> Void)?
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var selectedFrame: Int?
     @State private var equipment = ""
     @State private var issue: String?
     var body: some View {
         List {
-            Text(entry.name)
-                .font(.title2.bold())
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: 7) {
+                if !entry.movement.isEmpty { Text(entry.movement).font(.subheadline.weight(.semibold)).foregroundStyle(PlannerStyle.moss) }
+                Text(entry.name).font(.system(.title, design: .rounded, weight: .bold))
+                    .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
+                if !entry.primary.isEmpty { Text(entry.primary.joined(separator: " · ")).font(.headline).foregroundStyle(PlannerStyle.ink) }
+            }.padding(.vertical, 4).listRowBackground(PlannerStyle.paper)
             if let select {
                 Button("Use this exercise") {
                     select(planner.customExercises.first { ($0.variantID ?? $0.id) == entry.id } ?? entry.prescription)
@@ -173,23 +227,45 @@ private struct CatalogDetail: View {
             }
             if !entry.media.isEmpty {
                 Section("Demonstration") {
-                    ForEach(entry.media.indices, id: \.self) { i in
-                        let media = entry.media[i]
-                        if let url = media.localURL, let image = UIImage(contentsOfFile: url.path) {
-                            Image(uiImage: image).resizable().scaledToFit().accessibilityLabel("\(entry.name) demonstration, image \(i + 1)")
-                        } else { Label("Image unavailable offline", systemImage: "photo") }
+                    LazyVGrid(columns: [GridItem(typeSize.isAccessibilitySize ? .flexible() : .adaptive(minimum: 125), spacing: 8)], spacing: 8) {
+                        ForEach(entry.media.indices, id: \.self) { i in
+                            Button {
+                                selectedFrame = i
+                            } label: {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                                        Image(systemName: "arrow.up.left.and.arrow.down.right").accessibilityHidden(true)
+                                        Text("Frame \(i + 1)").fixedSize(horizontal: false, vertical: true)
+                                    }
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(PlannerStyle.ink)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 4)
+                                    catalogFrame(i, height: 110)
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Enlarge \(entry.name) demonstration, frame \(i + 1)")
+                            .accessibilityIdentifier("catalogFrame\(i + 1)")
+                        }
+                    }.padding(.vertical, 3)
+                }
+            }
+            if !entry.instructions.isEmpty {
+                Section("Form cues") {
+                    ForEach(entry.instructions.indices, id: \.self) { i in
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            Text(String(format: "%02d", i + 1)).font(.caption.monospacedDigit().bold()).foregroundStyle(PlannerStyle.moss)
+                            Text(entry.instructions[i]).fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
             }
-            Section {
-                if !entry.movement.isEmpty { LabeledContent("Movement", value: entry.movement) }
-                if !entry.primary.isEmpty { LabeledContent("Primary muscles", value: entry.primary.joined(separator: ", ")) }
-                if !entry.secondary.isEmpty { LabeledContent("Secondary muscles", value: entry.secondary.joined(separator: ", ")) }
+            Section("Training details") {
                 if !entry.equipment.isEmpty { LabeledContent("Equipment", value: entry.equipment.joined(separator: ", ")) }
+                if !entry.secondary.isEmpty { LabeledContent("Also works", value: entry.secondary.joined(separator: ", ")) }
                 if !entry.convention.isEmpty { LabeledContent("Recording method", value: entry.convention) }
-            }
-            if !entry.instructions.isEmpty {
-                Section("Instructions") { ForEach(entry.instructions.indices, id: \.self) { Text(entry.instructions[$0]) } }
             }
             if let url = entry.tutorialURL.flatMap(safeLink), let creator = entry.tutorialCreator, !creator.isEmpty {
                 Link("Tutorial by \(creator)", destination: url)
@@ -246,7 +322,13 @@ private struct CatalogDetail: View {
                 }
             }
             if let issue { Text(issue) }
-        }.navigationTitle("Exercise").navigationBarTitleDisplayMode(.inline)
+        }.scrollContentBackground(.hidden).background(PlannerStyle.paper)
+        .navigationTitle("Exercise").navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(item: $selectedFrame) { index in
+            ScrollView { catalogFrame(index, height: 400).padding() }
+                .navigationTitle("Frame \(index + 1) of \(entry.media.count)")
+                .navigationBarTitleDisplayMode(.inline)
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 let favorite = planner.favoriteExerciseIDs.contains(entry.id)
@@ -254,6 +336,17 @@ private struct CatalogDetail: View {
                     do { try planner.setExerciseFavorite(entry.id, favorite: !favorite); issue = nil } catch { issue = error.localizedDescription }
                 }.accessibilityIdentifier("favoriteExercise")
             }
+        }
+    }
+
+    @ViewBuilder private func catalogFrame(_ index: Int, height: CGFloat) -> some View {
+        if let url = entry.media[index].localURL, let image = UIImage(contentsOfFile: url.path) {
+            Image(uiImage: image).resizable().scaledToFit().padding(6)
+                .frame(maxWidth: .infinity).frame(height: height)
+                .background(.white, in: RoundedRectangle(cornerRadius: 10))
+                .accessibilityLabel("\(entry.name) demonstration, image \(index + 1)")
+        } else {
+            Label("Image unavailable offline", systemImage: "photo").font(.footnote)
         }
     }
 

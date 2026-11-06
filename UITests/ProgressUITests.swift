@@ -39,23 +39,30 @@ final class ProgressUITests: XCTestCase {
         tap(app.buttons["reviewSession"])
         tap(app.buttons["finishPartial"])
 
+        func tapOverviewControl(_ element: XCUIElement) {
+            for _ in 0..<5 where !element.isHittable { app.swipeUp() }
+            if !element.isHittable {
+                for _ in 0..<5 where !element.isHittable { app.swipeDown() }
+            }
+            tap(element)
+        }
         func openProgress() {
             tap(app.tabBars.buttons["Progress"])
-            XCTAssertTrue(app.buttons["progressHistory"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.navigationBars["Progress"].waitForExistence(timeout: 10))
         }
         func openRecord() {
-            tap(app.buttons["progressRecords"])
+            tapOverviewControl(app.buttons["progressRecords"])
             tap(app.buttons["recordGroup0"])
         }
         func openLoggedSet() {
-            tap(app.buttons["progressHistory"])
+            tapOverviewControl(app.buttons["progressHistory"])
             tap(app.buttons["historySession0"])
             tap(app.buttons["historySet0-0"])
         }
         func backToProgress() {
             tap(app.navigationBars.buttons.element(boundBy: 0))
             tap(app.navigationBars.buttons.element(boundBy: 0))
-            XCTAssertTrue(app.buttons["progressHistory"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.navigationBars["Progress"].waitForExistence(timeout: 5))
         }
 
         openProgress()
@@ -65,11 +72,11 @@ final class ProgressUITests: XCTestCase {
         capture("Exercise record", in: app)
         backToProgress()
 
-        tap(app.segmentedControls["weightUnit"].buttons["kg"])
+        tapOverviewControl(app.segmentedControls["weightUnit"].buttons["kg"])
         openRecord()
         XCTAssertTrue(app.staticTexts["11.34 kg · 10 reps"].firstMatch.waitForExistence(timeout: 5))
         backToProgress()
-        tap(app.segmentedControls["weightUnit"].buttons["lb"])
+        tapOverviewControl(app.segmentedControls["weightUnit"].buttons["lb"])
 
         openLoggedSet()
         capture("Correct a working set", in: app)
@@ -90,7 +97,7 @@ final class ProgressUITests: XCTestCase {
         app.terminate()
         app.launch()
         openProgress()
-        tap(app.buttons["progressRecords"])
+        tapOverviewControl(app.buttons["progressRecords"])
         XCTAssertTrue(app.staticTexts["No exercise records"].waitForExistence(timeout: 5))
     }
 }

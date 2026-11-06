@@ -142,22 +142,19 @@ struct TodayScreen: View {
                                 SessionLogGroup(sessions: parts, title: "\(occurrence.name) · \(occurrence.date.formatted(date: .abbreviated, time: .omitted))", training: training, plan: plan)
                             }
                         } else {
-                        NavigationLink {
-                            SavedWorkoutDetail(id: session.id, training: training, plan: plan)
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(session.name).font(.headline)
-                                    if let origin = training.occurrences.first(where: { $0.id == session.occurrenceID }) {
-                                        Text("Planned for \(origin.date.formatted(date: .abbreviated, time: .omitted))").font(.caption)
+                            NavigationLink {
+                                SavedWorkoutDetail(id: session.id, training: training, plan: plan)
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(session.name).font(.headline)
+                                        Text("\(session.startedAt.formatted(date: .omitted, time: .shortened)) · \(session.partial ? "Finished partial" : "Finished")")
+                                            .font(.subheadline).foregroundStyle(.secondary)
                                     }
-                                    Text("\(session.startedAt.formatted(date: .omitted, time: .shortened)) · \(session.partial ? "Finished partial" : "Finished")")
-                                        .font(.subheadline).foregroundStyle(.secondary)
+                                    Spacer()
+                                    Image(systemName: "chevron.right").font(.caption)
                                 }
-                                Spacer()
-                                Image(systemName: "chevron.right").font(.caption)
-                            }
-                        }.accessibilityIdentifier("savedSession")
+                            }.accessibilityIdentifier("savedSession")
                         }
                     }
                 }
@@ -205,7 +202,7 @@ struct TodayScreen: View {
                         Text(date, format: .dateTime.day()).font(.system(.headline, design: .rounded).monospacedDigit())
                         Image(systemName: complete ? "checkmark.circle.fill" : planned ? "dumbbell.fill" : "minus")
                             .font(.caption2)
-                            .symbolEffect(.bounce, value: reducedMotion || !isSelected ? 0 : finishPulse)
+                            .symbolEffect(.bounce, value: reducedMotion || !isSelected || !complete ? 0 : finishPulse)
                     }
                     .frame(maxWidth: .infinity).padding(.vertical, 9)
                     .foregroundStyle(isSelected ? Color(uiColor: .systemBackground) : PlannerStyle.moss)

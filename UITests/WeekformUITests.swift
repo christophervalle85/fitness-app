@@ -35,6 +35,13 @@ final class WeekformUITests: XCTestCase {
 
         app.terminate()
         app.launch()
+        let monday = app.buttons["reviewDay0"]
+        tap(monday)
+        XCTAssertTrue(app.staticTexts["Squat"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Hip hinge"].exists)
+        capture("Review the training week", in: app)
+        tap(app.buttons["reviewDay6"])
+        XCTAssertTrue(app.staticTexts["Rest day"].firstMatch.waitForExistence(timeout: 5))
         tap(app.buttons["confirmRoutine"])
 
         let today = app.tabBars.buttons["Today"]
@@ -102,12 +109,35 @@ final class WeekformUITests: XCTestCase {
         XCTAssertTrue(app.buttons["resolveVariants"].exists)
 
         let variants = app.buttons["chooseVariants"]
-        let countString = try XCTUnwrap(variants.value as? String)
-        let count = try XCTUnwrap(countString.split(whereSeparator: { !$0.isNumber }).first.flatMap { Int($0) })
-        XCTAssertGreaterThan(count, 0)
+        func number(in text: String?) throws -> Int {
+            let value = try XCTUnwrap(text)
+            return try XCTUnwrap(value.split(whereSeparator: { !$0.isNumber }).first.flatMap { Int($0) })
+        }
+        var remaining = try number(in: variants.value as? String)
+        XCTAssertGreaterThan(remaining, 0)
         tap(app.buttons["resolveVariants"])
+        let matches = app.buttons["reviewCatalogMatches"]
+        if matches.waitForExistence(timeout: 3) {
+            let proposed = try number(in: matches.label)
+            XCTAssertGreaterThan(proposed, 0)
+            XCTAssertLessThanOrEqual(proposed, remaining)
+            tap(matches)
+            XCTAssertTrue(app.buttons["useCatalogMatches"].waitForExistence(timeout: 5))
+            tap(app.navigationBars["Suggested choices"].buttons["BackButton"])
+            XCTAssertTrue(matches.waitForExistence(timeout: 5))
+            XCTAssertEqual(try number(in: matches.label), proposed)
+            tap(matches)
+            tap(app.buttons["useCatalogMatches"])
+            XCTAssertTrue(variants.waitForExistence(timeout: 5))
+            remaining -= proposed
+            XCTAssertEqual(try number(in: variants.value as? String), remaining)
+            if remaining > 0 {
+                tap(variants)
+                XCTAssertFalse(matches.exists)
+            }
+        }
         let unresolved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'variant' AND value == 'Unresolved'"))
-        for _ in 0..<count {
+        for _ in 0..<remaining {
             let next = unresolved.firstMatch
             var scrolls = 0
             while !next.isHittable && scrolls < 8 {
@@ -117,7 +147,7 @@ final class WeekformUITests: XCTestCase {
             tap(next)
             tap(app.buttons["variantOption0"].firstMatch)
         }
-        tap(app.navigationBars.buttons["Done"])
+        if remaining > 0 { tap(app.navigationBars.buttons["Done"]) }
         tap(app.buttons["reviewWeek"])
         tap(app.buttons["confirmRoutine"])
         XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 10))

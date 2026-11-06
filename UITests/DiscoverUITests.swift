@@ -47,7 +47,13 @@ final class DiscoverUITests: XCTestCase {
         tap(app.buttons["catalogRow-" + original])
         XCTAssertTrue(app.staticTexts[original].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["favoriteExercise"].exists)
-        screenshot("Bundled exercise detail", in: app)
+        screenshot("Exercise detail gallery", in: app)
+        tap(app.buttons["catalogFrame1"])
+        XCTAssertTrue(app.navigationBars["Frame 1 of 2"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.images[original + " demonstration, image 1"].exists)
+        screenshot("Expanded first demonstration frame", in: app)
+        tap(app.navigationBars.buttons.element(boundBy: 0))
+        XCTAssertTrue(app.buttons["favoriteExercise"].waitForExistence(timeout: 5))
 
         let candidate = app.buttons["catalogAlternative-" + alternative]
         for _ in 0..<12 where !candidate.isHittable { app.swipeUp() }
@@ -88,6 +94,10 @@ final class DiscoverUITests: XCTestCase {
         tap(exerciseMenu)
         tap(app.buttons["Squat"])
         XCTAssertTrue(app.buttons["undoSet0"].waitForExistence(timeout: 5))
+        // End this run's Live Activity so SpringBoard can present the next workout.
+        tap(app.buttons["reviewSession"])
+        tap(app.buttons["finishPartial"])
+        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 10))
     }
 
     func testCustomExerciseFavoritePersistsAndStaysWithItsProfile() {
