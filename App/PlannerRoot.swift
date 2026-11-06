@@ -2,7 +2,17 @@ import SwiftUI
 
 enum PlannerStyle {
     static let paper = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? .init(white: 0.085, alpha: 1) : .init(red: 0.975, green: 0.970, blue: 0.950, alpha: 1) })
-    static let blue = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? .init(red: 0.41, green: 0.62, blue: 1, alpha: 1) : .init(red: 0.10, green: 0.29, blue: 0.78, alpha: 1) })
+    static let moss = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark ? UIColor(red: 0.61, green: 0.83, blue: 0.60, alpha: 1) : UIColor(red: 0.14, green: 0.34, blue: 0.23, alpha: 1)
+    })
+    static let ochre = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark ? UIColor(red: 0.96, green: 0.72, blue: 0.46, alpha: 1) : UIColor(red: 0.56, green: 0.29, blue: 0.10, alpha: 1)
+    })
+    static let forest = Color(red: 0.10, green: 0.23, blue: 0.17)
+    static let ink = Color.primary
+    static let rule = Color(uiColor: .separator)
+    static let surface = Color(uiColor: .secondarySystemGroupedBackground)
+    static let blue = moss
     static let weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 }
 
@@ -11,8 +21,12 @@ struct PlannerRoot: View {
     @State private var training = TrainingStore()
     @Environment(\.scenePhase) private var scenePhase
     @State private var pendingURL: URL?
+    @State private var workoutRouteEvent = UUID()
     @State private var workoutRoute: WorkoutLiveRoute?
     @State private var workoutOpen = false
+    @State private var agendaDate = Date.now
+    @State private var finishPulse = 0
+    @State private var pendingCelebration = false
     @State private var editing = WeekPlan()
     @State private var loaded = false
     @State private var loadFailed = false
@@ -45,7 +59,7 @@ struct PlannerRoot: View {
                     Tab("Today", systemImage: "calendar", value: "Today") {
                         NavigationStack {
                             TodayScreen(plan: store.plans.first { $0.id == store.activeID },
-                                        training: training, openWorkout: { workoutOpen = true },
+                                        training: training, selected: $agendaDate, finishPulse: finishPulse, openWorkout: { workoutOpen = true },
                                         showRoutines: { tab = "Routines" })
                                 .toolbar { developerButton }
                         }
@@ -73,7 +87,7 @@ struct PlannerRoot: View {
                         }
                     }
                 }
-                .tabViewBottomAccessory(isEnabled: training.active != nil) {
+                .tabViewBottomAccessory(isEnabled: training.active != nil && tab != "Today") {
                     if let session = training.active {
                         Button { workoutOpen = true } label: {
                             HStack {
@@ -132,13 +146,17 @@ struct PlannerRoot: View {
             }
         }
         .id(restoreGeneration)
-        .sheet(isPresented: $workoutOpen, onDismiss: { workoutRoute = nil }) {
+        .fullScreenCover(isPresented: $workoutOpen, onDismiss: {
+            workoutRoute = nil
+            if pendingCelebration { finishPulse += 1; pendingCelebration = false }
+        }) {
             NavigationStack {
-                ActiveWorkout(store: training, planner: store, route: workoutRoute, onClose: { workoutOpen = false }, applyToRoutine: futureReplacement,
+                ActiveWorkout(store: training, planner: store, route: workoutRoute, routeEvent: workoutRouteEvent, onClose: { workoutOpen = false }, onFinished: finishWorkout, applyToRoutine: futureReplacement,
                               routineExercises: store.plans.first { $0.id == store.activeID }?.days.flatMap(\.exercises) ?? [])
-            }
+            }.id(workoutRouteEvent)
         }
         .preferredColorScheme(testAppearance)
+        .environment(store)
         .tint(PlannerStyle.blue)
         .task { if !loaded { load() } }
         .task(id: "\(loaded)-\(restoreGeneration)-\(training.liveRevision)") {
@@ -243,7 +261,18 @@ struct PlannerRoot: View {
                 try training.select(sessionID: route.sessionID, exerciseID: exerciseID)
             }
             workoutRoute = route
+            workoutRouteEvent = UUID()
             workoutOpen = true
+        }
+    }
+
+    private func finishWorkout(_ session: TrainingSession) {
+        let occurrence = training.occurrences.first { $0.id == session.occurrenceID }
+        agendaDate = occurrence?.date ?? session.performedDay.date
+        tab = "Today"
+        workoutOpen = false
+        if let occurrence, training.status(for: occurrence).hasPrefix("Done") {
+            pendingCelebration = true
         }
     }
 

@@ -28,6 +28,18 @@ struct TrainingTests {
         try store.confirm(sessionID: session.id, setID: set.id, actual: actual, revision: set.revision, commandID: commandID)
     }
 
+    @Test func calendarTicksKeepOutOfOrderCreditsOnTheirPrescribedSlots() throws {
+        try withDirectory { directory in
+            let store = TrainingStore(directory: directory)
+            try store.load(profileID: UUID())
+            try store.startPlanned(plan: plan(), date: friday)
+            try confirm(store, row: 2)
+            let occurrence = try #require(store.occurrences.first)
+            let exercise = try #require(occurrence.day?.exercises.first)
+            #expect(store.slotProgress(for: occurrence)[exercise.id] == [false, false, true])
+        }
+    }
+
     @Test func differentCatalogVariantsCannotShareCreditByName() {
         let a = PlanExercise(variantID: UUID(), name: "Machine row", convention: "Machine")
         let b = PlanExercise(variantID: UUID(), name: "Machine row", convention: "Machine")

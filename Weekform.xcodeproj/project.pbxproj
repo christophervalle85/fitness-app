@@ -64,12 +64,14 @@
 		61A99A92C17AB9F8A1724021 /* wger-75-114.jpg in Resources */ = {isa = PBXBuildFile; fileRef = C46292649E30CEE42396CDB2 /* wger-75-114.jpg */; };
 		62B6B16EA5F35EEBFFF6E839 /* everkinetic-404-1.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 13B4CC163F38824FD898BDC4 /* everkinetic-404-1.jpg */; };
 		64E9CA5B3B195E5EE648EA5B /* everkinetic-401-2.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 902347352236FCA17D6A0101 /* everkinetic-401-2.jpg */; };
+		65E6FD1842363ED03F83575F /* WorkoutChecklist.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B80F2F8B2AA8D733F302C0 /* WorkoutChecklist.swift */; };
 		677B4E65354A73A2E124104E /* wger-84-91.jpg in Resources */ = {isa = PBXBuildFile; fileRef = A30360A9A7CC322B8EE6B892 /* wger-84-91.jpg */; };
 		68C134C565EBCA7413C22319 /* WeekformUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7FEB2C1FD1E1195F5196E8 /* WeekformUITests.swift */; };
 		6AAED6E7400B3687B74B7430 /* everkinetic-39-2.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 646B9D01ED937E2674AC7C23 /* everkinetic-39-2.jpg */; };
 		6C911B95A5E41C645D17CB63 /* WeekformWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F53EA0B02855D3559C340A5 /* WeekformWidget.swift */; };
 		6CCA672516822812CA35E2D3 /* wger-348-177.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 02CB3070DDF189104026C1BB /* wger-348-177.jpg */; };
 		6D000EAB29CC394FC6397F56 /* PlanningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D7AFCA8422BE860551E6820 /* PlanningTests.swift */; };
+		6D76894B3A2CF40CBBA71349 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 88FF313D7921E522E3E5A293 /* Assets.xcassets */; };
 		6DA084FC460E389D016981BD /* everkinetic-305-2.jpg in Resources */ = {isa = PBXBuildFile; fileRef = A8821951A9E98F1E0FEE24A0 /* everkinetic-305-2.jpg */; };
 		71BCD41C05B82E72C4642FEC /* SetupScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48847A3745516FDF03C5F99C /* SetupScreens.swift */; };
 		72BEFA77C938A333FAE7BDD9 /* ProgressMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7890851D1F35AAC805C4F987 /* ProgressMetrics.swift */; };
@@ -93,6 +95,7 @@
 		9F272C0DF5CB73079A7509DF /* wger-366-182.jpg in Resources */ = {isa = PBXBuildFile; fileRef = DBEE8F1C3918E66C673AD5C3 /* wger-366-182.jpg */; };
 		A632B6616F133F049D57FCDA /* PlannerTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301CD797935D1B7DDBE4326F /* PlannerTabs.swift */; };
 		A87FEE3B3DD3C4ED801BF97E /* everkinetic-430-2.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 2248FC19B619543205B788F1 /* everkinetic-430-2.jpg */; };
+		B231832849BBDF20688C194C /* WorkoutChecklistTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ACF1AFFAAA8DBB15D965B10 /* WorkoutChecklistTests.swift */; };
 		B87F8D215C2CF64247EDF96F /* wger-272-47.jpg in Resources */ = {isa = PBXBuildFile; fileRef = DBEC3A14A2B473E1D3258999 /* wger-272-47.jpg */; };
 		B8BFB7A48F9652C8D6A3A4B4 /* ExerciseCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77A07DB61F867BEE691D1AE1 /* ExerciseCatalog.swift */; };
 		B9DE527C4D6E39688A4BC058 /* FoundationStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51A93CE5C876BFB699CC0100 /* FoundationStoreTests.swift */; };
@@ -172,6 +175,7 @@
 		08643FFB7B3A14CEBE2280A3 /* everkinetic-430-1.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "everkinetic-430-1.jpg"; sourceTree = "<group>"; };
 		0A509E492B6026301F842213 /* Starters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Starters.swift; sourceTree = "<group>"; };
 		0B5D6AAB7ABEE207688B8548 /* everkinetic-1004-1.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "everkinetic-1004-1.jpg"; sourceTree = "<group>"; };
+		10B80F2F8B2AA8D733F302C0 /* WorkoutChecklist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutChecklist.swift; sourceTree = "<group>"; };
 		13B4CC163F38824FD898BDC4 /* everkinetic-404-1.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "everkinetic-404-1.jpg"; sourceTree = "<group>"; };
 		1FE23CBA0C0D3ACB5E4CF49E /* wger-206-122.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "wger-206-122.jpg"; sourceTree = "<group>"; };
 		206BC3DDB93628650871FEDA /* wger-394-143.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "wger-394-143.jpg"; sourceTree = "<group>"; };
@@ -207,6 +211,7 @@
 		542C10FACF2B2FB870184884 /* everkinetic-919-1.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "everkinetic-919-1.jpg"; sourceTree = "<group>"; };
 		56B85EDA9A1B3394539EB7A6 /* wger-73-70.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "wger-73-70.jpg"; sourceTree = "<group>"; };
 		5A781A06BECB2207E990EC02 /* everkinetic-1044-1.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "everkinetic-1044-1.jpg"; sourceTree = "<group>"; };
+		5ACF1AFFAAA8DBB15D965B10 /* WorkoutChecklistTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutChecklistTests.swift; sourceTree = "<group>"; };
 		5C4576DB8FD89C0B211FA07A /* everkinetic-964-1.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "everkinetic-964-1.jpg"; sourceTree = "<group>"; };
 		5C9C6EE49724BB28189380E2 /* wger-206-124.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "wger-206-124.jpg"; sourceTree = "<group>"; };
 		5FC9E98EFAFA0C8CFF35AC6C /* WeekformApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekformApp.swift; sourceTree = "<group>"; };
@@ -230,6 +235,7 @@
 		8129745E252E96BAAE92E0C9 /* everkinetic-404-2.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "everkinetic-404-2.jpg"; sourceTree = "<group>"; };
 		8269E8A0B390EC790ACB07AD /* ProgressUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressUITests.swift; sourceTree = "<group>"; };
 		888CD8DB96879CD7E000CE89 /* wger-394-144.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "wger-394-144.jpg"; sourceTree = "<group>"; };
+		88FF313D7921E522E3E5A293 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8D504FD5D62B8C0C4BDC0E24 /* wger-567-174.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "wger-567-174.jpg"; sourceTree = "<group>"; };
 		902347352236FCA17D6A0101 /* everkinetic-401-2.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "everkinetic-401-2.jpg"; sourceTree = "<group>"; };
 		90A2AF65362B15D5713A1FA5 /* WorkoutPrivacySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutPrivacySettings.swift; sourceTree = "<group>"; };
@@ -306,6 +312,7 @@
 				29764476CAF8C6FABAB70A85 /* ProgressTests.swift */,
 				A2A3FF222A32D85564B6D51E /* RecoveryTests.swift */,
 				A4AAD5EFD0DA1A62929F4789 /* TrainingTests.swift */,
+				5ACF1AFFAAA8DBB15D965B10 /* WorkoutChecklistTests.swift */,
 				7D42265F97186887B73ABE77 /* WorkoutCSVTests.swift */,
 				A729762065349AB5D1F5517A /* WorkoutLiveTests.swift */,
 				6003EBBDFA410B7BB5173C13 /* WorkoutPickerTests.swift */,
@@ -438,6 +445,7 @@
 			isa = PBXGroup;
 			children = (
 				A44A07E9F9EC05FBD4F6B9DD /* ActiveWorkout.swift */,
+				88FF313D7921E522E3E5A293 /* Assets.xcassets */,
 				A6369D94A4E65230FA0968CB /* AssignTrainingWork.swift */,
 				77A07DB61F867BEE691D1AE1 /* ExerciseCatalog.swift */,
 				49EC4A42847333F4FB81B410 /* ExercisesScreen.swift */,
@@ -456,6 +464,7 @@
 				30A6DE64D22FCFAA159B3454 /* TrainingStore.swift */,
 				5FC9E98EFAFA0C8CFF35AC6C /* WeekformApp.swift */,
 				31ACD74696C397C48D1EC3DE /* WorkoutBackup.swift */,
+				10B80F2F8B2AA8D733F302C0 /* WorkoutChecklist.swift */,
 				9ADD712CCBC9224BB39DB7AE /* WorkoutCSV.swift */,
 				00C747F2C2F107AE6C6FE5B4 /* WorkoutLiveCoordinator.swift */,
 				90A2AF65362B15D5713A1FA5 /* WorkoutPrivacySettings.swift */,
@@ -582,6 +591,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6D76894B3A2CF40CBBA71349 /* Assets.xcassets in Resources */,
 				97498B77A0DEEB9930A45B16 /* catalog.json in Resources */,
 				46EDC511B830C5E99DB6CEA2 /* commons-wger-1205.jpg in Resources */,
 				CE5792DC2954BB60F2D4F65D /* commons-wger-1243.jpg in Resources */,
@@ -696,6 +706,7 @@
 				1BB44BFF8BDE094847CBC8C1 /* RecoveryTests.swift in Sources */,
 				D816B33957ACC90C6CA16966 /* TrainingTests.swift in Sources */,
 				D91BACD5E7F3A415B522A0A5 /* WorkoutCSVTests.swift in Sources */,
+				B231832849BBDF20688C194C /* WorkoutChecklistTests.swift in Sources */,
 				07939DAD83EEC77C654B0CEC /* WorkoutLiveTests.swift in Sources */,
 				153D419BBBE3D00289B30D97 /* WorkoutPickerTests.swift in Sources */,
 			);
@@ -739,6 +750,7 @@
 				F0F294430B70E45397ED0088 /* WeekformApp.swift in Sources */,
 				CBFA7681DE407ED4BF39C2CF /* WorkoutBackup.swift in Sources */,
 				8EEEBBC9CC67AA26DB5CCB73 /* WorkoutCSV.swift in Sources */,
+				65E6FD1842363ED03F83575F /* WorkoutChecklist.swift in Sources */,
 				F46D593BDB730CBFE6D9D3B1 /* WorkoutLiveActivity.swift in Sources */,
 				405116186DBFCDB033A99652 /* WorkoutLiveCoordinator.swift in Sources */,
 				23AC8078A24B8497465E837B /* WorkoutPrivacySettings.swift in Sources */,

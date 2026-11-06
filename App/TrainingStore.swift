@@ -113,6 +113,11 @@ final class TrainingStore {
         return contributors.allSatisfy { $0.performedDay.date < occurrence.date } ? "Done early" : "Done"
     }
 
+    func slotProgress(for occurrence: TrainingOccurrence) -> [UUID: [Bool]] {
+        let credits = creditedIDs(in: sessions.filter { $0.occurrenceID == occurrence.id })
+        return occurrence.plannedSets.mapValues { $0.map(credits.contains) }
+    }
+
     private func creditedIDs(in sessions: [TrainingSession]) -> Set<UUID> {
         Set(sessions.flatMap(\.exercises).flatMap(\.sets).filter { $0.confirmedAt != nil && $0.warmup != true }.compactMap(\.plannedID))
     }

@@ -4,7 +4,9 @@ struct ActiveWorkout: View {
     let store: TrainingStore
     var planner: PlanningStore? = nil
     var route: WorkoutLiveRoute? = nil
+    var routeEvent: UUID? = nil
     let onClose: () -> Void
+    var onFinished: ((TrainingSession) -> Void)? = nil
     var applyToRoutine: ((PlanExercise, PlanExercise) throws -> Void)? = nil
     var routineExercises: [PlanExercise] = []
 
@@ -12,6 +14,9 @@ struct ActiveWorkout: View {
     @State private var problem: String?
     @State private var changedFuture: UUID?
     @State private var confirmingDiscard = false
+    @State private var reviewing = false
+    @State private var chosenRow: UUID?
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private var session: TrainingSession? { store.active }
     private var exercise: TrainingExercise? {
@@ -27,55 +32,38 @@ struct ActiveWorkout: View {
     var body: some View {
         Group {
             if let session {
+                let occurrence = store.occurrences.first { $0.id == session.occurrenceID }
+                let checklist = WorkoutChecklist(session: session, occurrence: occurrence, sessions: store.sessions)
                 ScrollViewReader { scroll in
-                List {
-                    if session.isCardio {
-                        CardioLog(session: session, store: store)
-                    } else {
-                        if let exercise {
-                            Section {
-                                exerciseMenu(session: session, exercise: exercise)
-                                if !exercise.prescription.notes.isEmpty {
-                                    Text(exercise.prescription.notes).font(.subheadline).foregroundStyle(.secondary)
-                                }
-                                basisPicker(session: session, exercise: exercise)
-                            } header: {
-                                Text(session.name)
-                            }
-                            if session.rest != nil {
-                                Section("Rest") { restControls(session: session, exercise: exercise) }
-                            }
-                            Section {
-                                ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { index, row in
-                                    WorkoutSetRow(sessionID: session.id, exercise: exercise, row: row, index: index, store: store).id(row.id)
-                                }
-                            } header: {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("Set checklist")
-                                        Text("Target: \(targetDescription(exercise.prescription))").textCase(nil)
-                                    }
-                                    Spacer()
-                                    Menu {
-                                        Button("Add warm-up set") { run { try store.addSet(sessionID: session.id, exerciseID: exercise.id, warmup: true) } }
-                                        Button("Add working set") { run { try store.addSet(sessionID: session.id, exerciseID: exercise.id, warmup: false) } }
-                                    } label: {
-                                        Label("Add set", systemImage: "plus.circle").labelStyle(.iconOnly)
-                                            .frame(minWidth: 44, minHeight: 44)
-                                    }
-                                    .accessibilityIdentifier("addSet")
-                                }
-                            }
-                            if exercise.sets.allSatisfy({ $0.confirmedAt != nil }),
-                               let next = session.exercises.first(where: { $0.id != exercise.id && $0.sets.contains { $0.confirmedAt == nil } }) {
+                    List {
+                        if session.isCardio {
+                            CardioLog(session: session, store: store)
+                        } else {
+                            if let exercise {
                                 Section {
-                                    Button("Next exercise: \(next.prescription.name)") { run { try store.select(sessionID: session.id, exerciseID: next.id) } }
+                                    if !exercise.prescription.notes.isEmpty {
+                                        Text(exercise.prescription.notes).font(.subheadline).foregroundStyle(.secondary)
+                                    }
+                                    basisPicker(session: session, exercise: exercise)
+                                }
+                                if session.rest != nil {
+                                    Section("Rest timer") { restControls(session: session, exercise: exercise) }
+                                }
+                            } else {
+                                Section {
+                                    Text("Add your first exercise to start logging sets.").foregroundStyle(.secondary)
                                 }
                             }
-                            if session.rest == nil {
-                                Section("Rest") { restControls(session: session, exercise: exercise) }
+                            ForEach(checklist.groups) { group in
+                                checklistSection(group, session: session)
                             }
-                            if let original = exercise.replacedPrescription {
+                            if let exercise, exercise.sets.allSatisfy({ $0.confirmedAt != nil }),
+                               let next = session.exercises.first(where: { $0.id != exercise.id && $0.sets.contains { $0.confirmedAt == nil } }) {
+                                Button("Next exercise: \(next.prescription.name)") {
+                                    run { try store.select(sessionID: session.id, exerciseID: next.id) }
+                                }
+                            }
+                            if let exercise, let original = exercise.replacedPrescription {
                                 Section {
                                     LabeledContent("Replaced", value: original.name)
                                     if let applyToRoutine, session.occurrenceID != nil {
@@ -93,49 +81,59 @@ struct ActiveWorkout: View {
                                 }
                             }
                         }
-                        Section {
-                            Button { panel = .add } label: { Label("Add exercise", systemImage: "plus") }
-                                .accessibilityIdentifier("addCustomExercise")
-                            if let exercise, exercise.sets.contains(where: { $0.confirmedAt == nil }) {
-                                Button { panel = .swap } label: { Label("Swap remaining sets", systemImage: "arrow.triangle.2.circlepath") }
-                                    .accessibilityIdentifier("swapExercise")
-                            }
+                        Section("Workout notes") {
+                            TextField("Add a note", text: Binding(get: { store.active?.notes ?? "" }, set: { text in
+                                run { try store.note(sessionID: session.id, text: text) }
+                            }), axis: .vertical).lineLimit(1...5)
                         }
                     }
-                    Section("Workout notes") {
-                        TextField("Add a note", text: Binding(get: { store.active?.notes ?? "" }, set: { text in
-                            run { try store.note(sessionID: session.id, text: text) }
-                        }), axis: .vertical).lineLimit(1...5)
+                    .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
+                    .background(PlannerStyle.paper)
+                    .scrollDismissesKeyboard(.interactively)
+                    .onChange(of: currentRowID) { _, id in
+                        if let id { scroll.scrollTo(id, anchor: .center) }
+                    }
+                    .onChange(of: exercise?.id) { _, _ in
+                        if currentRowID == nil, let first = exercise?.sets.first {
+                            scroll.scrollTo(first.id, anchor: .center)
+                        }
+                    }
+                    .task(id: routeEvent) {
+                        if let route {
+                            panel = nil
+                            reviewing = route.review
+                            guard !route.review else { return }
+                            chosenRow = route.setID
+                            await Task.yield()
+                        }
+                        if let id = route?.setID ?? currentRowID { scroll.scrollTo(id, anchor: .center) }
                     }
                 }
-                .scrollContentBackground(.hidden)
-                .background(PlannerStyle.paper)
-                .scrollDismissesKeyboard(.interactively)
-                .task(id: route?.url) {
-                    if route?.review == true { panel = .summary }
-                    else if let setID = route?.setID { scroll.scrollTo(setID, anchor: .center) }
-                }
-                }
-                .navigationTitle(session.isCardio ? "Cardio" : "Workout")
+                .navigationTitle(session.name)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Close", action: onClose) }
-                }
-                .safeAreaInset(edge: .bottom) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if let problem { Label(problem, systemImage: "exclamationmark.circle").font(.footnote) }
-                        Button { panel = .summary } label: {
-                            Text("Review workout").frame(maxWidth: .infinity).font(.headline)
-                        }
-                        .buttonStyle(.borderedProminent).controlSize(.large).accessibilityIdentifier("reviewSession")
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close", action: onClose).accessibilityHint("Keeps this workout open to resume later")
                     }
-                    .padding(.horizontal).padding(.vertical, 8).background(.bar)
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Review") { reviewing = true }
+                            .accessibilityLabel("Review workout").accessibilityIdentifier("reviewSession")
+                    }
                 }
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if !session.isCardio { progressHeader(checklist, session: session) }
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    VStack(spacing: 0) {
+                        if let problem { Label(problem, systemImage: "exclamationmark.circle").font(.footnote).padding(8) }
+                        if !session.isCardio { actionBar(session) }
+                    }.background(PlannerStyle.surface)
+                }
+                .navigationDestination(isPresented: $reviewing) { summary(session) }
                 .sheet(item: $panel) { panel in
                     NavigationStack {
                         switch panel {
-                        case .summary:
-                            summary(session)
                         case .rest:
                             if let exercise {
                                 WorkoutRestEditor(current: exercise.restSeconds) { seconds in
@@ -160,7 +158,116 @@ struct ActiveWorkout: View {
                     .toolbar { Button("Done", action: onClose) }
             }
         }
-        .tint(PlannerStyle.blue)
+        .tint(PlannerStyle.moss)
+    }
+
+    private var currentRowID: UUID? {
+        guard let exercise else { return nil }
+        return exercise.sets.first { $0.id == chosenRow && $0.confirmedAt == nil }?.id ??
+            exercise.sets.first { $0.confirmedAt == nil }?.id
+    }
+
+    private func progressHeader(_ checklist: WorkoutChecklist, session: TrainingSession) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            if let exercise {
+                exerciseMenu(session: session, exercise: exercise)
+            }
+            HStack {
+                Text("Set checklist").font(.subheadline)
+                Spacer()
+                Text("\(checklist.completed) of \(checklist.total)").font(.subheadline.weight(.semibold)).monospacedDigit()
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(checklist.completed) of \(checklist.total) sets complete")
+            .accessibilityIdentifier("workoutSetProgress")
+            ProgressView(value: Double(checklist.completed), total: Double(max(1, checklist.total)))
+                .tint(PlannerStyle.moss).accessibilityHidden(true)
+        }
+        .foregroundStyle(PlannerStyle.ink)
+        .padding(.horizontal, 20).padding(.vertical, 10)
+        .background(PlannerStyle.surface)
+    }
+
+    private func checklistSection(_ group: WorkoutChecklist.Group, session: TrainingSession) -> some View {
+        Section {
+            ForEach(group.rows) { item in
+                switch item {
+                case .earlier(let set, let ordinal, let date):
+                    VStack(alignment: .leading, spacing: 3) {
+                        Label("Set \(ordinal) · Completed earlier", systemImage: "checkmark.circle.fill")
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(PlannerStyle.moss)
+                        Text(actualDescription(set.actual, basis: group.basis)).font(.subheadline)
+                        Text(date, format: .dateTime.month(.abbreviated).day().hour().minute()).font(.caption).foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("priorSet-\((set.plannedID ?? set.id).uuidString)")
+                case .remaining(_, let ordinal):
+                    Label("Set \(ordinal) · Remaining in plan", systemImage: "circle.dashed").font(.subheadline)
+                case .live(let row, let index):
+                    if let live = group.liveExercise, live.id == exercise?.id, row.confirmedAt != nil || row.id == currentRowID {
+                        WorkoutSetRow(sessionID: session.id, exercise: live, row: row, index: index, store: store,
+                                      isCurrent: row.id == currentRowID)
+                            .id(row.id)
+                    } else if let live = group.liveExercise {
+                        Button {
+                            run {
+                                if exercise?.id != live.id { try store.select(sessionID: session.id, exerciseID: live.id) }
+                                chosenRow = row.id
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: row.confirmedAt == nil ? "circle" : "checkmark.circle.fill")
+                                    .foregroundStyle(row.confirmedAt == nil ? .secondary : PlannerStyle.moss)
+                                Text(setTitle(row, index: index)).font(.subheadline.weight(.medium))
+                                Spacer()
+                                Text(row.confirmedAt == nil ? "Pending" : actualDescription(row.actual, basis: group.basis))
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }.frame(minHeight: 44)
+                        }.buttonStyle(.plain).id(row.id)
+                    }
+                }
+            }.listRowBackground(PlannerStyle.surface)
+        } header: {
+            HStack {
+                Text(group.prescription.name).font(.headline)
+                Spacer()
+                Text("\(group.completed)/\(group.rows.count)").font(.caption.monospacedDigit())
+            }.textCase(nil).foregroundStyle(PlannerStyle.ink)
+        } footer: {
+            Text("Target: \(targetDescription(group.prescription))")
+        }
+    }
+
+    private func actionBar(_ session: TrainingSession) -> some View {
+        let columns = typeSize.isAccessibilitySize ? 2 : 4
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: columns), spacing: 2) {
+            Button { panel = .add } label: { tool("Add exercise", "plus") }
+                .accessibilityIdentifier("addCustomExercise")
+            Menu {
+                if let exercise {
+                    Button("Add warm-up set") { run { try store.addSet(sessionID: session.id, exerciseID: exercise.id, warmup: true) } }
+                    Button("Add working set") { run { try store.addSet(sessionID: session.id, exerciseID: exercise.id, warmup: false) } }
+                }
+            } label: { tool("Add set", "plus.circle") }
+                .disabled(exercise == nil).accessibilityIdentifier("addSet")
+            Button { panel = .rest } label: { tool("Rest", "timer") }
+                .disabled(exercise == nil).accessibilityIdentifier("workoutRest")
+            Button { panel = .swap } label: { tool("Swap", "arrow.triangle.2.circlepath") }
+                .disabled(exercise?.sets.contains { $0.confirmedAt == nil } != true)
+                .accessibilityLabel("Swap remaining sets").accessibilityIdentifier("swapExercise")
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 12).padding(.vertical, 4)
+        .overlay(alignment: .top) { Rectangle().fill(PlannerStyle.rule).frame(height: 1) }
+    }
+
+    private func tool(_ label: String, _ systemImage: String) -> some View {
+        VStack(spacing: 3) {
+            Image(systemName: systemImage).font(.body.weight(.medium))
+            Text(label).font(.caption.weight(.semibold)).multilineTextAlignment(.center)
+        }
+        .foregroundStyle(PlannerStyle.moss).frame(maxWidth: .infinity, minHeight: 50)
+        .contentShape(Rectangle())
     }
 
     private func exerciseMenu(session: TrainingSession, exercise: TrainingExercise) -> some View {
@@ -240,37 +347,48 @@ struct ActiveWorkout: View {
         let hasResult = session.cardio != nil || rows.contains { $0.confirmedAt != nil }
         return List {
             TrainingSummaryContent(session: session)
+            if let occurrenceProgress {
+                Section("Scheduled workout") {
+                    LabeledContent(session.isCardio ? "Duration credited" : "Sets credited",
+                                   value: session.isCardio
+                                   ? "\(elapsedString(TimeInterval(occurrenceProgress.completed))) of \(elapsedString(TimeInterval(occurrenceProgress.total)))"
+                                   : "\(occurrenceProgress.completed) of \(occurrenceProgress.total)")
+                }
+            }
             if cardioEdits {
                 Text("Go back and confirm your activity changes before finishing.").foregroundStyle(.secondary)
             }
-            if let problem { Label(problem, systemImage: "exclamationmark.circle") }
-            Section {
-                Button(allConfirmed ? "Finish workout" : "Finish as partial") {
-                    run {
-                        try store.finish(sessionID: session.id, partial: !allConfirmed)
-                        panel = nil
-                        onClose()
-                    }
-                }
-                .disabled(!hasResult || cardioEdits)
-                .accessibilityIdentifier(allConfirmed ? "finishSession" : "finishPartial")
-                if !hasResult {
-                    Button("Discard empty workout", role: .destructive) { confirmingDiscard = true }
-                        .confirmationDialog("Discard this empty workout?", isPresented: $confirmingDiscard, titleVisibility: .visible) {
-                            Button("Discard workout", role: .destructive) {
-                                run {
-                                    try store.cancelEmpty(sessionID: session.id)
-                                    panel = nil
-                                    onClose()
-                                }
-                            }
+            if !hasResult {
+                Button("Discard empty workout", role: .destructive) { confirmingDiscard = true }
+                    .confirmationDialog("Discard this empty workout?", isPresented: $confirmingDiscard, titleVisibility: .visible) {
+                        Button("Discard workout", role: .destructive) {
+                            run { try store.cancelEmpty(sessionID: session.id); onClose() }
                         }
-                }
+                    }
             }
         }
         .navigationTitle("Workout summary")
-        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Back") { panel = nil } } }
         .scrollContentBackground(.hidden).background(PlannerStyle.paper)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
+                if let problem { Label(problem, systemImage: "exclamationmark.circle").font(.footnote) }
+                Button {
+                    run {
+                        try store.finish(sessionID: session.id, partial: !allConfirmed)
+                        if let saved = store.sessions.first(where: { $0.id == session.id }), let onFinished {
+                            onFinished(saved)
+                        } else { onClose() }
+                    }
+                } label: {
+                    Text(allConfirmed ? "Finish workout" : "Finish as partial").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent).controlSize(.large)
+                .disabled(!hasResult || cardioEdits)
+                .accessibilityIdentifier(allConfirmed ? "finishSession" : "finishPartial")
+            }
+            .padding(.horizontal, 20).padding(.vertical, 8)
+            .background(PlannerStyle.surface)
+        }
     }
 
     private func run(_ action: () throws -> Void) {
@@ -279,7 +397,7 @@ struct ActiveWorkout: View {
 }
 
 private enum WorkoutPanel: String, Identifiable {
-    case add, swap, rest, summary
+    case add, swap, rest
     var id: Self { self }
 }
 
@@ -337,6 +455,7 @@ private struct WorkoutSetRow: View {
     let row: TrainingSet
     let index: Int
     let store: TrainingStore
+    let isCurrent: Bool
 
     @State private var correctionRevision: Int?
     @State private var correction: SetActual?
@@ -365,13 +484,16 @@ private struct WorkoutSetRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(setTitle(row, index: index)).font(.headline)
-                Spacer()
-                if row.confirmedAt != nil && correction == nil {
-                    Label("Saved", systemImage: "checkmark.circle.fill")
-                        .font(.caption.weight(.semibold)).foregroundStyle(PlannerStyle.blue)
+        VStack(alignment: .leading, spacing: row.confirmedAt == nil || correction != nil ? 10 : 2) {
+            if row.confirmedAt == nil || correction != nil {
+                HStack {
+                    Text(setTitle(row, index: index)).font(.headline)
+                    Spacer()
+                    if isCurrent {
+                        Label("Current set", systemImage: "scope").font(.caption.weight(.semibold)).foregroundStyle(PlannerStyle.ochre)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Current set, \(setTitle(row, index: index))").accessibilityIdentifier("currentSetLabel")
+                    }
                 }
             }
             if let issue {
@@ -380,20 +502,27 @@ private struct WorkoutSetRow: View {
                     .accessibilityIdentifier("setIssue\(index)")
             }
             if row.confirmedAt != nil && correction == nil {
-                Text(actualDescription(row.actual, basis: exercise.basis))
-                HStack {
-                    Button("Edit result") {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Label(setTitle(row, index: index), systemImage: "checkmark.circle.fill")
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(PlannerStyle.moss)
+                            .accessibilityLabel("\(setTitle(row, index: index)), completed")
+                        Text(actualDescription(row.actual, basis: exercise.basis)).font(.subheadline)
+                    }
+                    Spacer(minLength: 0)
+                    Button {
                         correctionRevision = row.revision
                         correction = row.actual
                         issue = nil
-                    }
+                    } label: { Image(systemName: "pencil").frame(minWidth: 44, minHeight: 44) }
+                    .accessibilityLabel("Edit result for \(setTitle(row, index: index))")
                     .accessibilityIdentifier("editSet\(index)")
-                    Button("Undo") {
+                    Button {
                         do { try store.undo(sessionID: sessionID, setID: row.id, revision: row.revision); issue = nil }
                         catch { issue = error.localizedDescription }
-                    }
-                    .accessibilityIdentifier("undoSet\(index)")
-                }.buttonStyle(.bordered)
+                    } label: { Image(systemName: "arrow.uturn.backward").frame(minWidth: 44, minHeight: 44) }
+                    .accessibilityLabel("Undo \(setTitle(row, index: index))").accessibilityIdentifier("undoSet\(index)")
+                }.buttonStyle(.borderless)
             } else {
                 if row.confirmedAt == nil, let date = row.previousAt {
                     Text("Previous result · \(date.formatted(date: .abbreviated, time: .omitted))")
@@ -499,6 +628,7 @@ private struct WorkoutSetRow: View {
             guard actual.rightLoad != nil else { issue = "Enter the right-side load."; focused = .rightLoad; return }
         }
         guard let latest else { issue = "This set is no longer available."; return }
+        guard correction != nil || latest.confirmedAt == nil else { return }
         do {
             if correction != nil {
                 try store.edit(sessionID: sessionID, setID: row.id, actual: actual, revision: correctionRevision ?? row.revision)

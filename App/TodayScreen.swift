@@ -3,9 +3,10 @@ import SwiftUI
 struct TodayScreen: View {
     let plan: WeekPlan?
     let training: TrainingStore
+    @Binding var selected: Date
+    let finishPulse: Int
     let openWorkout: () -> Void
     let showRoutines: () -> Void
-    @State private var selected = Date.now
     @State private var issue: String?
     @State private var scheduling = false
     @State private var cardioName = ""
@@ -19,8 +20,11 @@ struct TodayScreen: View {
     private var datedWork: [TrainingOccurrence] {
         training.occurrences.filter { training.isScheduled($0, on: selected) }
     }
-    private var actualSessions: [TrainingSession] {
-        training.sessions.filter { training.isPerformed($0, on: selected) && $0.finishedAt != nil }.sorted { $0.startedAt > $1.startedAt }
+    private var standaloneSessions: [TrainingSession] {
+        let displayed = Set(datedWork.map(\.id))
+        return training.sessions.filter { session in
+            training.isPerformed(session, on: selected) && session.finishedAt != nil && session.occurrenceID.map(displayed.contains) != true
+        }.sorted { $0.startedAt > $1.startedAt }
     }
     private var templateOccurrence: TrainingOccurrence? {
         guard let plan else { return nil }
@@ -30,17 +34,28 @@ struct TodayScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    Text(selected.formatted(.dateTime.month(.wide).year()))
+                        .font(.system(.title, design: .serif, weight: .medium))
+                    Spacer()
+                    DatePicker("Selected date", selection: $selected, displayedComponents: .date).labelsHidden()
+                }
+                weekStrip
                 if let running = training.active {
                     Button(action: openWorkout) {
-                        Label("Resume \(running.name)", systemImage: "play.fill").frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent).controlSize(.large)
-                    .accessibilityIdentifier("resumeWorkout")
+                        HStack(spacing: 12) {
+                            Image(systemName: "play.circle.fill").font(.title)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Resume workout").font(.caption.weight(.semibold))
+                                Text(running.name).font(.headline)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption.bold())
+                        }.padding(14).foregroundStyle(PlannerStyle.moss)
+                        .background(PlannerStyle.moss.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
+                    }.buttonStyle(.plain).accessibilityIdentifier("resumeWorkout")
                 }
-                DatePicker("Selected date", selection: $selected, displayedComponents: .date)
-                    .datePickerStyle(.compact)
-                weekStrip
-                if let plan { Text(plan.name).font(.subheadline.bold()).foregroundStyle(PlannerStyle.blue) }
+                if let plan { Label(plan.name, systemImage: "calendar").font(.subheadline.weight(.semibold)).foregroundStyle(PlannerStyle.moss) }
                 if let issue {
                     Label(issue, systemImage: "exclamationmark.circle").font(.subheadline)
                 }
@@ -62,18 +77,17 @@ struct TodayScreen: View {
                     let status = training.status(for: entry)
                     let available = status == "Scheduled" || status == "Partial"
                     PlannedWorkoutCard(name: entry.name, day: entry.day, goal: entry.cardioGoalSeconds,
-                                       status: status, detail: detail(entry), canStart: available && training.active == nil,
+                                       status: status, detail: detail(entry), credited: training.slotProgress(for: entry), canStart: available && training.active == nil,
                                        startTitle: status == "Partial" ? "Continue planned workout" : startTitle,
                                        primaryID: "startOccurrence", selected: selected,
                                        start: { run { try training.startOccurrence(entry.id); openWorkout() } },
                                        move: available ? { date in run { try training.move(entry.id, to: date) } } : nil,
                                        skip: available ? { run { try training.skip(entry.id) } } : nil)
-                    ForEach(training.sessions.filter { $0.occurrenceID == entry.id && $0.finishedAt != nil && !training.isPerformed($0, on: selected) }) { contribution in
-                        NavigationLink {
-                            SavedWorkoutDetail(id: contribution.id, training: training, plan: plan)
-                        } label: {
-                            Label("View session from \(contribution.startedAt.formatted(date: .abbreviated, time: .omitted))", systemImage: "clock.arrow.circlepath")
-                        }
+                    let contributions = training.sessions.filter { $0.occurrenceID == entry.id && $0.finishedAt != nil }
+                        .sorted { $0.startedAt < $1.startedAt }
+                    if !contributions.isEmpty {
+                        SessionLogGroup(sessions: contributions, title: "Workout sessions (\(contributions.count))", training: training, plan: plan)
+
                     }
                 }
                 if let moved = templateOccurrence, !training.isScheduled(moved, on: selected) {
@@ -83,8 +97,12 @@ struct TodayScreen: View {
                         Text("No active routine").font(.title2.bold())
                         Button("Open Routines", action: showRoutines)
                     } else {
-                        Text("Rest day").font(.title.bold())
-                        Text("No workout scheduled. You can still log an extra session.").foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 12) {
+                            Image(systemName: "moon.stars").font(.title2).foregroundStyle(PlannerStyle.moss)
+                            Text("Rest day").font(.system(.largeTitle, design: .serif))
+                            Text("No workout scheduled. You can still log an extra session.").foregroundStyle(.secondary)
+                        }.frame(maxWidth: .infinity, alignment: .leading).padding(20)
+                            .background(PlannerStyle.moss.opacity(0.085), in: RoundedRectangle(cornerRadius: 20))
                     }
                 }
                 if training.active == nil {
@@ -115,15 +133,24 @@ struct TodayScreen: View {
                             .disabled(cardioName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }.padding(.top, 12)
                 }
-                if !actualSessions.isEmpty {
-                    Text("Sessions performed").font(.title3.bold())
-                    ForEach(actualSessions) { session in
+                if !standaloneSessions.isEmpty {
+                    Text("Activity on this date").font(.system(.title2, design: .serif))
+                    ForEach(standaloneSessions) { session in
+                        if let id = session.occurrenceID, let occurrence = training.occurrences.first(where: { $0.id == id }) {
+                            let parts = standaloneSessions.filter { $0.occurrenceID == id }
+                            if parts.first?.id == session.id {
+                                SessionLogGroup(sessions: parts, title: "\(occurrence.name) · \(occurrence.date.formatted(date: .abbreviated, time: .omitted))", training: training, plan: plan)
+                            }
+                        } else {
                         NavigationLink {
                             SavedWorkoutDetail(id: session.id, training: training, plan: plan)
                         } label: {
                             HStack {
                                 VStack(alignment: .leading) {
                                     Text(session.name).font(.headline)
+                                    if let origin = training.occurrences.first(where: { $0.id == session.occurrenceID }) {
+                                        Text("Planned for \(origin.date.formatted(date: .abbreviated, time: .omitted))").font(.caption)
+                                    }
                                     Text("\(session.startedAt.formatted(date: .omitted, time: .shortened)) · \(session.partial ? "Finished partial" : "Finished")")
                                         .font(.subheadline).foregroundStyle(.secondary)
                                 }
@@ -131,12 +158,13 @@ struct TodayScreen: View {
                                 Image(systemName: "chevron.right").font(.caption)
                             }
                         }.accessibilityIdentifier("savedSession")
+                        }
                     }
                 }
             }.padding(.horizontal, 20).padding(.bottom, 20)
         }
         .background(PlannerStyle.paper)
-        .navigationTitle("Today")
+        .navigationTitle("Today").navigationBarTitleDisplayMode(.inline)
         .onChange(of: selected) { _, _ in issue = nil; scheduling = false }
     }
 
@@ -158,23 +186,66 @@ struct TodayScreen: View {
     }
 
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reducedMotion
     @ViewBuilder private var weekStrip: some View {
-        if !typeSize.isAccessibilitySize {
-            HStack(spacing: 2) {
-                ForEach(week, id: \.self) { date in
-                    let isSelected = calendar.isDate(date, inSameDayAs: selected)
-                    Button { selected = date } label: {
-                        VStack(spacing: 5) {
-                            Text(date, format: .dateTime.weekday(.narrow)).font(.caption)
-                            Text(date, format: .dateTime.day()).font(.headline.monospacedDigit())
-                        }.frame(maxWidth: .infinity, minHeight: 55)
-                        .foregroundStyle(isSelected ? Color.white : .primary)
-                        .background(isSelected ? PlannerStyle.blue : Color.clear, in: RoundedRectangle(cornerRadius: 12))
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: typeSize.isAccessibilitySize ? 4 : 7)
+        LazyVGrid(columns: columns, spacing: 6) {
+            ForEach(week, id: \.self) { date in
+                let isSelected = calendar.isDate(date, inSameDayAs: selected)
+                let entries = training.occurrences.filter { training.isScheduled($0, on: date) }
+                let index = CivilTrainingDay(date).mondayIndex
+                let templateScheduled = (plan?.days[safe: index]?.isWorkout == true) &&
+                    !training.occurrences.contains { $0.planID == plan?.id && training.isOriginal($0, on: date) && !training.isScheduled($0, on: date) }
+                let pendingTemplate = templateScheduled && !entries.contains { $0.planID == plan?.id && training.isOriginal($0, on: date) }
+                let complete = !pendingTemplate && !entries.isEmpty && entries.allSatisfy { training.status(for: $0).hasPrefix("Done") }
+                let planned = templateScheduled || !entries.isEmpty
+                Button { selected = date } label: {
+                    VStack(spacing: 4) {
+                        Text(date, format: .dateTime.weekday(.abbreviated)).font(.caption2)
+                        Text(date, format: .dateTime.day()).font(.system(.headline, design: .rounded).monospacedDigit())
+                        Image(systemName: complete ? "checkmark.circle.fill" : planned ? "dumbbell.fill" : "minus")
+                            .font(.caption2)
+                            .symbolEffect(.bounce, value: reducedMotion || !isSelected ? 0 : finishPulse)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("weekday\((calendar.component(.weekday, from: date) + 5) % 7)")
+                    .frame(maxWidth: .infinity).padding(.vertical, 9)
+                    .foregroundStyle(isSelected ? Color(uiColor: .systemBackground) : PlannerStyle.moss)
+                    .background(isSelected ? PlannerStyle.moss : PlannerStyle.moss.opacity(0.065), in: RoundedRectangle(cornerRadius: 12))
+                }.buttonStyle(.plain)
+                    .accessibilityIdentifier("weekday\(index)")
                     .accessibilityLabel(date.formatted(date: .complete, time: .omitted))
+                    .accessibilityValue(complete ? "Complete" : planned ? "Workout" : "Rest day")
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+    }
+}
+
+private struct SessionLogGroup: View {
+    let sessions: [TrainingSession]
+    let title: String
+    let training: TrainingStore
+    let plan: WeekPlan?
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button { expanded.toggle() } label: {
+                HStack { Label(title, systemImage: "clock.arrow.circlepath"); Spacer(); Image(systemName: expanded ? "chevron.up" : "chevron.down") }
+                    .frame(minHeight: 44)
+            }.accessibilityIdentifier("workoutSessions").accessibilityValue(expanded ? "Expanded" : "Collapsed")
+            if expanded {
+                ForEach(Array(sessions.sorted { $0.startedAt < $1.startedAt }.enumerated()), id: \.element.id) { index, item in
+                    Divider()
+                    NavigationLink {
+                        SavedWorkoutDetail(id: item.id, training: training, plan: plan)
+                    } label: {
+                        HStack {
+                            Text("Session \(index + 1)").font(.headline)
+                            Spacer()
+                            Text(item.startedAt.formatted(date: .abbreviated, time: .shortened)).font(.subheadline)
+                            Image(systemName: "chevron.right").font(.caption)
+                        }.padding(.vertical, 10)
+                    }.accessibilityIdentifier("savedSession")
                 }
             }
         }
@@ -191,6 +262,7 @@ private struct PlannedWorkoutCard: View {
     let goal: Int?
     let status: String
     let detail: String?
+    var credited: [UUID: [Bool]] = [:]
     let canStart: Bool
     let startTitle: String
     let primaryID: String
@@ -202,27 +274,50 @@ private struct PlannedWorkoutCard: View {
     @State private var editingSchedule = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(name).font(.system(.title, design: .rounded, weight: .bold))
-            HStack {
-                Text(status).font(.subheadline.weight(.semibold)).foregroundStyle(PlannerStyle.blue)
-                if let goal { Text("\(goal / 60) min").foregroundStyle(.secondary) }
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(status, systemImage: status.hasPrefix("Done") ? "checkmark.circle.fill" : "calendar")
+                    .font(.subheadline.weight(.semibold))
+                Text(name).font(.system(.largeTitle, design: .serif, weight: .medium))
+                if let detail { Text(detail).font(.subheadline) }
+                else if let goal { Text("\(goal / 60) min cardio").font(.subheadline) }
+                else if let day {
+                    Text("\(day.exercises.count) prescribed exercises")
+                        .font(.subheadline.weight(.medium))
+                }
+            }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundStyle(Color.white).background(PlannerStyle.forest)
+            if let day {
+                ForEach(day.exercises) { exercise in
+                    let slots = credited[exercise.id] ?? []
+                    let completed = slots.filter { $0 }.count
+                    HStack(spacing: 14) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(exercise.name).font(.headline)
+                            Text(prescription(exercise))
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        if exercise.sets <= 6 {
+                            HStack(spacing: 3) {
+                                ForEach(0..<max(0, exercise.sets), id: \.self) { index in
+                                    Capsule().fill((slots.indices.contains(index) && slots[index]) ? PlannerStyle.moss : PlannerStyle.rule)
+                                        .frame(width: 5, height: 16)
+                                }
+                            }.accessibilityElement(children: .ignore)
+                                .accessibilityLabel("\(completed) of \(exercise.sets) sets complete")
+                        } else {
+                            Text("\(completed)/\(exercise.sets)").font(.subheadline.monospacedDigit())
+                                .accessibilityLabel("\(completed) of \(exercise.sets) sets complete")
+                        }
+                    }.padding(.horizontal, 18).padding(.vertical, 12)
+                    Divider().padding(.leading, 18)
+                }
             }
-            if let detail { Text(detail).font(.subheadline) }
             if canStart {
                 Button(action: start) {
                     Label(startTitle, systemImage: "play.fill").frame(maxWidth: .infinity)
-                }.buttonStyle(.borderedProminent).controlSize(.large).accessibilityIdentifier(primaryID)
-            }
-            if let day, !day.exercises.isEmpty {
-                DisclosureGroup("Exercises (\(day.exercises.count))") {
-                    ForEach(day.exercises) { row in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(row.name).font(.body.weight(.medium))
-                            Text(prescription(row)).font(.subheadline).foregroundStyle(.secondary)
-                        }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 6)
-                    }
-                }
+                }.buttonStyle(.borderedProminent).controlSize(.large).padding(14).accessibilityIdentifier(primaryID)
             }
             if move != nil || skip != nil {
                 DisclosureGroup("Change schedule", isExpanded: $editingSchedule) {
@@ -236,10 +331,10 @@ private struct PlannedWorkoutCard: View {
                             Button("Skip this scheduled workout") { editingSchedule = false; skip() }
                         }
                     }.padding(.top, 10)
-                }
+                }.padding(14)
             }
         }
-        .padding(16).background(.background, in: RoundedRectangle(cornerRadius: 18))
+        .background(PlannerStyle.surface).clipShape(RoundedRectangle(cornerRadius: 20))
         .onChange(of: editingSchedule) { _, expanded in if expanded { destination = selected } }
     }
 }

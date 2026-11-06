@@ -40,7 +40,8 @@ final class TrainUITests: XCTestCase {
         tap(app.buttons["startPlanned"])
         let confirm = app.buttons["confirmSet0"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 10))
-        capture("Planned workout", in: app)
+        XCTAssertFalse(app.tabBars.buttons["Today"].isHittable)
+        capture("Full-screen planned workout", in: app)
         tap(confirm)
         XCTAssertTrue(app.descendants(matching: .any)["setIssue0"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["undoSet0"].exists)
@@ -64,6 +65,55 @@ final class TrainUITests: XCTestCase {
         tap(app.buttons["weekday0"])
         XCTAssertTrue(app.staticTexts["Partial"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "1 / 6 sets")).firstMatch.exists)
+        let groups = app.buttons.matching(identifier: "workoutSessions")
+        XCTAssertEqual(groups.count, 1)
+        tap(groups.element)
+        XCTAssertTrue(app.buttons.matching(identifier: "savedSession").firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons.matching(identifier: "savedSession").count, 1)
+        capture("Partial planned workout grouped on Today", in: app)
+
+        tap(app.buttons["startOccurrence"])
+        let total = app.descendants(matching: .any)["workoutSetProgress"]
+        XCTAssertTrue(total.waitForExistence(timeout: 5))
+        XCTAssertTrue((total.label + String(describing: total.value)).contains("1 of 6"))
+        let prior = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "priorSet-"))
+        XCTAssertEqual(prior.count, 1)
+        XCTAssertTrue(prior.element.label.contains("10"))
+        XCTAssertTrue(prior.element.label.contains("25"))
+        let next = app.descendants(matching: .any).matching(identifier: "currentSetLabel").firstMatch
+        XCTAssertEqual(next.label, "Current set, Set 2")
+        capture("Resumed workout with earlier set", in: app)
+
+        for (field, value) in [(app.textFields["actualReps0"], "11"), (app.textFields["actualLoad0"], "30")] {
+            tap(field)
+            if (field.value as? String)?.first?.isNumber == true {
+                field.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).doubleTap()
+            }
+            field.typeText(value)
+            XCTAssertEqual(field.value as? String, value)
+        }
+        if app.buttons["dismissSetKeyboard"].isHittable { tap(app.buttons["dismissSetKeyboard"]) }
+        tap(app.buttons["confirmSet0"])
+        tap(app.buttons["reviewSession"])
+        tap(app.buttons["finishPartial"])
+        let today = app.tabBars.buttons["Today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 10))
+        XCTAssertTrue(today.isSelected)
+        XCTAssertTrue(app.buttons["weekday0"].isSelected)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "2 / 6 sets")).firstMatch.exists)
+        XCTAssertEqual(groups.count, 1)
+        let segments = app.buttons.matching(identifier: "savedSession")
+        if segments.count == 0 { tap(groups.element) }
+        XCTAssertTrue(segments.element(boundBy: 1).waitForExistence(timeout: 5))
+        XCTAssertEqual(segments.count, 2)
+        tap(segments.element(boundBy: 0))
+        XCTAssertTrue(app.navigationBars["Lower body"].waitForExistence(timeout: 5))
+
+        tap(app.tabBars.buttons["Progress"])
+        let adherence = app.descendants(matching: .any)["adherence"]
+        XCTAssertTrue(adherence.waitForExistence(timeout: 5))
+        XCTAssertEqual(adherence.value as? String, "0 of 3")
+        capture("Progress after two partial sessions", in: app)
     }
 
     func testAssignSavedExtraCardioToScheduledGoal() {
@@ -94,10 +144,62 @@ final class TrainUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 10))
         XCTAssertTrue(credit.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Partial"].exists)
+        let group = app.buttons["workoutSessions"]
+        XCTAssertTrue(group.exists)
+        XCTAssertEqual(saved.count, 0)
+        tap(group)
+        XCTAssertTrue(saved.firstMatch.waitForExistence(timeout: 5))
         XCTAssertEqual(saved.count, 1)
         tap(saved.firstMatch)
         XCTAssertTrue(app.navigationBars["Cardio"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["Assign to planned work"].exists)
+        tap(app.navigationBars.buttons.element(boundBy: 0))
+
+        tap(app.buttons["extraCardio"])
+        enter("120", in: app.textFields["cardioSeconds"])
+        tap(app.buttons["confirmCardio"])
+        tap(app.buttons["reviewSession"])
+        tap(app.buttons["finishSession"])
+        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 10))
+        XCTAssertTrue(credit.exists)
+        if saved.count == 2 { tap(group) }
+        XCTAssertEqual(saved.count, 1)
+        tap(saved.element)
+        XCTAssertTrue(app.buttons["Assign to planned work"].waitForExistence(timeout: 5))
+        tap(app.navigationBars.buttons.element(boundBy: 0))
+        tap(group)
+        XCTAssertEqual(saved.count, 2)
+        capture("Planned activity and separate extra cardio", in: app)
+    }
+
+    func testFulfilledCardioMarksOnlyItsScheduledDayComplete() {
+        let app = startWithRoutine()
+        tap(app.buttons["weekday6"])
+        XCTAssertTrue(app.staticTexts["Rest day"].waitForExistence(timeout: 5))
+        tap(app.buttons["Schedule a cardio activity"])
+        enter("Sunday walk", in: app.textFields["scheduledCardioName"])
+        tap(app.buttons["saveScheduledCardio"])
+        XCTAssertEqual(app.buttons["weekday6"].value as? String, "Workout")
+        tap(app.buttons["startOccurrence"])
+        enter("1200", in: app.textFields["cardioSeconds"])
+        tap(app.buttons["confirmCardio"])
+        tap(app.buttons["reviewSession"])
+        tap(app.buttons["finishSession"])
+
+        let today = app.tabBars.buttons["Today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 10))
+        XCTAssertTrue(today.isSelected)
+        XCTAssertTrue(app.buttons["weekday6"].isSelected)
+        XCTAssertEqual(app.buttons["weekday6"].value as? String, "Complete")
+        XCTAssertEqual(app.buttons["weekday0"].value as? String, "Workout")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "1200 / 1200 seconds")).firstMatch.exists)
+        tap(app.buttons["workoutSessions"])
+        let segments = app.buttons.matching(identifier: "savedSession")
+        XCTAssertTrue(segments.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(segments.count, 1)
+        capture("Completed cardio on scheduled day", in: app)
+        tap(segments.element)
+        XCTAssertTrue(app.navigationBars["Sunday walk"].waitForExistence(timeout: 5))
     }
 
     func testExtraCardioOnARestDay() {
@@ -114,6 +216,10 @@ final class TrainUITests: XCTestCase {
         tap(app.buttons["finishSession"])
         XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["resumeWorkout"].exists)
+        let performedWeekday = (Calendar.current.component(.weekday, from: Date()) + 5) % 7
+        XCTAssertTrue(app.buttons["weekday\(performedWeekday)"].isSelected)
+        XCTAssertTrue(app.buttons["savedSession"].exists)
+        tap(app.buttons["weekday6"])
         XCTAssertTrue(app.staticTexts["Rest day"].exists)
         tap(app.buttons["weekday0"])
         XCTAssertTrue(app.buttons["startPlanned"].waitForExistence(timeout: 5))
