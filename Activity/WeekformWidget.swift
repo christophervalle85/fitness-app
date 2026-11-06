@@ -20,12 +20,28 @@ private struct WorkoutActivityWidget: Widget {
                 .widgetURL(WorkoutLiveRoute(context.attributes, state: context.state).url)
         } dynamicIsland: { context in
             DynamicIsland {
-                DynamicIslandExpandedRegion(.bottom) { WorkoutLiveControls(context: context) }
+                DynamicIslandExpandedRegion(.leading) {
+                    Label(context.state.restStart == nil ? "Workout" : (context.state.restPausedAt == nil ? "Rest" : "Paused"),
+                          systemImage: context.state.restStart == nil ? "figure.strengthtraining.traditional" : "timer")
+                        .font(.caption.bold()).foregroundStyle(.white)
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    if context.state.restStart != nil {
+                        RestClock(state: context.state).frame(width: 68, alignment: .trailing)
+                            .font(.headline).foregroundStyle(.white)
+                    }
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    WorkoutLiveControls(context: context, island: true)
+                        .foregroundStyle(.white)
+                }
             } compactLeading: {
                 Image(systemName: "dumbbell.fill").accessibilityLabel("Workout active")
             } compactTrailing: {
                 if context.state.restStart != nil {
-                    Image(systemName: context.state.restPausedAt == nil ? "timer" : "pause.fill").accessibilityLabel("Rest")
+                    RestClock(state: context.state)
+                        .font(.caption2.weight(.semibold)).frame(width: 41, alignment: .trailing)
+                        .foregroundStyle(.white)
                 } else if let number = context.state.ordinal {
                     Text("\(number)").monospacedDigit().accessibilityLabel("Set \(number)")
                 } else { Image(systemName: "checkmark.circle") }
@@ -37,53 +53,80 @@ private struct WorkoutActivityWidget: Widget {
     }
 }
 
+private struct RestClock: View {
+    let state: WorkoutLiveActivity.ContentState
+
+    @ViewBuilder var body: some View {
+        if let start = state.restStart, start <= .distantFuture {
+            Group {
+                if let paused = state.restPausedAt {
+                    let seconds = max(0, Int(exactly: paused.timeIntervalSince(start).rounded(.down)) ?? 0)
+                    Text(restDuration(seconds))
+                } else {
+                    Text(timerInterval: start...Date.distantFuture, countsDown: false)
+                }
+            }
+            .monospacedDigit().lineLimit(1).minimumScaleFactor(0.65)
+            .accessibilityLabel(state.restPausedAt == nil ? "Elapsed rest" : "Paused rest")
+        }
+    }
+}
+
+private func restDuration(_ seconds: Int) -> String {
+    let value = max(0, seconds)
+    return "\(value / 60):" + String(format: "%02d", value % 60)
+}
+
 private struct WorkoutLiveControls: View {
     let context: ActivityViewContext<WorkoutLiveActivity>
+    var island = false
     @Environment(\.redactionReasons) private var redactions
     private var state: WorkoutLiveActivity.ContentState { context.state }
     private var url: URL { WorkoutLiveRoute(context.attributes, state: state).url }
 
     var body: some View {
-        ViewThatFits(in: .vertical) {
-            fullControls.fixedSize(horizontal: false, vertical: true)
-            // If complete actuals and their action cannot fit together, the
-            // user can inspect and confirm the same set in the app.
-            Link("Open workout", destination: url)
-        }
-    }
-
-    private var fullControls: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(state.exerciseName ?? "Weekform workout").font(.headline).privacySensitive(state.exerciseName != nil)
-            if let number = state.ordinal {
-                Text("\(state.warmup ? "Warm-up" : "Set") \(number)").font(.caption)
-            }
-            if let result = state.result { Text(result).font(.subheadline).monospacedDigit().privacySensitive() }
-            if let start = state.restStart, let target = state.restTarget {
-                HStack(spacing: 4) {
-                    Text(state.restPausedAt == nil ? "Rest timer" : "Rest timer paused")
-                    if let paused = state.restPausedAt {
-                        let elapsed = paused.timeIntervalSince(start)
-                        if elapsed.isFinite, elapsed < Double(Int.max) {
-                            Text(duration(Int(max(0, elapsed))))
-                        }
-                    } else if start <= .distantFuture {
-                        Text(timerInterval: start...Date.distantFuture, countsDown: false)
-                            .monospacedDigit().fixedSize()
-                    }
-                    Text("· target \(duration(target))")
-                }.font(.caption)
-            }
             HStack {
+                Text(state.exerciseName ?? "Weekform workout")
+                    .font(.headline).lineLimit(1).privacySensitive(state.exerciseName != nil)
+                Spacer(minLength: 4)
+                if let number = state.ordinal {
+                    Text("\(state.warmup ? "Warm-up" : "Set") \(number)").font(.caption.bold())
+                }
+            }
+            if state.restStart != nil, let target = state.restTarget {
+                HStack(spacing: 5) {
+                    if !island {
+                        Text(state.restPausedAt == nil ? "Rest" : "Paused")
+                        RestClock(state: state).frame(width: 66, alignment: .leading)
+                    }
+                    Text("Target \(restDuration(target))")
+                }.font(.caption.weight(.semibold))
+            }
+            if state.primary != .confirm, let result = state.result {
+                Text(result).font(.subheadline.weight(.medium)).monospacedDigit()
+                    .lineLimit(2).privacySensitive()
+            }
+            HStack(spacing: 8) {
                 switch state.primary {
                 case .edit:
                     Link(state.setID == nil ? "Open workout" : "Edit result", destination: url)
                 case .review:
                     Link("Review workout", destination: url)
                 case .confirm:
-                    if redactions.isEmpty {
-                        action(state.finalSet ? "Log final set" : (state.willRest ? "Confirm & rest" : "Confirm set"), .confirm)
-                        Link("Edit", destination: url)
+                    if redactions.isEmpty, let result = state.result, !result.isEmpty {
+                        ViewThatFits {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(result).font(.subheadline.weight(.medium))
+                                    .monospacedDigit().lineLimit(nil).privacySensitive()
+                                HStack {
+                                    action(state.finalSet ? "Log final set" : (state.willRest ? "Confirm & rest" : "Confirm set"), .confirm)
+                                    Link("Edit", destination: url)
+                                }
+                            }
+                            .fixedSize(horizontal: true, vertical: true)
+                            Link("Edit in app", destination: url)
+                        }
                     } else {
                         Link("Open workout", destination: url)
                     }
@@ -94,7 +137,7 @@ private struct WorkoutLiveControls: View {
                 case .startSet:
                     action("Start set", .startSet)
                 }
-                if state.canStartSet { action("Start set", .startSet) }
+                if state.canStartSet && state.primary != .startSet { action("Start set", .startSet) }
             }
             .font(.caption.weight(.semibold))
             .buttonStyle(.bordered)
@@ -106,9 +149,7 @@ private struct WorkoutLiveControls: View {
         Button(intent: WorkoutLiveIntent(action, activityID: context.activityID, state: state)) { Text(title) }
     }
 
-    private func duration(_ seconds: Int) -> String {
-        "\(seconds / 60):" + String(format: "%02d", seconds % 60)
-    }
+
 }
 
 #if WEEKFORM_DEVELOPMENT
