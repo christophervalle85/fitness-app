@@ -1,16 +1,18 @@
 import SwiftUI
 
-struct TodayScreen: View {
+struct PlanScreen: View {
     let plan: WeekPlan?
     let training: TrainingStore
     @Binding var selected: Date
     let finishPulse: Int
     let openWorkout: () -> Void
     let showRoutines: () -> Void
+    let requestPlanStart: (PlanStartTarget) -> Void
+    var onRootVisibilityChanged: (Bool) -> Void = { _ in }
     @State private var issue: String?
-    @State private var scheduling = false
-    @State private var cardioName = ""
-    @State private var cardioMinutes = 20
+    @State private var calendarOpen = false
+    @State private var reviewID: UUID?
+    @Environment(\.layoutDirection) private var layoutDirection
     private var calendar: Calendar { .autoupdatingCurrent }
     private var weekday: Int { (calendar.component(.weekday, from: selected) + 5) % 7 }
     private var week: [Date] {
@@ -34,27 +36,15 @@ struct TodayScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                HStack {
-                    Text(selected.formatted(.dateTime.month(.wide).year()))
-                        .font(.system(.title, design: .serif, weight: .medium))
-                    Spacer()
-                    DatePicker("Selected date", selection: $selected, displayedComponents: .date).labelsHidden()
-                }
+                calendarHeader
                 weekStrip
-                if let running = training.active {
-                    Button(action: openWorkout) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "play.circle.fill").font(.title)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Resume workout").font(.caption.weight(.semibold))
-                                Text(running.name).font(.headline)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right").font(.caption.bold())
-                        }.padding(14).foregroundStyle(PlannerStyle.moss)
-                        .background(PlannerStyle.moss.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
-                    }.buttonStyle(.plain).accessibilityIdentifier("resumeWorkout")
-                }
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(DragGesture(minimumDistance: 28).onEnded { drag in
+                        let delta = drag.translation
+                        guard abs(delta.width) > 48, abs(delta.width) > abs(delta.height) * 1.5 else { return }
+                        let forward = layoutDirection == .leftToRight ? delta.width < 0 : delta.width > 0
+                        changeWeek(forward ? 1 : -1)
+                    })
                 if let plan { Label(plan.name, systemImage: "calendar").font(.subheadline.weight(.semibold)).foregroundStyle(PlannerStyle.moss) }
                 if let issue {
                     Label(issue, systemImage: "exclamationmark.circle").font(.subheadline)
@@ -62,27 +52,28 @@ struct TodayScreen: View {
                 if let plan, plan.days.count == 7, templateOccurrence == nil, plan.days[weekday].isWorkout {
                     let day = plan.days[weekday]
                     PlannedWorkoutCard(name: day.name, day: day, goal: day.cardioGoalSeconds,
-                                       status: "Scheduled", detail: nil, canStart: training.active == nil,
+                                       status: "Scheduled", detail: nil, canStart: true,
                                        startTitle: startTitle, primaryID: "startPlanned", selected: selected,
-                                       start: { run { try training.startPlanned(plan: plan, date: selected); openWorkout() } },
-                                       move: { target in run {
-                                           let id = try training.materialize(plan: plan, date: selected)
-                                           try training.move(id, to: target)
-                                       } }, skip: { run {
-                                           let id = try training.materialize(plan: plan, date: selected)
-                                           try training.skip(id)
-                                       } })
+                                       start: { requestPlanStart(.template(plan, selected)) },
+                                       move: { target in
+                                           try training.move(plan: plan, date: selected, to: target)
+                                           selected = target
+                                       }, skip: {
+                                           try training.skip(plan: plan, date: selected)
+                                       })
                 }
                 ForEach(datedWork) { entry in
                     let status = training.status(for: entry)
                     let available = status == "Scheduled" || status == "Partial"
+                    let here = training.active?.occurrenceID == entry.id
                     PlannedWorkoutCard(name: entry.name, day: entry.day, goal: entry.cardioGoalSeconds,
-                                       status: status, detail: detail(entry), credited: training.slotProgress(for: entry), canStart: available && training.active == nil,
-                                       startTitle: status == "Partial" ? "Continue planned workout" : startTitle,
-                                       primaryID: "startOccurrence", selected: selected,
-                                       start: { run { try training.startOccurrence(entry.id); openWorkout() } },
-                                       move: available ? { date in run { try training.move(entry.id, to: date) } } : nil,
-                                       skip: available ? { run { try training.skip(entry.id) } } : nil)
+                                       status: status, detail: detail(entry), credited: training.slotProgress(for: entry), canStart: here || available,
+                                       startTitle: here ? "Resume workout" : status == "Partial" ? "Continue planned workout" : startTitle,
+                                       primaryID: here ? "resumeWorkout" : "startOccurrence", selected: selected,
+                                       start: { if here { openWorkout() } else { requestPlanStart(.occurrence(entry.id)) } },
+                                       move: available && !here ? { date in try training.move(entry.id, to: date); selected = date } : nil,
+                                       skip: available && !here ? { try training.skip(entry.id) } : nil,
+                                       review: !here && status.hasPrefix("Done") ? { reviewID = entry.id } : nil)
                     let contributions = training.sessions.filter { $0.occurrenceID == entry.id && $0.finishedAt != nil }
                         .sorted { $0.startedAt < $1.startedAt }
                     if !contributions.isEmpty {
@@ -105,33 +96,23 @@ struct TodayScreen: View {
                             .background(PlannerStyle.moss.opacity(0.085), in: RoundedRectangle(cornerRadius: 20))
                     }
                 }
+                NavigationLink {
+                    AddCardioScreen(selected: selected, training: training, onScheduled: { selected = $0 })
+                } label: {
+                    Label("Add cardio", systemImage: "figure.run").frame(minHeight: 44)
+                }.accessibilityIdentifier("scheduleCardio")
                 if training.active == nil {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Train today").font(.headline)
+                        Text("Train now").font(.headline)
                         HStack {
                             Button { run { try training.startExtra(name: "Extra workout"); openWorkout() } }
                                 label: { Label("Extra workout", systemImage: "plus") }
                                 .accessibilityIdentifier("extraWorkout")
                             Button { run { try training.startCardio(name: "Cardio"); openWorkout() } }
-                                label: { Label("Cardio", systemImage: "figure.run") }
+                                label: { Label("Log cardio", systemImage: "figure.run") }
                                 .accessibilityIdentifier("extraCardio")
                         }.buttonStyle(.bordered)
                     }
-                }
-                DisclosureGroup("Schedule a cardio activity", isExpanded: $scheduling) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        TextField("Activity name", text: $cardioName).textFieldStyle(.roundedBorder)
-                            .accessibilityIdentifier("scheduledCardioName")
-                        Stepper("Duration · \(cardioMinutes) min", value: $cardioMinutes, in: 1...1440)
-                        Button("Schedule for \(selected.formatted(date: .abbreviated, time: .omitted))") {
-                            run {
-                                try training.scheduleCardio(name: cardioName, date: selected, goalSeconds: cardioMinutes * 60)
-                                cardioName = ""
-                                scheduling = false
-                            }
-                        }.buttonStyle(.bordered).accessibilityIdentifier("saveScheduledCardio")
-                            .disabled(cardioName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }.padding(.top, 12)
                 }
                 if !standaloneSessions.isEmpty {
                     Text("Activity on this date").font(.system(.title2, design: .serif))
@@ -161,8 +142,60 @@ struct TodayScreen: View {
             }.padding(.horizontal, 20).padding(.bottom, 20)
         }
         .background(PlannerStyle.paper)
-        .navigationTitle("Today").navigationBarTitleDisplayMode(.inline)
-        .onChange(of: selected) { _, _ in issue = nil; scheduling = false }
+        .onAppear { onRootVisibilityChanged(true) }
+        .onDisappear { onRootVisibilityChanged(false) }
+        .navigationTitle("Plan").navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $calendarOpen) {
+            PlanMonthCalendar(date: selected) { date in selected = date; calendarOpen = false }
+        }
+        .navigationDestination(item: $reviewID) { id in
+            if let entry = training.occurrences.first(where: { $0.id == id }) {
+                List {
+                    Section(entry.name) {
+                        LabeledContent("Planned date", value: entry.date.formatted(date: .abbreviated, time: .omitted))
+                        LabeledContent("Status", value: training.status(for: entry))
+                        if let progress = detail(entry) { Text(progress) }
+                    }
+                    Section("Workout sessions") {
+                        ForEach(training.sessions.filter { $0.occurrenceID == id && $0.finishedAt != nil }.sorted { $0.startedAt < $1.startedAt }) { item in
+                            NavigationLink {
+                                SavedWorkoutDetail(id: item.id, training: training, plan: plan)
+                            } label: {
+                                VStack(alignment: .leading) {
+                                    Text(item.name).font(.headline)
+                                    Text(item.startedAt.formatted(date: .abbreviated, time: .shortened)).font(.subheadline)
+                                }
+                            }.accessibilityIdentifier("reviewedSession")
+                        }
+                    }
+                }.navigationTitle("Workout review")
+            }
+        }
+        .onChange(of: selected) { _, _ in issue = nil }
+    }
+
+    private var calendarHeader: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button { calendarOpen = true } label: {
+                Text(selected.formatted(.dateTime.month(.wide).year()))
+                    .font(.system(.title, design: .serif, weight: .medium)).foregroundStyle(PlannerStyle.ink)
+                    .fixedSize(horizontal: false, vertical: true).frame(minHeight: 44)
+            }.buttonStyle(.plain).accessibilityIdentifier("monthYear").accessibilityHint("Choose a date in the calendar.")
+            HStack {
+                if !calendar.isDateInToday(selected) {
+                    Button("Today") { selected = .now }.accessibilityIdentifier("jumpToToday")
+                }
+                Spacer()
+                Button("Previous week", systemImage: "chevron.backward") { changeWeek(-1) }
+                    .accessibilityIdentifier("previousWeek")
+                Button("Next week", systemImage: "chevron.forward") { changeWeek(1) }
+                    .accessibilityIdentifier("nextWeek")
+            }.labelStyle(.iconOnly).buttonStyle(.bordered).controlSize(.large)
+        }
+    }
+
+    private func changeWeek(_ direction: Int) {
+        if let date = calendar.date(byAdding: .day, value: 7 * direction, to: selected) { selected = date }
     }
 
     private var startTitle: String {
@@ -198,7 +231,7 @@ struct TodayScreen: View {
                 let planned = templateScheduled || !entries.isEmpty
                 Button { selected = date } label: {
                     VStack(spacing: 4) {
-                        Text(date, format: .dateTime.weekday(.abbreviated)).font(.caption2)
+                        Text(calendar.isDateInToday(date) ? "Today" : date.formatted(.dateTime.weekday(.abbreviated))).font(.caption2)
                         Text(date, format: .dateTime.day()).font(.system(.headline, design: .rounded).monospacedDigit())
                         Image(systemName: complete ? "checkmark.circle.fill" : planned ? "dumbbell.fill" : "minus")
                             .font(.caption2)
@@ -207,12 +240,43 @@ struct TodayScreen: View {
                     .frame(maxWidth: .infinity).padding(.vertical, 9)
                     .foregroundStyle(isSelected ? Color(uiColor: .systemBackground) : PlannerStyle.moss)
                     .background(isSelected ? PlannerStyle.moss : PlannerStyle.moss.opacity(0.065), in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(alignment: .bottom) {
+                        if calendar.isDateInToday(date) {
+                            Capsule().fill(isSelected ? Color(uiColor: .systemBackground) : PlannerStyle.ochre).frame(width: 15, height: 3)
+                        }
+                    }
                 }.buttonStyle(.plain)
                     .accessibilityIdentifier("weekday\(index)")
-                    .accessibilityLabel(date.formatted(date: .complete, time: .omitted))
+                    .accessibilityLabel((calendar.isDateInToday(date) ? "Today, " : "") + date.formatted(date: .complete, time: .omitted))
                     .accessibilityValue(complete ? "Complete" : planned ? "Workout" : "Rest day")
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
+        }
+    }
+}
+
+private struct PlanMonthCalendar: View {
+    @State private var date: Date
+    let choose: (Date) -> Void
+
+    init(date: Date, choose: @escaping (Date) -> Void) {
+        _date = State(initialValue: date)
+        self.choose = choose
+    }
+
+    var body: some View {
+        ScrollView {
+            DatePicker("Plan date", selection: $date, displayedComponents: .date)
+                .datePickerStyle(.graphical).padding()
+        }
+        .background(PlannerStyle.paper)
+        .navigationTitle("Calendar")
+        .safeAreaInset(edge: .bottom) {
+            Button { choose(date) } label: {
+                Text("Show \(date.formatted(.dateTime.month(.abbreviated).day()))")
+                    .frame(maxWidth: .infinity)
+            }.buttonStyle(.borderedProminent).controlSize(.large).padding()
+             .accessibilityIdentifier("showPlanDate")
         }
     }
 }
@@ -265,10 +329,9 @@ private struct PlannedWorkoutCard: View {
     let primaryID: String
     let selected: Date
     let start: () -> Void
-    let move: ((Date) -> Void)?
-    let skip: (() -> Void)?
-    @State private var destination = Date.now
-    @State private var editingSchedule = false
+    let move: ((Date) throws -> Void)?
+    let skip: (() throws -> Void)?
+    var review: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -316,23 +379,19 @@ private struct PlannedWorkoutCard: View {
                     Label(startTitle, systemImage: "play.fill").frame(maxWidth: .infinity)
                 }.buttonStyle(.borderedProminent).controlSize(.large).padding(14).accessibilityIdentifier(primaryID)
             }
-            if move != nil || skip != nil {
-                DisclosureGroup("Change schedule", isExpanded: $editingSchedule) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        DatePicker("Move to", selection: $destination, displayedComponents: .date)
-                        if let move {
-                            Button("Move this workout") { editingSchedule = false; move(destination) }
-                                .disabled(Calendar.current.isDate(destination, inSameDayAs: selected))
-                        }
-                        if let skip {
-                            Button("Skip this scheduled workout") { editingSchedule = false; skip() }
-                        }
-                    }.padding(.top, 10)
-                }.padding(14)
+            if let review {
+                Button(action: review) { Label("Review workout", systemImage: "checkmark.circle").frame(maxWidth: .infinity) }
+                    .buttonStyle(.bordered).controlSize(.large).padding(14).accessibilityIdentifier("reviewOccurrence")
+            }
+            if let move {
+                NavigationLink {
+                    RescheduleWorkoutScreen(selected: selected, title: name, move: move, skip: skip)
+                } label: {
+                    Label("Reschedule", systemImage: "calendar.badge.clock").frame(minHeight: 44)
+                }.padding(.horizontal, 14).accessibilityIdentifier("rescheduleWorkout")
             }
         }
         .background(PlannerStyle.surface).clipShape(RoundedRectangle(cornerRadius: 20))
-        .onChange(of: editingSchedule) { _, expanded in if expanded { destination = selected } }
     }
 }
 

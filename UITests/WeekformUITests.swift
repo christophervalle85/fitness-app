@@ -44,11 +44,11 @@ final class WeekformUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Rest day"].firstMatch.waitForExistence(timeout: 5))
         tap(app.buttons["confirmRoutine"])
 
-        let today = app.tabBars.buttons["Today"]
+        let planTab = app.tabBars.buttons["Plan"]
         let routines = app.tabBars.buttons["Routines"]
-        XCTAssertTrue(today.waitForExistence(timeout: 10))
-        XCTAssertTrue(today.isSelected)
-        capture("Today", in: app)
+        XCTAssertTrue(planTab.waitForExistence(timeout: 10))
+        XCTAssertTrue(planTab.isSelected)
+        capture("Plan", in: app)
 
         tap(routines)
         XCTAssertTrue(routines.isSelected)
@@ -67,8 +67,8 @@ final class WeekformUITests: XCTestCase {
 
         app.terminate()
         app.launch()
-        XCTAssertTrue(today.waitForExistence(timeout: 10))
-        XCTAssertTrue(today.isSelected)
+        XCTAssertTrue(planTab.waitForExistence(timeout: 10))
+        XCTAssertTrue(planTab.isSelected)
     }
 
     func testManualDraftResumesAndBecomesAnActiveRoutine() {
@@ -150,7 +150,7 @@ final class WeekformUITests: XCTestCase {
         if remaining > 0 { tap(app.navigationBars.buttons["Done"]) }
         tap(app.buttons["reviewWeek"])
         tap(app.buttons["confirmRoutine"])
-        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.tabBars.buttons["Plan"].waitForExistence(timeout: 10))
     }
 
     func testFoundationConfirmationSurvivesRelaunch() {
