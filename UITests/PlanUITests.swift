@@ -12,9 +12,10 @@ final class PlanUITests: XCTestCase {
         element.tap()
     }
 
-    private func launchPlan() -> XCUIApplication {
+    private func launchPlan(reduceMotion: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["WEEKFORM_UI_TEST_RUN"] = UUID().uuidString
+        if reduceMotion { app.launchEnvironment["WEEKFORM_UI_TEST_REDUCE_MOTION"] = "1" }
         app.launch()
         tap(app.buttons["chooseStarter"])
         tap(app.buttons["starterGeneral"])
@@ -53,42 +54,115 @@ final class PlanUITests: XCTestCase {
     private func selectDate(_ date: Date, in app: XCUIApplication) {
         let day = calendar.component(.day, from: date)
         let monthDay = date.formatted(.dateTime.month(.wide).day())
-        let possibleLabels = [String(day), monthDay, date.formatted(.dateTime.weekday(.wide).month(.wide).day()), date.formatted(date: .complete, time: .omitted)]
+        let weekdayAndDate = date.formatted(.dateTime.weekday(.wide).month(.wide).day())
+        var possibleLabels = [String(day), monthDay, weekdayAndDate, date.formatted(date: .complete, time: .omitted)]
+        if calendar.isDateInToday(date) { possibleLabels.append("Today, " + weekdayAndDate) }
         let cell = app.buttons.matching(NSPredicate(format: "label IN %@", possibleLabels)).firstMatch
         tap(cell)
     }
 
-    func testMonthSelectionWeekSwipeAndTodayShortcut() {
+    private func swipeWeek(forward: Bool, in app: XCUIApplication) {
+        let left = app.buttons["weekday0"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let right = app.buttons["weekday6"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let from = forward ? right : left
+        let to = forward ? left : right
+        from.press(forDuration: 0.06, thenDragTo: to)
+    }
+
+    private func assertSelected(_ date: Date, in app: XCUIApplication, line: UInt = #line) {
+        let cell = dayCell(date, in: app)
+        let formatted = date.formatted(date: .complete, time: .omitted)
+        let match = NSPredicate(format: "selected == true AND label CONTAINS %@", formatted)
+        let changed = XCTNSPredicateExpectation(predicate: match, object: cell)
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed,
+                       "Expected selected day \(formatted), found \(cell.label)", line: line)
+        XCTAssertEqual(app.buttons.matching(identifier: cell.identifier).count, 1, line: line)
+        XCTAssertTrue(cell.isHittable, "Selected day must be visible in the settled week", line: line)
+        XCTAssertTrue(app.frame.contains(cell.frame), "Selected cell is outside the visible screen", line: line)
+    }
+
+    private func selectCalendarYear(from year: Int, to target: Int, in app: XCUIApplication) {
+        tap(app.buttons["DatePicker.Show"])
+        let yearWheel = app.pickerWheels.matching(NSPredicate(format: "value == %@", String(year))).firstMatch
+        XCTAssertTrue(yearWheel.waitForExistence(timeout: 5))
+        yearWheel.adjust(toPickerWheelValue: String(target))
+        XCTAssertTrue(app.pickerWheels.matching(NSPredicate(format: "value == %@", String(target))).firstMatch.waitForExistence(timeout: 5))
+        if target > year { capture("Calendar month and year selection", in: app) }
+        tap(app.buttons.matching(NSPredicate(format: "identifier IN %@ OR label IN %@",
+            ["DatePicker.Show", "DatePicker.Hide"], ["Hide year picker", "Show calendar"])).firstMatch)
+    }
+
+    func testMonthYearCalendarWeekPagingAndReturnToCurrentDate() {
         let app = launchPlan()
         let today = calendar.startOfDay(for: .now)
-        let otherDay = nextDateInMonth(to: today)
-        let actual = dayCell(today, in: app)
-        let selected = dayCell(otherDay, in: app)
-        XCTAssertTrue(actual.isSelected)
-        XCTAssertTrue(actual.label.hasPrefix("Today, "))
+        let destination = calendar.date(byAdding: .year, value: 2, to: today)!
+        let year = calendar.component(.year, from: today)
+        let lastDay = calendar.date(byAdding: .day, value: -1, to: calendar.dateInterval(of: .month, for: destination)!.end)!
+        let next = calendar.date(byAdding: .day, value: 7, to: lastDay)!
+        assertSelected(today, in: app)
+        XCTAssertTrue(dayCell(today, in: app).label.hasPrefix("Today, "))
         XCTAssertFalse(app.datePickers.firstMatch.exists)
+        for id in ["previousWeek", "nextWeek", "jumpToToday"] { XCTAssertFalse(app.buttons[id].exists) }
+
         tap(app.buttons["monthYear"])
         XCTAssertTrue(app.navigationBars["Calendar"].waitForExistence(timeout: 5))
-        selectDate(otherDay, in: app)
+        selectCalendarYear(from: year, to: year + 2, in: app)
+        selectDate(lastDay, in: app)
         capture("Month calendar", in: app)
         tap(app.buttons["showPlanDate"])
-        XCTAssertTrue(selected.isSelected)
-        let original = selected.label
-        XCTAssertTrue(original.contains(otherDay.formatted(date: .complete, time: .omitted)))
+        assertSelected(lastDay, in: app)
+        swipeWeek(forward: true, in: app)
+        assertSelected(next, in: app)
+        XCTAssertEqual(app.buttons["monthYear"].label, next.formatted(.dateTime.month(.wide).year()))
+        swipeWeek(forward: false, in: app)
+        assertSelected(lastDay, in: app)
 
-        let left = app.buttons["weekday1"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        let right = app.buttons["weekday5"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        right.press(forDuration: 0.08, thenDragTo: left)
-        let next = calendar.date(byAdding: .weekOfYear, value: 1, to: otherDay)!
-        XCTAssertTrue(selected.isSelected)
-        XCTAssertTrue(selected.label.contains(next.formatted(date: .complete, time: .omitted)))
-        tap(app.buttons["previousWeek"])
-        XCTAssertEqual(selected.label, original)
-        tap(app.buttons["jumpToToday"])
-        XCTAssertTrue(actual.isSelected)
-        XCTAssertTrue(actual.label.hasPrefix("Today, "))
-        XCTAssertFalse(app.buttons["jumpToToday"].exists)
+        tap(app.buttons["monthYear"])
+        selectCalendarYear(from: year + 2, to: year, in: app)
+        selectDate(today, in: app)
+        tap(app.buttons["showPlanDate"])
+        assertSelected(today, in: app)
+        XCTAssertTrue(dayCell(today, in: app).label.hasPrefix("Today, "))
         capture("Plan week with today selected", in: app)
+    }
+
+    func testConsecutiveWeekSwipesAndVerticalScrollPreserveSelection() {
+        let app = launchPlan()
+        let monday = dateOnWeekday(0)
+        tap(dayCell(monday, in: app))
+        for offset in 1...3 {
+            swipeWeek(forward: true, in: app)
+            assertSelected(calendar.date(byAdding: .day, value: 7 * offset, to: monday)!, in: app)
+        }
+        swipeWeek(forward: false, in: app)
+        swipeWeek(forward: false, in: app)
+        let nextMonday = calendar.date(byAdding: .day, value: 7, to: monday)!
+        assertSelected(nextMonday, in: app)
+        let anchor = app.buttons["weekday3"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let destination = anchor.withOffset(CGVector(dx: 4, dy: -125))
+        let initialHeader = app.buttons["monthYear"].frame.minY
+        anchor.press(forDuration: 0.06, thenDragTo: destination)
+        XCTAssertLessThan(app.buttons["monthYear"].frame.minY, initialHeader - 12)
+        app.swipeDown()
+        assertSelected(nextMonday, in: app)
+        swipeWeek(forward: false, in: app)
+        assertSelected(monday, in: app)
+        let today = calendar.startOfDay(for: .now)
+        XCTAssertTrue(dayCell(today, in: app).label.hasPrefix("Today, "))
+    }
+
+    func testReduceMotionKeepsWeekAndDaySelectionUsable() {
+        let app = launchPlan(reduceMotion: true)
+        let wednesday = dateOnWeekday(2)
+        tap(dayCell(wednesday, in: app))
+        swipeWeek(forward: true, in: app)
+        assertSelected(calendar.date(byAdding: .day, value: 7, to: wednesday)!, in: app)
+        swipeWeek(forward: false, in: app)
+        assertSelected(wednesday, in: app)
+        tap(app.buttons["weekday3"])
+        assertSelected(dateOnWeekday(3), in: app)
+        XCTAssertTrue(app.staticTexts["Rest day"].waitForExistence(timeout: 5))
+        capture("Plan with reduced motion", in: app)
     }
 
     func testActiveWorkoutBelongsToItsSelectedDay() {
@@ -166,7 +240,7 @@ final class PlanUITests: XCTestCase {
         tap(dayCell(original, in: app))
         XCTAssertFalse(app.buttons["startOccurrence"].exists)
         XCTAssertFalse(app.buttons["startPlanned"].exists)
-        tap(app.buttons["nextWeek"])
+        swipeWeek(forward: true, in: app)
         XCTAssertTrue(app.buttons["startPlanned"].waitForExistence(timeout: 5))
     }
 
