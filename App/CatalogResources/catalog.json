@@ -1,5 +1,59 @@
 [
   {
+    "id": "8b96e52c-7a6b-564f-82e6-ff3e261312e7",
+    "name": "Alternating incline dumbbell curl",
+    "primary": [
+      "Biceps"
+    ],
+    "secondary": [],
+    "equipment": [
+      "Incline bench",
+      "Dumbbell"
+    ],
+    "movement": "Elbow flexion",
+    "convention": "Per side, weight per dumbbell",
+    "instructions": [
+      "Sit back on an inclined bench with a dumbbell in each hand. Let your arms hang at your sides.",
+      "Bend one elbow to lift the dumbbell, lower it, then repeat on the other side."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-964-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0214/0214-relaxation.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0214/0214-relaxation.png",
+        "providerBlobSHA": "bcd9b21387415d2739e93163278e18f8e544c51c",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-964-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0214/0214-tension.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0214/0214-tension.png",
+        "providerBlobSHA": "ddd4dbb93516ef164502f66e2b1b85995cc581c6",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0214/0214.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:964",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0214/0214.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    }
+  },
+  {
     "id": "79677105-bd3a-5edc-96da-3e7b613be38e",
     "name": "Barbell bench press",
     "primary": [
@@ -233,6 +287,185 @@
     }
   },
   {
+    "id": "ba25ee9e-a22d-5966-a810-8f9bc9ce2349",
+    "name": "Cable triceps pushdown",
+    "primary": [
+      "Triceps"
+    ],
+    "secondary": [],
+    "equipment": [
+      "Cable machine",
+      "Straight bar"
+    ],
+    "movement": "Elbow extension",
+    "convention": "Cable machine setting",
+    "instructions": [
+      "Attach a short bar to a high pulley and stand facing it. Hold the bar with your palms down.",
+      "Keep your elbows beside your torso. Press the bar down, then guide it back up."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-954-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0205/0205-relaxation.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0205/0205-relaxation.png",
+        "providerBlobSHA": "2a23e21573e7386a0fcb80bad181c4b0d69f24ea",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-954-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0205/0205-tension.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0205/0205-tension.png",
+        "providerBlobSHA": "4dfadc24c092a18edeb2eb184d77af16ecc5851a",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0205/0205.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:954",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0205/0205.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    },
+    "relatedWgerRecord": {
+      "id": 1185,
+      "url": "https://wger.de/api/v2/exerciseinfo/1185/",
+      "version": "2026-10-31T00:07:56.559772+01:00"
+    }
+  },
+  {
+    "id": "1f1776ac-5281-508c-bbe4-aca8049c3dcd",
+    "name": "Close neutral-grip lat pulldown",
+    "primary": [
+      "Lats"
+    ],
+    "secondary": [
+      "Middle back",
+      "Biceps"
+    ],
+    "equipment": [
+      "Cable machine",
+      "V-bar"
+    ],
+    "movement": "Vertical pull",
+    "convention": "Cable machine setting",
+    "instructions": [
+      "Attach a V-bar to the high pulley. Sit facing the machine and take the handles with your palms facing each other.",
+      "Pull toward your upper chest with your elbows moving down. Control the return overhead."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-401-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0096/0096-relaxation.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0096/0096-relaxation.png",
+        "providerBlobSHA": "22d7979d6d19817ad5402c646e0eddb8f205e089",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-401-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0096/0096-tension.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0096/0096-tension.png",
+        "providerBlobSHA": "133685eb7bdeb48ee33037d08e5ac7f21db4d774",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0096/0096.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:401",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0096/0096.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    },
+    "relatedWgerRecord": {
+      "id": 1510,
+      "url": "https://wger.de/api/v2/exerciseinfo/1510/",
+      "version": "2026-10-31T00:06:36.249169+01:00"
+    }
+  },
+  {
+    "id": "13db16a1-ee76-5604-b9ef-2c3cefe54ff3",
+    "name": "Decline crunch",
+    "primary": [
+      "Abs"
+    ],
+    "secondary": [],
+    "equipment": [
+      "Decline bench"
+    ],
+    "movement": "Trunk flexion",
+    "convention": "Bodyweight",
+    "instructions": [
+      "Lie face up on the decline bench with your feet held under the pads.",
+      "Curl your shoulders and upper back off the bench, then lower with control."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-1044-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0292/0292-relaxation.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0292/0292-relaxation.png",
+        "providerBlobSHA": "cc46194f07d082083f90d3147e978a2bf7a8e931",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-1044-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0292/0292-tension.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0292/0292-tension.png",
+        "providerBlobSHA": "757ebb885bfc4bafd15504b6a26d11c105031b3f",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0292/0292.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:1044",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0292/0292.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    },
+    "relatedWgerRecord": {
+      "id": 171,
+      "url": "https://wger.de/api/v2/exerciseinfo/171/",
+      "version": "2026-10-24T15:57:33.735122+02:00"
+    }
+  },
+  {
     "id": "a886c380-568a-5035-a1f3-9e76b9351977",
     "name": "Dumbbell bench press",
     "primary": [
@@ -403,6 +636,90 @@
       "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
       "modifications": "Weekform wording and recording guidance."
     }
+  },
+  {
+    "id": "0c5dccff-fe39-50b5-a4ae-9be24687e60a",
+    "name": "Dumbbell wrist curl",
+    "primary": [
+      "Forearms"
+    ],
+    "secondary": [],
+    "equipment": [
+      "Dumbbell",
+      "Bench"
+    ],
+    "movement": "Wrist flexion",
+    "convention": "Per side, weight per dumbbell",
+    "instructions": [
+      "Sit with your forearm supported on your thigh, palm up, and your hand just beyond the knee.",
+      "Curl the wrist upward while the forearm stays supported. Lower the dumbbell slowly."
+    ],
+    "media": [
+      {
+        "file": "commons-wger-1205.jpg",
+        "author": "BruceBlaus",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://commons.wikimedia.org/wiki/File:Exercise_Wrist_Curls.png",
+        "original": "https://upload.wikimedia.org/wikipedia/commons/2/29/Exercise_Wrist_Curls.png",
+        "sourceSHA256": "984fac80c3009bf7cdcd97af2b30431007e36ea7254557634fbf388ef47fedab",
+        "modifications": "Resized where necessary and encoded as JPEG."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/1205/",
+    "version": "2026-10-31T00:08:06.193848+01:00",
+    "providerID": "1205",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/2165/",
+      "authors": [
+        "wakanda90"
+      ],
+      "license": "CC-BY-SA 4",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "a3a595af-074e-5b99-94c1-8302820af3c7",
+    "name": "Forearm plank",
+    "primary": [
+      "Abs"
+    ],
+    "secondary": [],
+    "equipment": [
+      "Exercise mat"
+    ],
+    "movement": "Isometric trunk hold",
+    "convention": "Timed hold, duration in seconds",
+    "instructions": [
+      "Rest your forearms on the floor with your elbows beneath your shoulders. Step your feet back to support yourself on your toes.",
+      "Hold your trunk steady in line with your legs. Record how long you maintain the position."
+    ],
+    "media": [
+      {
+        "file": "commons-wger-458.jpg",
+        "author": "Nenad Stojković (Shixart1985)",
+        "license": "CC BY 2.0",
+        "licenseURL": "https://creativecommons.org/licenses/by/2.0/",
+        "source": "https://commons.wikimedia.org/w/index.php?title=File:Woman_performing_plank_exercise_at_home_gym.jpg&oldid=1278997413",
+        "original": "https://upload.wikimedia.org/wikipedia/commons/6/65/Woman_performing_plank_exercise_at_home_gym.jpg",
+        "sourceSHA256": "5548b4841f71cb95662e99be5326216102b2ff7766bcb77f7a2c5dc3b46b1a6b",
+        "modifications": "Resized and encoded as JPEG."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/458/",
+    "version": "2026-10-10T17:06:12.972143+02:00",
+    "providerID": "458",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/238/",
+      "authors": [
+        "YYCfit / BFad07"
+      ],
+      "license": "CC-BY-SA 3",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    },
+    "timed": true
   },
   {
     "id": "421d7ed7-4add-568f-89c6-780a7a48f7b5",
@@ -579,6 +896,125 @@
     }
   },
   {
+    "id": "55414dc9-0b93-5e92-8c11-7c37221e9603",
+    "name": "Leg extension",
+    "primary": [
+      "Quads"
+    ],
+    "secondary": [],
+    "equipment": [
+      "Leg extension machine"
+    ],
+    "movement": "Knee extension",
+    "convention": "Machine setting",
+    "instructions": [
+      "Adjust the seat and position the roller above your ankles. Keep your back against the pad.",
+      "Straighten your knees to lift the roller, then lower it smoothly."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-893-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0142/0142-relaxation.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0142/0142-relaxation.png",
+        "providerBlobSHA": "f66435a326aa156aa780f288bb8ac9c6d138b1ae",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-893-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0142/0142-tension.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0142/0142-tension.png",
+        "providerBlobSHA": "35867e38496dafa777341960aa1551a549938545",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0142/0142.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:893",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0142/0142.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    },
+    "relatedWgerRecord": {
+      "id": 369,
+      "url": "https://wger.de/api/v2/exerciseinfo/369/",
+      "version": "2026-10-31T00:06:42.382437+01:00"
+    }
+  },
+  {
+    "id": "4da5b267-102f-531a-b2db-e79e8d679ce5",
+    "name": "Leg press",
+    "primary": [
+      "Quads"
+    ],
+    "secondary": [
+      "Calves",
+      "Hamstrings"
+    ],
+    "equipment": [
+      "Leg press machine"
+    ],
+    "movement": "Leg press",
+    "convention": "Machine setting",
+    "instructions": [
+      "Sit against the back pad and place your feet on the platform. Set the machine for a comfortable starting position.",
+      "Bend your knees to lower the carriage under control, then press the platform away."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-878-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0127/0127-relaxation.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0127/0127-relaxation.png",
+        "providerBlobSHA": "d90c346b4fce6a6a7cc7df5aab9dc6db56a50bad",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-878-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0127/0127-tension.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0127/0127-tension.png",
+        "providerBlobSHA": "42a1e5745239808eb0c6b51391aedc70795c11c2",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0127/0127.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:878",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0127/0127.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    },
+    "relatedWgerRecord": {
+      "id": 371,
+      "url": "https://wger.de/api/v2/exerciseinfo/371/",
+      "version": "2026-10-24T15:57:54.804815+02:00"
+    }
+  },
+  {
     "id": "19bcd2e8-ab4b-54f2-97ef-0980d9d67f77",
     "name": "Lying leg curl",
     "primary": [
@@ -631,6 +1067,351 @@
       "license": "CC-BY-SA 3",
       "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
       "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "7d64843d-dd66-541a-bfcb-10a15fb0a603",
+    "name": "Machine biceps curl",
+    "primary": [
+      "Biceps"
+    ],
+    "secondary": [
+      "Forearms"
+    ],
+    "equipment": [
+      "Biceps curl machine"
+    ],
+    "movement": "Elbow flexion",
+    "convention": "Machine setting",
+    "instructions": [
+      "Adjust the machine so its pivot aligns with your elbows. Support your upper arms on the pads.",
+      "Curl the handles toward your shoulders and lower them under control."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-1004-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0253/0253-relaxation.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0253/0253-relaxation.png",
+        "providerBlobSHA": "723df0b3b9cacbb2ab35b8d0e7b0c31bb8c1247d",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-1004-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0253/0253-tension.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0253/0253-tension.png",
+        "providerBlobSHA": "302611d2f62a258b619e2ee192115f308ed5c723",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0253/0253.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:1004",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0253/0253.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    },
+    "relatedWgerRecord": {
+      "id": 1424,
+      "url": "https://wger.de/api/v2/exerciseinfo/1424/",
+      "version": "2026-10-31T00:05:58.715391+01:00"
+    }
+  },
+  {
+    "id": "a97beb62-6853-5400-bfb1-ed24ee971c48",
+    "name": "Machine chest press",
+    "primary": [
+      "Chest"
+    ],
+    "secondary": [
+      "Triceps",
+      "Shoulders"
+    ],
+    "equipment": [
+      "Chest press machine"
+    ],
+    "movement": "Horizontal press",
+    "convention": "Machine setting",
+    "instructions": [
+      "Adjust the seat so the handles are level with your chest. Sit against the back pad with your feet supported.",
+      "Press the handles forward, then guide them back toward your chest."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-305-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0066/0066-relaxation.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0066/0066-relaxation.png",
+        "providerBlobSHA": "582458b3ba229a637b65fbf54cdb5d54688d8ea9",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-305-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0066/0066-tension.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0066/0066-tension.png",
+        "providerBlobSHA": "f8b9460d8999d8757f47c47a363e2d9763002608",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0066/0066.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:305",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0066/0066.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    },
+    "relatedWgerRecord": {
+      "id": 129,
+      "url": "https://wger.de/api/v2/exerciseinfo/129/",
+      "version": "2026-10-31T00:05:25.632951+01:00"
+    }
+  },
+  {
+    "id": "7b61070e-d9c7-5e51-942f-e81160e6ab6f",
+    "name": "Machine hack squat",
+    "primary": [
+      "Quads"
+    ],
+    "secondary": [
+      "Hamstrings",
+      "Calves"
+    ],
+    "equipment": [
+      "Hack squat machine"
+    ],
+    "movement": "Squat",
+    "convention": "Machine setting",
+    "instructions": [
+      "Stand with your back against the carriage and shoulders under its pads. Plant both feet on the platform.",
+      "Bend your knees and hips to lower the carriage, then drive the platform away."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-870-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0123/0123-relaxation.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0123/0123-relaxation.png",
+        "providerBlobSHA": "daae83ce06eb63df662557561cd8488592e50074",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-870-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0123/0123-tension.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0123/0123-tension.png",
+        "providerBlobSHA": "0b73ed9878917c04bc93039a064c2ce7deb3b33c",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0123/0123.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:870",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0123/0123.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    },
+    "relatedWgerRecord": {
+      "id": 1414,
+      "url": "https://wger.de/api/v2/exerciseinfo/1414/",
+      "version": "2026-10-31T00:07:49.729970+01:00"
+    }
+  },
+  {
+    "id": "da94342c-832d-518a-ae3a-d63bd642d6c0",
+    "name": "Machine shoulder press",
+    "primary": [
+      "Shoulders"
+    ],
+    "secondary": [
+      "Triceps"
+    ],
+    "equipment": [
+      "Shoulder press machine"
+    ],
+    "movement": "Overhead press",
+    "convention": "Machine setting",
+    "instructions": [
+      "Adjust the seat to bring the handles to shoulder height. Sit against the back support.",
+      "Press the handles overhead, then lower them to the starting position."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-39-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/images-web/seated-shoulder-press-machine-1.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/images-web/seated-shoulder-press-machine-1.png",
+        "providerBlobSHA": "126c729b3c22ded4718a3f1972396b5969688a5d",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-39-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/images-web/seated-shoulder-press-machine-2.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/images-web/seated-shoulder-press-machine-2.png",
+        "providerBlobSHA": "64b2158d77c9d736b61221b7c6fd1b81ea393eab",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0003/0003.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:39",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0003/0003.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    },
+    "relatedWgerRecord": {
+      "id": 543,
+      "url": "https://wger.de/api/v2/exerciseinfo/543/",
+      "version": "2026-04-15T22:23:55.116420+02:00"
+    }
+  },
+  {
+    "id": "040fb869-84ab-5223-a474-a69567ff703c",
+    "name": "One-arm dumbbell row",
+    "primary": [
+      "Lats"
+    ],
+    "secondary": [
+      "Biceps",
+      "Middle back"
+    ],
+    "equipment": [
+      "Dumbbell",
+      "Bench"
+    ],
+    "movement": "Horizontal pull",
+    "convention": "Per side, weight per dumbbell",
+    "instructions": [
+      "Place one hand and knee on a bench and hold the dumbbell in your other hand. Brace your torso and let your working arm hang.",
+      "Draw your elbow toward your hip. Lower the dumbbell under control before changing sides."
+    ],
+    "media": [
+      {
+        "file": "commons-wger-81.jpg",
+        "author": "GeorgeStepanek (model: Emily)",
+        "license": "CC BY-SA 3.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/",
+        "source": "https://commons.wikimedia.org/wiki/File:DumbbellBentOverRow.JPG",
+        "original": "https://upload.wikimedia.org/wikipedia/commons/6/67/DumbbellBentOverRow.JPG",
+        "sourceSHA256": "a464752345cf963b5dccbaef0a182feba08870b21794ced522f1d0a8e15b04fa",
+        "modifications": "Resized where necessary and encoded as JPEG."
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/81/",
+    "version": "2026-10-24T15:57:26.440602+02:00",
+    "providerID": "81",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/362/",
+      "authors": [
+        "sebk"
+      ],
+      "license": "CC-BY-SA 4",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "a0577318-96ad-5db8-97db-66cc55785161",
+    "name": "One-arm rear-delt dumbbell row",
+    "primary": [
+      "Rear delts"
+    ],
+    "secondary": [
+      "Shoulders",
+      "Biceps",
+      "Trapezius"
+    ],
+    "equipment": [
+      "Bench",
+      "Dumbbell"
+    ],
+    "movement": "Horizontal pull",
+    "convention": "Per side, weight per dumbbell",
+    "instructions": [
+      "Support one hand and the same-side knee on a bench. Hold the dumbbell in the opposite hand, allowing the arm to hang.",
+      "Row with the elbow moving out from your torso. Lower the dumbbell before changing sides."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-112-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0024/0024-relaxation.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0024/0024-relaxation.png",
+        "providerBlobSHA": "c7cd9279ae43cd49e1586152a15bc485211c0975",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-112-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0024/0024-tension.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0024/0024-tension.png",
+        "providerBlobSHA": "5c8660ce612ac14a61b5c1d9a7f9d7208ca1ab29",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0024/0024.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:112",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0024/0024.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
     }
   },
   {
@@ -688,6 +1469,122 @@
       "license": "CC-BY-SA 3",
       "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
       "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "a203bb22-1124-5bc3-9386-9c41bf2d8c4e",
+    "name": "Reverse dumbbell curl",
+    "primary": [
+      "Biceps"
+    ],
+    "secondary": [
+      "Forearms"
+    ],
+    "equipment": [
+      "Dumbbell"
+    ],
+    "movement": "Elbow flexion",
+    "convention": "Weight per dumbbell",
+    "instructions": [
+      "Stand with dumbbells in front of your thighs and the backs of your hands facing forward.",
+      "Bend your elbows without turning your palms up. Control the return to your thighs."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-1008-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0257/0257-relaxation.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0257/0257-relaxation.png",
+        "providerBlobSHA": "2cbee91058dac5f14365c3d62aa48b3d98a03314",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-1008-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0257/0257-tension.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0257/0257-tension.png",
+        "providerBlobSHA": "c7d8e10db79f0c0e6ad21aaf0ddae7ad63bcbb1a",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0257/0257.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:1008",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0257/0257.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    }
+  },
+  {
+    "id": "708bc0f9-2ce7-533a-893b-9d0713089396",
+    "name": "Roman chair back extension",
+    "primary": [
+      "Lower back"
+    ],
+    "secondary": [
+      "Hamstrings",
+      "Abs"
+    ],
+    "equipment": [
+      "Back extension bench"
+    ],
+    "movement": "Hip hinge",
+    "convention": "Bodyweight",
+    "instructions": [
+      "Adjust the bench so the front pad supports your thighs and your ankles are secure. Cross your arms at your chest.",
+      "Hinge at the hips, then raise your torso until it aligns with your legs."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-430-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0103/0103-relaxation.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0103/0103-relaxation.png",
+        "providerBlobSHA": "b51fa4875666dce4e5670701e1fcba9262bc6977",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-430-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0103/0103-tension.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0103/0103-tension.png",
+        "providerBlobSHA": "45189bcb591e93df49fb807b12bf21933ee5547e",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0103/0103.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:430",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0103/0103.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    },
+    "relatedWgerRecord": {
+      "id": 301,
+      "url": "https://wger.de/api/v2/exerciseinfo/301/",
+      "version": "2026-10-31T00:05:21.576123+01:00"
     }
   },
   {
@@ -860,6 +1757,159 @@
     }
   },
   {
+    "id": "868089bc-176b-5aa8-af0d-323a08ed6b3d",
+    "name": "Seated machine dip",
+    "primary": [
+      "Triceps"
+    ],
+    "secondary": [
+      "Shoulders"
+    ],
+    "equipment": [
+      "Seated dip machine"
+    ],
+    "movement": "Elbow extension",
+    "convention": "Machine setting",
+    "instructions": [
+      "Sit with the handles beside your torso, near elbow height. Take a handle in each hand.",
+      "Straighten your elbows to press down. Guide the handles back up."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-919-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0171/0171-relaxation.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0171/0171-relaxation.png",
+        "providerBlobSHA": "7b7db17a47b86f6bdc3847e69af9d3d9d777dfba",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-919-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0171/0171-tension.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0171/0171-tension.png",
+        "providerBlobSHA": "8e836f27f71450ee23b25d678beda8a4310faa31",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0171/0171.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:919",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0171/0171.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    }
+  },
+  {
+    "id": "c104d4d8-5224-5bbd-95eb-c4a3735fa9d9",
+    "name": "Standing calf raise",
+    "primary": [
+      "Calves"
+    ],
+    "secondary": [],
+    "equipment": [],
+    "movement": "Ankle plantarflexion",
+    "convention": "Bodyweight",
+    "instructions": [
+      "Stand with both feet flat. Lift your heels together so your weight moves onto the balls of your feet.",
+      "Lower both heels under control."
+    ],
+    "media": [
+      {
+        "file": "commons-wger-1243.jpg",
+        "author": "BruceBlaus",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://commons.wikimedia.org/wiki/File:Exercise_Heel_Raise_Two_Legs.png",
+        "original": "https://upload.wikimedia.org/wikipedia/commons/f/f8/Exercise_Heel_Raise_Two_Legs.png",
+        "sourceSHA256": "b8f6bac56f07f578ef49de95211e2b68929d81b41a7f13b13a912142bb174d7d",
+        "modifications": "Resized and encoded as JPEG.",
+        "relatedWgerImageRecord": "https://wger.de/api/v2/exerciseimage/453/"
+      }
+    ],
+    "source": "https://wger.de/api/v2/exerciseinfo/1243/",
+    "version": "2026-10-31T00:05:43.010741+01:00",
+    "providerID": "1243",
+    "textReference": {
+      "source": "https://wger.de/api/v2/translation/2205/",
+      "authors": [
+        "erikocobra"
+      ],
+      "license": "CC-BY-SA 4",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/deed.en",
+      "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "377d6c7a-10b8-5874-b3d9-171ca7fd4c1e",
+    "name": "Standing overhead barbell triceps extension",
+    "primary": [
+      "Triceps"
+    ],
+    "secondary": [],
+    "equipment": [
+      "Barbell"
+    ],
+    "movement": "Elbow extension",
+    "convention": "Barbell, total weight including bar",
+    "instructions": [
+      "Stand with the bar above your head. Set your grip so both hands support it evenly.",
+      "Bend your elbows to lower the bar behind your head. Straighten your arms to return overhead."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-950-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0201/0201-relaxation.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0201/0201-relaxation.png",
+        "providerBlobSHA": "f922d427f9fc39ff45a9a2c265bc577663450566",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-950-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0201/0201-tension.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0201/0201-tension.png",
+        "providerBlobSHA": "ab6d97da23989402e6fd2945368273a62d9f267e",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0201/0201.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:950",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0201/0201.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    },
+    "relatedWgerRecord": {
+      "id": 1519,
+      "url": "https://wger.de/api/v2/exerciseinfo/1519/",
+      "version": "2026-10-31T00:07:59.359026+01:00"
+    }
+  },
+  {
     "id": "02391032-5fe5-56eb-b5a5-b78cd343f6c6",
     "name": "Underhand barbell row",
     "primary": [
@@ -996,6 +2046,68 @@
       "license": "CC-BY-SA 3",
       "licenseURL": "https://creativecommons.org/licenses/by-sa/3.0/deed.en",
       "modifications": "Weekform wording and recording guidance."
+    }
+  },
+  {
+    "id": "cd076fd3-4752-5ded-9649-9c9e34db93f2",
+    "name": "Wide-grip lat pulldown",
+    "primary": [
+      "Lats"
+    ],
+    "secondary": [
+      "Biceps",
+      "Middle back"
+    ],
+    "equipment": [
+      "Cable machine",
+      "Wide bar"
+    ],
+    "movement": "Vertical pull",
+    "convention": "Cable machine setting",
+    "instructions": [
+      "Sit at the pulldown machine and hold the bar wider than shoulder width with your palms facing forward.",
+      "Pull the bar toward the front of your upper chest. Extend your arms under control."
+    ],
+    "media": [
+      {
+        "file": "everkinetic-404-1.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/images-web/wide-grip-lat-pull-down-1.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/images-web/wide-grip-lat-pull-down-1.png",
+        "providerBlobSHA": "9549d0aeae36ad0a577d0e642f4a0ffe29a15aca",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      },
+      {
+        "file": "everkinetic-404-2.jpg",
+        "author": "Everkinetic",
+        "license": "CC BY-SA 4.0",
+        "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/images-web/wide-grip-lat-pull-down-2.png",
+        "original": "https://raw.githubusercontent.com/everkinetic/data/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/images-web/wide-grip-lat-pull-down-2.png",
+        "providerBlobSHA": "84d1ce6c79a3482bb1f9230d1a8fe0526fba6cde",
+        "sourceRevision": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+        "modifications": "Resized on white and encoded as JPEG."
+      }
+    ],
+    "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0097/0097.json",
+    "version": "446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6",
+    "providerID": "everkinetic:404",
+    "textReference": {
+      "source": "https://github.com/everkinetic/data/blob/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6/src/exercises/0097/0097.json",
+      "authors": [
+        "Everkinetic"
+      ],
+      "license": "CC BY-SA 4.0",
+      "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "modifications": "Weekform wording, equipment labels and recording guidance."
+    },
+    "relatedWgerRecord": {
+      "id": 355,
+      "url": "https://wger.de/api/v2/exerciseinfo/355/",
+      "version": "2026-10-13T21:09:08.662144+02:00"
     }
   }
 ]
