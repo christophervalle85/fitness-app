@@ -23,14 +23,32 @@ targets:
       - Shared
     settings:
       base:
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) WEEKFORM_APP"
         TARGETED_DEVICE_FAMILY: '1'
         PRODUCT_BUNDLE_IDENTIFIER: com.christophervalle.weekform
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: Config/Weekform.entitlements
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: Config/App-Info.plist
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+    postBuildScripts:
+      - name: Bundle optional development starter
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(SRCROOT)/DevelopmentPrivate
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LocalStarter.json
+        script: |
+          set -eu
+          source_file="$SRCROOT/DevelopmentPrivate/LocalStarter.json"
+          destination="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/LocalStarter.json"
+          if [ "$CONFIGURATION" = Debug ] && [ -f "$source_file" ]; then
+            /bin/cp "$source_file" "$destination"
+          elif [ -f "$destination" ]; then
+            /bin/rm "$destination"
+          fi
     dependencies:
       - target: WeekformActivity
   WeekformActivity:

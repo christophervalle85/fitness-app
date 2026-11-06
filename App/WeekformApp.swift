@@ -5,11 +5,7 @@ import SwiftUI
 struct WeekformApp: App {
     var body: some Scene {
         WindowGroup {
-            #if WEEKFORM_DEVELOPMENT
-            FoundationView()
-            #else
-            Text("Weekform")
-            #endif
+            PlannerRoot()
         }
     }
 }
