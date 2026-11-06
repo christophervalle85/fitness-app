@@ -45,13 +45,15 @@ final class DiscoverUITests: XCTestCase {
         let alternative = "Dumbbell bench press"
         XCTAssertFalse(app.buttons["catalogRow-Barbell row"].exists)
         tap(app.buttons["catalogRow-" + original])
-        XCTAssertTrue(app.navigationBars[original].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts[original].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["favoriteExercise"].exists)
         screenshot("Bundled exercise detail", in: app)
 
         let candidate = app.buttons["catalogAlternative-" + alternative]
         for _ in 0..<12 where !candidate.isHittable { app.swipeUp() }
         tap(candidate)
-        XCTAssertTrue(app.navigationBars[alternative].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts[alternative].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["favoriteExercise"].exists)
         screenshot("Selected comparable alternative", in: app)
     }
 

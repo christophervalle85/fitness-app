@@ -20,13 +20,13 @@ Extra workouts count toward a plan only when you assign them. Open the saved ent
 
 ## Exercise catalog
 
-**Exercises** includes 17 offline entries with setup cues and 36 illustrated frames. Search by exercise, movement or equipment. Open an exercise to see the demonstration, recording method and related movements. For example, the flat barbell and dumbbell bench presses share a movement and target muscle, but use different load conventions. You can keep a text-only custom exercise when the catalog lacks the variant you train.
+**Exercises** includes 37 offline entries with setup cues and 72 images. Search by exercise, movement or equipment. Open an exercise to see the demonstration, recording method and related movements. For example, the flat barbell and dumbbell bench presses share a movement and target muscle, but use different load conventions. You can keep a text-only custom exercise when the catalog lacks the variant you train.
 
-The included illustrations are by Everkinetic. Each wger image record identifies Everkinetic as the author, specifies CC BY-SA 3.0 and marks the image as non-AI. The bundled copies use white backgrounds and JPEG encoding and retain that license. [Illustrator’s source collection](https://github.com/everkinetic/data) · [Illustration license](https://creativecommons.org/licenses/by-sa/3.0/)
+The snapshot uses 36 Everkinetic images distributed by wger under CC BY-SA 3.0. Another 32 frames come directly from Everkinetic’s collection under CC BY-SA 4.0. Each direct-source frame retains its original Git file hash and revision. The app bundles JPEG copies with credits and links to the original records. [Everkinetic source revision and license](https://github.com/everkinetic/data/tree/446bb9a3d0c3beb6b84f7c9d77dfc8af707a2ab6) · [wger image license](https://creativecommons.org/licenses/by-sa/3.0/)
 
-The catalog retains the source record, version, author credits, license links and modifications for each exercise or image. The rewritten instructions retain the license of the referenced translation. These records credit the contributing wger authors alongside each source. [Catalog and attribution records](App/CatalogResources/catalog.json)
+Four images come from Wikimedia Commons. BruceBlaus illustrated the calf raise and wrist curl under CC BY-SA 4.0. GeorgeStepanek photographed the dumbbell row under CC BY-SA 3.0, and Nenad Stojković (Shixart1985) photographed the forearm plank under CC BY 2.0. The catalog records the source and license for each image and its rewritten exercise instructions. [Catalog and attribution records](App/CatalogResources/catalog.json)
 
-For this development snapshot, each frame was checked visually against its named movement and the provider’s credit record. Public content acceptance still requires checking every required routine variant and useful alternative against a coverage list, securing any missing demonstrations, and signing off on form, instructions and redistribution terms. Several machine variants and timed holds still need coverage.
+Each bundled image was checked visually against the named movement and its source credit. Of the 37 variants in the acceptance inventory, 22 have a matching demonstration, six need an equipment or grip choice, and nine still need an exact illustration. Form, instructions and redistribution terms await qualified review.
 
 ## Progress and recovery
 
@@ -59,11 +59,17 @@ Open **Developer tools** from the Debug welcome screen, Today or Routines. **Rep
 
 Starting a workout in Today requests a Live Activity. The Lock Screen and expanded Dynamic Island can show actions for the current set when iOS allows them. The in-app workout remains available if the activity is dismissed or the device cannot show it.
 
+The compact Dynamic Island displays elapsed rest numerically. The expanded view adds the target, set number and available actions. In the iOS 26.2 and 27.2 simulators, the expanded activity on the Home Screen showed 0:07 elapsed against a 1:30 target for set 2, with **Edit result** and **Start set** visible.
+
 Under **Progress → Lock Screen privacy**, **Show exercise name** and **Show set values** both default to off. Turn on both to confirm a set from the activity when its full actual values are visible and valid. If they are missing, hidden or too long to display, open the app to check and edit them.
 
 **Confirm & rest** saves the displayed set and starts the configured rest interval. With **No timer**, **Confirm set** just saves the result. Elapsed rest can pass its target without logging a set. **Start set** ends that interval, and **Resume** continues paused rest. **Log final set** finishes the current exercise’s last set. **Next exercise** selects the next unfinished exercise. **Review workout** opens the summary, where finishing the session ends the activity. Repeated or outdated controls cannot credit the next set.
 
+Accessibility checks at Accessibility Large passed for exercise detail and unobstructed search results in light and dark appearances. The full unfiltered list still produces a contrast-audit report for a partially visible row behind the system tab bar; the diagnostic screenshot captured tab icons at that location. This broad audit remains an open verification item. The search field grows vertically for longer queries.
+
 ### Check on a signed iPhone
+
+Physical-device acceptance remains open for signing, locked and suspended actions, and recovery after interruption. A spoken VoiceOver walkthrough from onboarding through a completed workout also remains open.
 
 Use a dedicated test iPhone with Live Activities enabled. The project has no signing team selected. Before installing on the phone, configure authorized signing for both `Weekform` and `WeekformActivity`. Their provisioning profiles must allow the same App Group, `group.com.christophervalle.weekform`.
 

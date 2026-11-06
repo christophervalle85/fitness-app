@@ -23,6 +23,7 @@ private struct CatalogBrowser: View {
     @State private var issue: String?
     @State private var filter = CatalogFilter()
     @State private var showAll = false
+    @ScaledMetric(relativeTo: .body) private var searchHeight: CGFloat = 38
 
     var body: some View {
         let custom = planner.customExercises.map(CatalogEntry.custom)
@@ -35,18 +36,32 @@ private struct CatalogBrowser: View {
         let ranked = base.map { ExerciseCatalog(entries: all).alternatives(to: $0, filter: filter, favorites: planner.favoriteExerciseIDs) } ?? []
         let visible = all.filter { filter.accepts($0, favorites: planner.favoriteExerciseIDs) }
         List {
-            HStack {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
-                TextField("Search exercises", text: $filter.text)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .submitLabel(.search)
-                    .accessibilityIdentifier("catalogSearch")
-                if !filter.text.isEmpty {
-                    Button("Clear search", systemImage: "xmark.circle.fill") { filter.text = "" }
-                        .labelStyle(.iconOnly).buttonStyle(.borderless)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Search exercises")
+                    .font(.body.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(.primary)
+                    .accessibilityHidden(true)
+                HStack(spacing: 4) {
+                    TextField("", text: $filter.text, axis: .vertical)
+                        .font(.body)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.search)
+                        .frame(minHeight: searchHeight)
+                        .accessibilityLabel("Search exercises")
+                        .accessibilityIdentifier("catalogSearch")
+                    if !filter.text.isEmpty {
+                        Button("Clear search", systemImage: "xmark.circle.fill") { filter.text = "" }
+                            .labelStyle(.iconOnly).buttonStyle(.borderless)
+                    }
                 }
+                .padding(.horizontal, 10)
+                .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                .overlay { RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.5), lineWidth: 1) }
             }
+            .padding(.vertical, 3)
             if let issue { Text(issue).foregroundStyle(.secondary) }
             if base != nil {
                 Picker("Exercise selection", selection: $showAll) {
@@ -108,7 +123,7 @@ private struct CatalogBrowser: View {
                         if planner.favoriteExerciseIDs.contains(entry.id) { Image(systemName: "star.fill").accessibilityLabel("Favorite") }
                     }
                     Text(reason ?? (entry.source.isEmpty ? "Custom exercise" : (entry.primary + entry.equipment).joined(separator: " · ")))
-                        .font(.subheadline).foregroundStyle(.secondary)
+                        .font(.subheadline).foregroundStyle(.primary)
                 }
             }.padding(.vertical, 2)
         }
@@ -147,6 +162,10 @@ private struct CatalogDetail: View {
     @State private var issue: String?
     var body: some View {
         List {
+            Text(entry.name)
+                .font(.title2.bold())
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
             if let select {
                 Button("Use this exercise") {
                     select(planner.customExercises.first { ($0.variantID ?? $0.id) == entry.id } ?? entry.prescription)
@@ -227,7 +246,7 @@ private struct CatalogDetail: View {
                 }
             }
             if let issue { Text(issue) }
-        }.navigationTitle(entry.name)
+        }.navigationTitle("Exercise").navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 let favorite = planner.favoriteExerciseIDs.contains(entry.id)

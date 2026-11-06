@@ -138,6 +138,7 @@ struct PlannerRoot: View {
                               routineExercises: store.plans.first { $0.id == store.activeID }?.days.flatMap(\.exercises) ?? [])
             }
         }
+        .preferredColorScheme(testAppearance)
         .tint(PlannerStyle.blue)
         .task { if !loaded { load() } }
         .task(id: "\(loaded)-\(restoreGeneration)-\(training.liveRevision)") {
@@ -244,6 +245,20 @@ struct PlannerRoot: View {
             workoutRoute = route
             workoutOpen = true
         }
+    }
+
+    private var testAppearance: ColorScheme? {
+        #if WEEKFORM_DEVELOPMENT
+        let environment = ProcessInfo.processInfo.environment
+        if environment["WEEKFORM_UI_TEST_RUN"].flatMap(UUID.init(uuidString:)) != nil {
+            switch environment["WEEKFORM_UI_TEST_APPEARANCE"] {
+            case "dark": return .dark
+            case "light": return .light
+            default: break
+            }
+        }
+        #endif
+        return nil
     }
 
     private func load() {
