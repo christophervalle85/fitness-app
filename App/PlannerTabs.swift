@@ -22,14 +22,20 @@ struct RoutinesScreen: View {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
                         if plan.id == active {
-                            Label("Active routine", systemImage: "checkmark.circle.fill")
-                                .font(.caption.weight(.semibold)).foregroundStyle(PlannerStyle.blue)
+                            HStack {
+                                Label("Active routine", systemImage: "checkmark.circle.fill")
+                                    .font(.caption.weight(.semibold)).foregroundStyle(PlannerStyle.blue)
+                                Spacer(minLength: 8)
+                                routineMenu(plan)
+                            }
                         }
                         HStack(alignment: .top) {
                             Text(plan.name).font(.system(.title, design: .serif, weight: .medium))
                                 .fixedSize(horizontal: false, vertical: true)
-                            Spacer(minLength: 8)
-                            routineMenu(plan)
+                            if plan.id != active {
+                                Spacer(minLength: 8)
+                                routineMenu(plan)
+                            }
                         }
                         HStack(spacing: 4) {
                             ForEach(Array(plan.days.enumerated()), id: \.element.id) { index, day in
@@ -58,7 +64,8 @@ struct RoutinesScreen: View {
                 }
             }
         }
-        .navigationTitle("Routines").scrollContentBackground(.hidden).background(PlannerStyle.paper)
+        .navigationBarTitleDisplayMode(.inline)
+        .scrollContentBackground(.hidden).background(PlannerStyle.paper)
         .safeAreaInset(edge: .bottom) {
             NavigationLink {
                 NewRoutineScreen(manual: newPlan, preset: usePreset)
