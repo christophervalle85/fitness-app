@@ -102,8 +102,15 @@ struct ProgressionSuggestion: Identifiable {
     let kg: Double
 }
 
+struct ProgressActivityDay: Identifiable {
+    let date: Date
+    let sessions: [TrainingSession]
+    var id: Date { date }
+}
+
 struct ProgressMetrics {
     let history: [TrainingSession]
+    let activityDays: [ProgressActivityDay]
     let sessionCount: Int
     let cardioCount: Int
     let cardioSeconds: Int
@@ -117,19 +124,27 @@ struct ProgressMetrics {
             if $0.startedAt == $1.startedAt { return $0.id.uuidString < $1.id.uuidString }
             return $0.startedAt > $1.startedAt
         }
-        sessionCount = history.count
-        let cardio = history.filter(\.isCardio).compactMap(\.cardio)
+        let today = CivilTrainingDay(asOf)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let sessionsByDay = Dictionary(grouping: history) { $0.performedDay.date }
+        activityDays = (-6...0).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: offset, to: today.date) else { return nil }
+            let day = CivilTrainingDay(date).date
+            return ProgressActivityDay(date: day, sessions: sessionsByDay[day] ?? [])
+        }
+        let recentSessions = activityDays.flatMap(\.sessions)
+        sessionCount = recentSessions.count
+        let cardio = recentSessions.filter(\.isCardio).compactMap(\.cardio)
         cardioCount = cardio.count
         cardioSeconds = cardio.reduce(0) { $0 + min(Int.max - $0, max(0, $1.seconds)) }
 
         let linked = Dictionary(grouping: sessions.filter { $0.occurrenceID != nil }) { $0.occurrenceID! }
         let done = Set(occurrences.filter { Self.fulfilled($0, by: linked[$0.id] ?? []) }.map(\.id))
-        let today = CivilTrainingDay(asOf)
         let known = occurrences.filter { $0.scheduledDay.date <= today.date }
         knownAdherence = (known.filter { done.contains($0.id) }.count, known.count)
         var scheduled = 0
         var fulfilled = 0
-        let calendar = Calendar(identifier: .gregorian)
         let weekStart = calendar.date(byAdding: .day, value: -today.mondayIndex, to: today.date)!
         for offset in 0..<7 {
             guard let date = calendar.date(byAdding: .day, value: offset, to: weekStart) else { continue }

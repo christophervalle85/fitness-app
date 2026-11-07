@@ -117,6 +117,36 @@ struct ProgressTests {
         #expect(result.cardioSeconds == 240)
     }
 
+    @Test func activityUsesSevenCivilDaysAndKeepsOlderSessionsInHistory() throws {
+        let calendar = Calendar.current
+        let today = try #require(calendar.date(byAdding: .day, value: 8, to: monday))
+        let first = try #require(calendar.date(byAdding: .day, value: -6, to: today))
+        let previous = try #require(calendar.date(byAdding: .day, value: -7, to: today))
+        let tomorrow = try #require(calendar.date(byAdding: .day, value: 1, to: today))
+        var older = session([], on: previous)
+        older.isCardio = true
+        older.cardio = CardioResult(seconds: 600)
+        var corrected = session([], on: previous)
+        corrected.performedDay = CivilTrainingDay(first)
+        corrected.isCardio = true
+        corrected.cardio = CardioResult(seconds: 120)
+        var partial = session([], on: today)
+        partial.partial = true
+        var open = session([], on: today)
+        open.finishedAt = nil
+        let future = session([], on: tomorrow)
+
+        let metrics = ProgressMetrics(sessions: [older, corrected, partial, open, future], occurrences: [], asOf: today)
+        #expect(metrics.activityDays.count == 7)
+        #expect(metrics.activityDays.first.map { CivilTrainingDay($0.date) } == CivilTrainingDay(first))
+        #expect(metrics.activityDays.first?.sessions.map(\.id) == [corrected.id])
+        #expect(metrics.activityDays.last?.sessions.map(\.id) == [partial.id])
+        #expect(metrics.sessionCount == 2)
+        #expect(metrics.cardioCount == 1)
+        #expect(metrics.cardioSeconds == 120)
+        #expect(Set(metrics.history.map(\.id)) == [older.id, corrected.id, partial.id, future.id])
+    }
+
     @Test func assignedExtraMustMeetOriginalPrescriptionAndUnitSuggestionsPreservePhysicalLoad() throws {
         let path = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: path) }
