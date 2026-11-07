@@ -46,29 +46,31 @@ struct PlanScreen: View {
                     }
                     if let plan, plan.days.count == 7, templateOccurrence == nil, plan.days[weekday].isWorkout {
                         let day = plan.days[weekday]
+                        let sourceDate = selected
                         PlannedWorkoutCard(name: day.name, day: day, goal: day.cardioGoalSeconds,
-                                           status: "Scheduled", detail: nil, canStart: true,
-                                           startTitle: startTitle, primaryID: "startPlanned", selected: selected,
-                                           start: { requestPlanStart(.template(plan, selected)) },
+                                           status: PlanWorkoutState.notStarted.rawValue, detail: nil, canStart: true,
+                                           startTitle: "Start", primaryID: "startPlanned", selected: sourceDate,
+                                           start: { requestPlanStart(.template(plan, sourceDate)) },
                                            move: { target in
-                                               try training.move(plan: plan, date: selected, to: target)
+                                               try training.move(plan: plan, date: sourceDate, to: target)
                                                selected = target
                                            }, skip: {
-                                               try training.skip(plan: plan, date: selected)
+                                               try training.skip(plan: plan, date: sourceDate)
                                            })
                     }
                     ForEach(datedWork) { entry in
-                        let status = training.status(for: entry)
-                        let available = status == "Scheduled" || status == "Partial"
+                        let state = training.planState(for: entry)
+                        let available = state == .notStarted || state == .inProgress
                         let here = training.active?.occurrenceID == entry.id
                         PlannedWorkoutCard(name: entry.name, day: entry.day, goal: entry.cardioGoalSeconds,
-                                           status: status, detail: detail(entry), credited: training.slotProgress(for: entry), canStart: here || available,
-                                           startTitle: here ? "Resume workout" : status == "Partial" ? "Continue planned workout" : startTitle,
+                                           status: state.rawValue, detail: detail(entry), credited: training.slotProgress(for: entry), canStart: available,
+                                           startTitle: state == .inProgress ? "Resume" : "Start",
                                            primaryID: here ? "resumeWorkout" : "startOccurrence", selected: selected,
                                            start: { if here { openWorkout() } else { requestPlanStart(.occurrence(entry.id)) } },
                                            move: available && !here ? { date in try training.move(entry.id, to: date); selected = date } : nil,
-                                           skip: available && !here ? { try training.skip(entry.id) } : nil,
-                                           review: !here && status.hasPrefix("Done") ? { reviewID = entry.id } : nil)
+                                           skip: entry.planID != nil && available && !here ? { try training.skip(entry.id) } : nil,
+                                           remove: training.canRemoveAdditionalActivity(entry) ? { try training.removeAdditionalActivity(entry.id) } : nil,
+                                           review: state == .finished ? { reviewID = entry.id } : nil)
                         let contributions = training.sessions.filter { $0.occurrenceID == entry.id && $0.finishedAt != nil }
                             .sorted { $0.startedAt < $1.startedAt }
                         if !contributions.isEmpty {
@@ -194,10 +196,6 @@ struct PlanScreen: View {
         if let date = calendar.date(byAdding: .day, value: 7 * direction, to: selected) { selected = date }
     }
 
-    private var startTitle: String {
-        calendar.isDateInToday(selected) ? "Start planned workout" : "Do this workout today"
-    }
-
     private func detail(_ entry: TrainingOccurrence) -> String? {
         let counts = training.progress(for: entry)
         let sessions = training.sessions.filter { $0.occurrenceID == entry.id }
@@ -276,10 +274,15 @@ struct PlanScreen: View {
                 let templateScheduled = (plan?.days[safe: index]?.isWorkout == true) &&
                     !training.occurrences.contains { $0.planID == plan?.id && training.isOriginal($0, on: date) && !training.isScheduled($0, on: date) }
                 let pendingTemplate = templateScheduled && !entries.contains { $0.planID == plan?.id && training.isOriginal($0, on: date) }
-                let complete = !pendingTemplate && !entries.isEmpty && entries.allSatisfy { training.status(for: $0).hasPrefix("Done") }
+                let complete = !pendingTemplate && !entries.isEmpty && entries.allSatisfy { training.planState(for: $0) == .finished }
                 let planned = templateScheduled || !entries.isEmpty
                 let tile = VStack(spacing: 4) {
-                    Text(calendar.isDateInToday(date) ? "Today" : date.formatted(.dateTime.weekday(.abbreviated))).font(.caption2)
+                    Text(date.formatted(.dateTime.weekday(.abbreviated))).font(.caption2)
+                    Image(systemName: "diamond.fill")
+                        .font(.system(size: 6, weight: .bold))
+                        .foregroundStyle(isSelected ? Color(uiColor: .systemBackground).opacity(0.87) : PlannerStyle.moss)
+                        .opacity(calendar.isDateInToday(date) ? 1 : 0)
+                        .accessibilityHidden(true)
                     Text(date, format: .dateTime.day()).font(.system(.headline, design: .rounded).monospacedDigit())
                     Image(systemName: complete ? "checkmark.circle.fill" : planned ? "dumbbell.fill" : "minus")
                         .font(.caption2)
@@ -288,11 +291,6 @@ struct PlanScreen: View {
                 .frame(maxWidth: .infinity).padding(.vertical, 9)
                 .foregroundStyle(isSelected ? Color(uiColor: .systemBackground) : PlannerStyle.moss)
                 .background(isSelected ? PlannerStyle.moss : PlannerStyle.moss.opacity(0.065), in: RoundedRectangle(cornerRadius: 12))
-                .overlay(alignment: .bottom) {
-                    if calendar.isDateInToday(date) {
-                        Capsule().fill(isSelected ? Color(uiColor: .systemBackground) : PlannerStyle.ochre).frame(width: 15, height: 3)
-                    }
-                }
                 if start == weekStart {
                     Button { selected = date } label: { tile }
                         .buttonStyle(.plain)
@@ -384,13 +382,43 @@ private struct PlannedWorkoutCard: View {
     let start: () -> Void
     let move: ((Date) throws -> Void)?
     let skip: (() throws -> Void)?
+    var remove: (() throws -> Void)? = nil
+    @State private var rescheduling = false
+    @State private var confirmingSkip = false
+    @State private var confirmingRemove = false
+    @State private var problem: String?
     var review: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 8) {
-                Label(status, systemImage: status.hasPrefix("Done") ? "checkmark.circle.fill" : "calendar")
-                    .font(.subheadline.weight(.semibold))
+                HStack {
+                    Text(status)
+                        .font(.subheadline.weight(.semibold))
+                        .accessibilityIdentifier("planWorkoutStatus")
+                    Spacer(minLength: 8)
+                    if move != nil || skip != nil || remove != nil {
+                        Menu {
+                            if move != nil {
+                                Button { rescheduling = true } label: { Label("Reschedule", systemImage: "calendar.badge.clock") }
+                                .accessibilityIdentifier("rescheduleWorkout")
+                            }
+                            if skip != nil {
+                                Button(role: .destructive) { confirmingSkip = true } label: { Label("Skip", systemImage: "forward.end") }
+                                    .accessibilityIdentifier("skipPlannedWorkout")
+                            }
+                            if remove != nil {
+                                Button(role: .destructive) { confirmingRemove = true } label: { Label("Remove", systemImage: "trash") }
+                                    .accessibilityIdentifier("removePlannedActivity")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis").font(.body.weight(.semibold))
+                                .frame(width: 44, height: 44).contentShape(Rectangle())
+                        }
+                        .tint(.white).accessibilityLabel("Options for \(name)")
+                        .accessibilityIdentifier("planWorkoutOptions")
+                    }
+                }
                 Text(name).font(.system(.largeTitle, design: .serif, weight: .medium))
                 if let detail { Text(detail).font(.subheadline) }
                 else if let goal { Text("\(goal / 60) min cardio").font(.subheadline) }
@@ -436,15 +464,29 @@ private struct PlannedWorkoutCard: View {
                 Button(action: review) { Label("Review workout", systemImage: "checkmark.circle").frame(maxWidth: .infinity) }
                     .buttonStyle(.bordered).controlSize(.large).padding(14).accessibilityIdentifier("reviewOccurrence")
             }
-            if let move {
-                NavigationLink {
-                    RescheduleWorkoutScreen(selected: selected, title: name, move: move, skip: skip)
-                } label: {
-                    Label("Reschedule", systemImage: "calendar.badge.clock").frame(minHeight: 44)
-                }.padding(.horizontal, 14).accessibilityIdentifier("rescheduleWorkout")
+            if let problem {
+                Label(problem, systemImage: "exclamationmark.circle").font(.subheadline).padding(14)
+                    .accessibilityIdentifier("planWorkoutActionError")
             }
         }
         .background(PlannerStyle.surface).clipShape(RoundedRectangle(cornerRadius: 20))
+        .navigationDestination(isPresented: $rescheduling) {
+            if let move { RescheduleWorkoutScreen(selected: selected, title: name, move: move) }
+        }
+        .confirmationDialog("Skip this scheduled workout?", isPresented: $confirmingSkip, titleVisibility: .visible) {
+            Button("Skip workout", role: .destructive) { if let skip { perform(skip) } }
+                .accessibilityIdentifier("confirmSkipWorkout")
+            Button("Keep workout", role: .cancel) {}
+        } message: { Text("Only this scheduled workout is skipped. Your routine and logged workouts are kept.") }
+        .confirmationDialog("Remove this planned activity?", isPresented: $confirmingRemove, titleVisibility: .visible) {
+            Button("Remove activity", role: .destructive) { if let remove { perform(remove) } }
+                .accessibilityIdentifier("confirmRemovePlannedActivity")
+            Button("Keep activity", role: .cancel) {}
+        } message: { Text("This activity will be removed from the plan. Logged workouts stay in your history on their original dates.") }
+    }
+
+    private func perform(_ action: () throws -> Void) {
+        do { try action(); problem = nil } catch { problem = error.localizedDescription }
     }
 }
 

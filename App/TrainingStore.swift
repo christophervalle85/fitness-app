@@ -3,6 +3,13 @@ import Foundation
 import Observation
 import SwiftData
 
+enum PlanWorkoutState: String {
+    case notStarted = "Not started"
+    case inProgress = "In progress"
+    case finished = "Finished"
+    case skipped = "Skipped"
+}
+
 enum TrainingSchemaV1: VersionedSchema {
     static let versionIdentifier = Schema.Version(1, 0, 0)
     static var models: [any PersistentModel.Type] { [Head.self, Entry.self] }
@@ -111,6 +118,14 @@ final class TrainingStore {
             $0.occurrenceID == occurrence.id && ($0.cardio != nil || !creditedIDs(in: [$0]).isEmpty)
         }
         return contributors.allSatisfy { $0.performedDay.date < occurrence.date } ? "Done early" : "Done"
+    }
+
+    func planState(for occurrence: TrainingOccurrence) -> PlanWorkoutState {
+        if occurrence.skipped { return .skipped }
+        if active?.occurrenceID == occurrence.id { return .inProgress }
+        let (completed, total) = progress(for: occurrence)
+        if total > 0 && completed == total { return .finished }
+        return completed > 0 ? .inProgress : .notStarted
     }
 
     func slotProgress(for occurrence: TrainingOccurrence) -> [UUID: [Bool]] {
@@ -306,6 +321,38 @@ final class TrainingStore {
         var occurrence = original
         occurrence.skipped = true
         try commit(occurrence: occurrence)
+    }
+
+    func canRemoveAdditionalActivity(_ occurrence: TrainingOccurrence) -> Bool {
+        occurrence.planID == nil && occurrence.day == nil && occurrence.cardioGoalSeconds != nil &&
+            occurrence.plannedSets.isEmpty && sessions.allSatisfy { session in
+                session.occurrenceID != occurrence.id || (session.isCardio && session.finishedAt != nil)
+            }
+    }
+
+    func removeAdditionalActivity(_ id: UUID) throws {
+        guard let occurrence = occurrences.first(where: { $0.id == id }) else {
+            throw TrainingError("This activity is no longer on the plan.")
+        }
+        guard canRemoveAdditionalActivity(occurrence) else {
+            throw TrainingError("Only added activities without an open workout can be removed.")
+        }
+        let detached = sessions.enumerated().compactMap { index, session -> (Int, TrainingSession)? in
+            guard session.occurrenceID == id else { return nil }
+            var saved = session
+            saved.occurrenceID = nil
+            return (index, saved)
+        }
+        try saveChanges { context in
+            guard let row = try fetch(id, context), row.kind == "occurrence" else {
+                throw TrainingError("This activity is no longer on the plan.")
+            }
+            // Remove the scheduled goal and detach its saved results together.
+            for (_, session) in detached { try write(session, kind: "session", context: context) }
+            context.delete(row)
+        }
+        for (index, session) in detached { sessions[index] = session }
+        occurrences.removeAll { $0.id == id }
     }
 
     private func makeExercise(_ prescription: PlanExercise, basis: LoadBasis, slots: [UUID?], rest: Int?, ordinals: [Int]? = nil) -> TrainingExercise {
@@ -670,17 +717,23 @@ final class TrainingStore {
         }
     }
 
-    private func commit(session: TrainingSession? = nil, occurrence: TrainingOccurrence? = nil, deletingSession: UUID? = nil) throws {
+    private func saveChanges(_ changes: (ModelContext) throws -> Void) throws {
         guard let directory else { throw TrainingError("Open your local profile and try again.") }
         try withDatabase(directory) { context, head in
             guard head.revision == revision else { throw TrainingError("Workout data changed. Reopen the workout before retrying.") }
-            if let session { try write(session, kind: "session", context: context) }
-            if let occurrence { try write(occurrence, kind: "occurrence", context: context) }
-            if let deletingSession, let row = try fetch(deletingSession, context) { context.delete(row) }
+            try changes(context)
             head.revision = try increment(head.revision)
             try beforeSave()
             try context.save()
             revision = head.revision
+        }
+    }
+
+    private func commit(session: TrainingSession? = nil, occurrence: TrainingOccurrence? = nil, deletingSession: UUID? = nil) throws {
+        try saveChanges { context in
+            if let session { try write(session, kind: "session", context: context) }
+            if let occurrence { try write(occurrence, kind: "occurrence", context: context) }
+            if let deletingSession, let row = try fetch(deletingSession, context) { context.delete(row) }
         }
         if let session {
             if let i = sessions.firstIndex(where: { $0.id == session.id }) { sessions[i] = session }

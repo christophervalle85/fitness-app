@@ -4,17 +4,14 @@ struct RescheduleWorkoutScreen: View {
     let selected: Date
     let title: String
     let move: (Date) throws -> Void
-    let skip: (() throws -> Void)?
     @State private var destination: Date
-    @State private var confirmingSkip = false
     @State private var problem: String?
     @Environment(\.dismiss) private var dismiss
 
-    init(selected: Date, title: String, move: @escaping (Date) throws -> Void, skip: (() throws -> Void)? = nil) {
+    init(selected: Date, title: String, move: @escaping (Date) throws -> Void) {
         self.selected = selected
         self.title = title
         self.move = move
-        self.skip = skip
         _destination = State(initialValue: selected)
     }
 
@@ -33,15 +30,6 @@ struct RescheduleWorkoutScreen: View {
                 .padding(14).background(PlannerStyle.surface, in: RoundedRectangle(cornerRadius: 16))
                 Text("Only this scheduled workout moves. Its logged sets stay on the dates you performed them.")
                     .font(.subheadline).foregroundStyle(.secondary)
-                if let skip {
-                    Button("Skip this workout", role: .destructive) { confirmingSkip = true }
-                        .accessibilityIdentifier("skipPlannedWorkout")
-                        .confirmationDialog("Skip this scheduled workout?", isPresented: $confirmingSkip, titleVisibility: .visible) {
-                            Button("Skip workout", role: .destructive) { save(skip) }
-                                .accessibilityIdentifier("confirmSkipWorkout")
-                            Button("Keep workout", role: .cancel) {}
-                        }
-                }
             }.frame(maxWidth: 560, alignment: .leading).frame(maxWidth: .infinity).padding(20)
         }
         .background(PlannerStyle.paper)
