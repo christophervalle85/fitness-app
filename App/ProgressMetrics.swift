@@ -58,19 +58,36 @@ struct ProgressSet: Identifiable {
     let seconds: Int?
 }
 
+struct ExerciseWorkoutPoint: Identifiable {
+    var id: UUID { result.sessionID }
+    let date: Date
+    let result: ProgressSet
+}
+
 struct ExerciseRecords: Identifiable {
     let id: RecordIdentity
     let name: String
     var basis: LoadBasis { id.basis }
     var side: String? { id.side }
-    var trend: [ProgressSet]
+    let trend: [ProgressSet]
+    let workoutPoints: [ExerciseWorkoutPoint]
     let heaviest: ProgressSet?
     let repBests: [ProgressSet]
 
-    init(id: RecordIdentity, name: String, rows: [ProgressSet]) {
+    init(id: RecordIdentity, name: String, rows: [ProgressSet], workoutDates: [UUID: Date]) {
         self.id = id
         self.name = name
         trend = rows.sorted { a, b in a.date == b.date ? a.id.uuidString < b.id.uuidString : a.date < b.date }
+        var byWorkout: [UUID: ProgressSet] = [:]
+        for row in trend {
+            if let previous = byWorkout[row.sessionID], !Self.prefers(row, over: previous, basis: id.basis) { continue }
+            byWorkout[row.sessionID] = row
+        }
+        workoutPoints = byWorkout.values.map { row in
+            ExerciseWorkoutPoint(date: workoutDates[row.sessionID] ?? row.date, result: row)
+        }.sorted { a, b in
+            a.date == b.date ? a.id.uuidString < b.id.uuidString : a.date < b.date
+        }
         guard ![.timed, .assisted, .bodyweight].contains(id.basis) else {
             heaviest = nil
             repBests = []
@@ -85,6 +102,20 @@ struct ExerciseRecords: Identifiable {
         }
         heaviest = best
         repBests = byReps.keys.sorted().compactMap { byReps[$0] }
+    }
+
+    private static func prefers(_ row: ProgressSet, over previous: ProgressSet, basis: LoadBasis) -> Bool {
+        // The input is already ordered by set time and ID, so replacing an equal
+        // representative keeps the latest set and breaks timestamp ties consistently.
+        switch basis {
+        case .bodyweight: return (row.reps ?? 0) >= (previous.reps ?? 0)
+        case .timed: return (row.seconds ?? 0) >= (previous.seconds ?? 0)
+        case .assisted: return true
+        default:
+            guard let weight = row.kg, let oldWeight = previous.kg else { return false }
+            if WeightUnits.equal(weight, oldWeight) { return (row.reps ?? 0) >= (previous.reps ?? 0) }
+            return weight > oldWeight
+        }
     }
 
     private static func improves(weight: Double, reps: Int, over previous: ProgressSet?) -> Bool {
@@ -108,6 +139,19 @@ struct ProgressActivityDay: Identifiable {
     var id: Date { date }
 }
 
+struct RoutineProgressDay: Identifiable {
+    var id: UUID { day.id }
+    let weekdayIndex: Int
+    let day: PlanDay
+    let exercises: [RoutineExerciseProgress]
+}
+
+struct RoutineExerciseProgress: Identifiable {
+    var id: UUID { prescription.id }
+    let prescription: PlanExercise
+    let records: [ExerciseRecords]
+}
+
 struct ProgressMetrics {
     let history: [TrainingSession]
     let activityDays: [ProgressActivityDay]
@@ -117,6 +161,7 @@ struct ProgressMetrics {
     let adherence: (fulfilled: Int, scheduled: Int)
     let knownAdherence: (fulfilled: Int, scheduled: Int)
     let records: [ExerciseRecords]
+    let routineDays: [RoutineProgressDay]
     let suggestions: [ProgressionSuggestion]
 
     init(sessions: [TrainingSession], occurrences: [TrainingOccurrence], activePlan: WeekPlan? = nil, asOf: Date = Date()) {
@@ -191,7 +236,8 @@ struct ProgressMetrics {
                 attempts[key] = (attempted, Self.suggestion(exercise, session: session, occurrence: occurrence))
             }
         }
-        records = points.map { ExerciseRecords(id: $0.key, name: titles[$0.key] ?? "", rows: $0.value) }.sorted {
+        let workoutDates = Dictionary(sessions.map { ($0.id, $0.startedAt) }, uniquingKeysWith: { first, _ in first })
+        records = points.map { ExerciseRecords(id: $0.key, name: titles[$0.key] ?? "", rows: $0.value, workoutDates: workoutDates) }.sorted {
             if $0.name != $1.name { return $0.name.localizedStandardCompare($1.name) == .orderedAscending }
             if $0.id.variant != $1.id.variant { return $0.id.variant.uuidString < $1.id.variant.uuidString }
             if $0.id.convention != $1.id.convention { return $0.id.convention < $1.id.convention }
@@ -200,6 +246,22 @@ struct ProgressMetrics {
                 return ($0.id.machineProfile?.uuidString ?? "") < ($1.id.machineProfile?.uuidString ?? "")
             }
             return ($0.side ?? "") < ($1.side ?? "")
+        }
+        if let activePlan, !activePlan.archived {
+            let byVariant = Dictionary(grouping: records, by: \.id.variant)
+            routineDays = activePlan.days.prefix(7).enumerated().compactMap { weekday, day in
+                guard !day.exercises.isEmpty else { return nil }
+                let exercises = day.exercises.map { prescription in
+                    let matches = byVariant[prescription.variantID ?? prescription.id, default: []].filter { record in
+                        record.name == prescription.name && record.id.convention == prescription.convention &&
+                            (record.id.machineProfile == nil || record.id.machineProfile == prescription.id)
+                    }
+                    return RoutineExerciseProgress(prescription: prescription, records: matches)
+                }
+                return RoutineProgressDay(weekdayIndex: weekday, day: day, exercises: exercises)
+            }
+        } else {
+            routineDays = []
         }
         suggestions = attempts.values.compactMap(\.suggestion).sorted { $0.date > $1.date }
     }
