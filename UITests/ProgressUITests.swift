@@ -191,13 +191,20 @@ final class ProgressUITests: XCTestCase {
         tap(app.buttons["reviewWeek"])
         tap(app.buttons["confirmRoutine"])
         tap(app.tabBars.buttons["Progress"])
-        XCTAssertTrue(app.staticTexts["No finished workouts in the last seven days."].waitForExistence(timeout: 5))
+        let chart = app.descendants(matching: .any)["progressActivityChart"].firstMatch
+        XCTAssertTrue(chart.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["No finished workouts in the last seven days."].exists)
+        XCTAssertFalse(app.staticTexts["No sessions logged."].exists)
+        let selectedDate = app.descendants(matching: .any)["progressSelectedDate"].firstMatch
+        let firstDay = Calendar.current.date(byAdding: .day, value: -6, to: .now)!
+        chart.coordinate(withNormalizedOffset: CGVector(dx: 0.06, dy: 0.45)).tap()
+        XCTAssertEqual(selectedDate.label, firstDay.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
+        XCTAssertFalse(app.buttons["progressDaySession0"].exists)
         assertProgressTitleHidden(in: app)
         let emptyRecord = app.descendants(matching: .any)["progressExerciseRecord-Hip hinge"].firstMatch
         XCTAssertTrue(emptyRecord.waitForExistence(timeout: 5))
         XCTAssertTrue(emptyRecord.label.contains("pounds"))
         XCTAssertTrue(emptyRecord.label.contains("Date unavailable"))
-        XCTAssertFalse(app.descendants(matching: .any)["progressActivityChart"].firstMatch.exists)
         XCTAssertFalse(app.buttons["backupRecovery"].exists)
         capture("Progress before the first workout", in: app)
 
