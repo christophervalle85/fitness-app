@@ -182,7 +182,7 @@ private struct TrainingActivityChart: View {
                 Chart(days.indices, id: \.self) { index in
                     let day = days[index]
                     // Marks, ticks and touch selection share the center of each day's slot.
-                    BarMark(x: .value("Day slot", Double(index)), y: .value("Finished sessions", day.sessions.count), width: .ratio(0.55))
+                    BarMark(x: .value("Day slot", Double(index)), y: .value("Finished sessions", day.sessions.count), width: .fixed(22))
                         .cornerRadius(3).foregroundStyle(index == selectedIndex ? PlannerStyle.ochre : PlannerStyle.moss)
                         .accessibilityLabel(day.date.formatted(date: .complete, time: .omitted))
                         .accessibilityValue("\(day.sessions.count) finished sessions")
@@ -204,20 +204,25 @@ private struct TrainingActivityChart: View {
                                     select(at: location, in: plot, proxy: proxy)
                                 })
                                 .accessibilityHidden(true)
-                        }
-                    }
-                }
-                .chartXAxis {
-                    AxisMarks(values: days.indices.map(Double.init)) { value in
-                        if let slot = value.as(Double.self), days.indices.contains(Int(slot)) {
-                            AxisValueLabel {
-                                Text(days[Int(slot)].date.formatted(.dateTime.weekday(typeSize.isAccessibilitySize ? .narrow : .abbreviated)))
+                            ForEach(days.indices, id: \.self) { index in
+                                if let x = proxy.position(forX: Double(index)) {
+                                    Text(days[index].date.formatted(.dateTime.weekday(typeSize.isAccessibilitySize ? .narrow : .abbreviated)))
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize()
+                                        .position(x: plot.minX + x, y: plot.maxY + 13)
+                                        .allowsHitTesting(false)
+                                        .accessibilityHidden(true)
+                                }
                             }
                         }
                     }
                 }
+                .chartXAxis(.hidden)
                 .chartYAxis(.hidden)
-                .frame(height: 140).accessibilityIdentifier("progressActivityChart")
+                .frame(height: 140)
+                .padding(.bottom, 26)
+                .accessibilityIdentifier("progressActivityChart")
                 if let index = selectedIndex {
                     let selected = days[index]
                     VStack(alignment: .leading, spacing: 8) {
