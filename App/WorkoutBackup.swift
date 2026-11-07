@@ -63,8 +63,9 @@ struct WorkoutBackup: Codable, Equatable {
         try check(format == "Weekform" && (1...2).contains(version) && ["kg","lb"].contains(unit))
         try check(version == 1 || library != nil)
         try library?.validate()
-        try check(["home","edit","starters","review","welcome"].contains(step))
-        try check(!["edit","review"].contains(step) || draft != nil)
+        let editorSteps = ["edit", "review", "libraryEdit", "libraryReview"]
+        try check((["home", "starters", "welcome"] + editorSteps).contains(step))
+        try check(!editorSteps.contains(step) || draft != nil)
         try check(unique(plans) && unique(sessions) && unique(occurrences) && sessions.filter { $0.finishedAt == nil }.count <= 1)
         try check(activeID == nil || plans.contains { $0.id == activeID && !$0.archived })
         if let draft { try check(draft.days.count == 7 && unique(draft.days) && draft.days.allSatisfy { unique($0.exercises) }) }

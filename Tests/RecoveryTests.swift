@@ -3,6 +3,45 @@ import Testing
 @testable import Weekform
 
 @MainActor struct RecoveryTests {
+    @Test func deletingTheLastRoutinePreservesLinkedWorkAndTheLibraryDraft() throws {
+        let temp = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: temp) }
+        let root = temp.appending(path: "Recovery")
+        let original = try RecoveryPaths.current(at: root)
+        let planner = PlanningStore(directory: original.planning)
+        let training = TrainingStore(directory: original.training)
+        try planner.load()
+        try training.load(profileID: #require(planner.profileID))
+        let plan = Starters.general()
+        try planner.begin(plan, step: "review")
+        try planner.confirm(plan)
+        let today = CivilTrainingDay(.now)
+        let monday = try #require(Calendar.current.date(byAdding: .day, value: -today.mondayIndex, to: today.date))
+        try training.startPlanned(plan: plan, date: monday)
+        let before = try WorkoutBackup(planner, training)
+
+        try planner.deleteRoutine(plan.id)
+        #expect(planner.plans.isEmpty)
+        #expect(planner.activeID == nil)
+        #expect(planner.step == "home")
+        let replacement = Starters.general()
+        try planner.begin(replacement, step: "edit")
+        try planner.update(replacement, step: "review")
+
+        let backup = try WorkoutBackup(planner, training)
+        #expect(backup.sessions == before.sessions)
+        #expect(backup.occurrences == before.occurrences)
+        try RecoveryPaths.replace(with: backup, planner: planner, training: training, at: root)
+        let restored = PlanningStore(directory: try RecoveryPaths.current(at: root).planning)
+        try restored.load()
+        #expect(restored.isLibraryDraft)
+        #expect(restored.editorStep == "review")
+        #expect(restored.draft == replacement)
+        try restored.discard()
+        #expect(restored.step == "home")
+        #expect(restored.plans.isEmpty)
+    }
+
     @Test func interruptedRestorePreservesBothStoresAndSuccessfulRestoreKeepsRecoveryCopy() throws {
         let temp = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: temp) }
