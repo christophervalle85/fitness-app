@@ -137,8 +137,11 @@ final class M4AccessibilityUITests: XCTestCase {
         tap(app.buttons["reviewWeek"])
         tap(app.buttons["confirmRoutine"])
         tap(app.tabBars.buttons["Exercises"])
-        tap(app.buttons["exercisesBrowseAll"])
-        let row = app.buttons["catalogRow-Barbell bench press"]
+        let searchField = app.searchFields["Search"].firstMatch
+        let query = searchCurl ? "Barbell curl" : "Barbell bench press"
+        tap(searchField)
+        searchField.typeText(query + "\n")
+        let row = app.buttons["catalogRow-" + query]
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         let defaultHeight = row.frame.height
         app.terminate()
@@ -150,7 +153,8 @@ final class M4AccessibilityUITests: XCTestCase {
         app.launch()
         device.appearance = appearance
         tap(app.tabBars.buttons["Exercises"])
-        tap(app.buttons["exercisesBrowseAll"])
+        tap(searchField)
+        searchField.typeText(query + "\n")
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         XCTAssertGreaterThan(row.frame.height, defaultHeight, "The catalog row should grow with Dynamic Type.")
         if detail {
@@ -160,16 +164,8 @@ final class M4AccessibilityUITests: XCTestCase {
             XCTAssertTrue(frame.waitForExistence(timeout: 5))
             XCTAssertEqual(frame.label, "Enlarge Barbell bench press demonstration, frame 1")
         } else if searchCurl {
-            // Audit the same row that can sit beneath the system's translucent
-            // tabs in the unfiltered list. The unfiltered tests remain separate.
-            let searchField = app.searchFields["Search"].firstMatch
-            tap(searchField)
-            searchField.typeText("Barbell curl\n")
-            let curl = app.buttons["catalogRow-Barbell curl"]
-            for _ in 0..<5 where !curl.isHittable { app.swipeUp() }
-            XCTAssertTrue(curl.waitForExistence(timeout: 5))
-            XCTAssertTrue(curl.isHittable)
-            XCTAssertLessThan(curl.frame.maxY, app.tabBars.firstMatch.frame.minY)
+            XCTAssertTrue(row.isHittable)
+            XCTAssertLessThan(row.frame.maxY, app.tabBars.firstMatch.frame.minY)
         } else {
             XCTAssertTrue(app.searchFields["Search"].firstMatch.exists)
         }
@@ -192,7 +188,7 @@ final class M4AccessibilityUITests: XCTestCase {
             XCTAssertGreaterThan(pixel.prefix(3).min() ?? 0, 160, "Expected a light rendered page margin.")
         }
         let screenshot = XCTAttachment(screenshot: rendered)
-        let surface = detail ? "Exercise detail" : (searchCurl ? "Barbell curl result" : "Exercise list")
+        let surface = detail ? "Exercise detail" : (searchCurl ? "Barbell curl result" : "Exercise results")
         screenshot.name = "\(surface) · \(appearance == .dark ? "dark" : "light") · Accessibility Large"
         screenshot.lifetime = .keepAlways
         add(screenshot)
