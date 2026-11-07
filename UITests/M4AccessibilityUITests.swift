@@ -137,6 +137,7 @@ final class M4AccessibilityUITests: XCTestCase {
         tap(app.buttons["reviewWeek"])
         tap(app.buttons["confirmRoutine"])
         tap(app.tabBars.buttons["Exercises"])
+        tap(app.buttons["exercisesBrowseAll"])
         let row = app.buttons["catalogRow-Barbell bench press"]
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         let defaultHeight = row.frame.height
@@ -149,6 +150,7 @@ final class M4AccessibilityUITests: XCTestCase {
         app.launch()
         device.appearance = appearance
         tap(app.tabBars.buttons["Exercises"])
+        tap(app.buttons["exercisesBrowseAll"])
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         XCTAssertGreaterThan(row.frame.height, defaultHeight, "The catalog row should grow with Dynamic Type.")
         if detail {
@@ -160,7 +162,7 @@ final class M4AccessibilityUITests: XCTestCase {
         } else if searchCurl {
             // Audit the same row that can sit beneath the system's translucent
             // tabs in the unfiltered list. The unfiltered tests remain separate.
-            let searchField = app.textFields["catalogSearch"]
+            let searchField = app.searchFields["Search"].firstMatch
             tap(searchField)
             searchField.typeText("Barbell curl\n")
             let curl = app.buttons["catalogRow-Barbell curl"]
@@ -169,7 +171,7 @@ final class M4AccessibilityUITests: XCTestCase {
             XCTAssertTrue(curl.isHittable)
             XCTAssertLessThan(curl.frame.maxY, app.tabBars.firstMatch.frame.minY)
         } else {
-            XCTAssertTrue(app.textFields["catalogSearch"].exists)
+            XCTAssertTrue(app.searchFields["Search"].firstMatch.exists)
         }
 
         let rendered = app.screenshot()

@@ -4,7 +4,185 @@ import SwiftUI
 struct ExercisesScreen: View {
     let planner: PlanningStore
     let training: TrainingStore
-    var body: some View { CatalogBrowser(planner: planner, training: training) }
+    var body: some View { ExerciseDiscovery(planner: planner, training: training) }
+}
+
+private struct ExerciseDiscovery: View {
+    let planner: PlanningStore
+    let training: TrainingStore
+    @State private var entries: [CatalogEntry] = []
+    @State private var issue: String?
+    @State private var filter = CatalogFilter()
+    @State private var browseAll = false
+    @State private var customOnly = false
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    private var all: [CatalogEntry] {
+        entries + planner.customExercises.map(CatalogEntry.custom).filter { custom in
+            !entries.contains { $0.id == custom.id }
+        }
+    }
+    private var hasSelections: Bool {
+        !filter.muscle.isEmpty || !filter.equipment.isEmpty || !filter.movement.isEmpty || filter.favoritesOnly || customOnly
+    }
+    private var showingResults: Bool {
+        browseAll || hasSelections || !filter.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    private var results: [CatalogEntry] {
+        let customIDs = Set(planner.customExercises.map { $0.variantID ?? $0.id })
+        return all.filter { (!customOnly || customIDs.contains($0.id)) && filter.accepts($0, favorites: planner.favoriteExerciseIDs) }
+    }
+
+    var body: some View {
+        let visibleResults = results
+        List {
+            if let issue { Text(issue).foregroundStyle(.secondary) }
+            if showingResults {
+                Section {
+                    if hasSelections {
+                        LazyVGrid(columns: typeSize.isAccessibilitySize ? [GridItem(.flexible(), alignment: .leading)] : [GridItem(.adaptive(minimum: 145), spacing: 8, alignment: .leading)], alignment: .leading, spacing: 8) {
+                            if !filter.muscle.isEmpty { removal(filter.muscle) { filter.muscle = "" } }
+                            if !filter.equipment.isEmpty { removal("Equipment: \(filter.equipment)") { filter.equipment = "" } }
+                            if !filter.movement.isEmpty { removal("Movement: \(filter.movement)") { filter.movement = "" } }
+                            if filter.favoritesOnly { removal("Favorites") { filter.favoritesOnly = false } }
+                            if customOnly { removal("My exercises") { customOnly = false } }
+                        }
+                    }
+                    Button("Clear search and filters", action: clear)
+                        .accessibilityIdentifier("exercisesClearFilters")
+                } header: {
+                    HStack {
+                        Text(visibleResults.count == 1 ? "1 result" : "\(visibleResults.count) results").font(.headline).foregroundStyle(PlannerStyle.ink)
+                        Spacer()
+                        filters
+                    }.textCase(nil)
+                }
+                if visibleResults.isEmpty {
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(filter.favoritesOnly ? "No matching favorites" : customOnly ? "No matching custom exercises" : "No matching exercises")
+                                .font(.headline)
+                            Text(filter.favoritesOnly ? "Save exercises with the star on their detail page, or clear your filters." : "Try another search, clear your filters, or create a custom exercise.")
+                                .foregroundStyle(.secondary)
+                        }.padding(.vertical, 8)
+                        createCustom
+                    }
+                } else {
+                    Section {
+                        ForEach(visibleResults) { entry in
+                            NavigationLink {
+                                CatalogDetail(entry: entry, catalog: ExerciseCatalog(entries: all), planner: planner, training: training, select: nil)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    if let media = entry.media.first { CatalogThumbnail(media: media) }
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(entry.name).font(.headline)
+                                        Text(entry.source.isEmpty ? "Custom exercise" : (entry.primary + entry.equipment).joined(separator: " · "))
+                                            .font(.subheadline).foregroundStyle(.secondary)
+                                    }
+                                    if planner.favoriteExerciseIDs.contains(entry.id) {
+                                        Image(systemName: "star.fill").foregroundStyle(PlannerStyle.moss).accessibilityLabel("Favorite")
+                                    }
+                                }.padding(.vertical, 3)
+                            }.accessibilityIdentifier("catalogRow-" + entry.name)
+                        }
+                    }
+                    if customOnly { Section { createCustom } }
+                }
+            } else {
+                Section {
+                    Button { filter.favoritesOnly = true } label: { Label("Favorites", systemImage: "star") }
+                        .accessibilityIdentifier("exercisesFavorites")
+                    Button { customOnly = true } label: { Label("My exercises", systemImage: "person.crop.rectangle") }
+                        .accessibilityIdentifier("exercisesMyExercises")
+                    Button { browseAll = true } label: { Label("Browse all", systemImage: "list.bullet") }
+                        .accessibilityIdentifier("exercisesBrowseAll")
+                }
+                Section("Browse by muscle") {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: typeSize.isAccessibilitySize ? 1 : 2), spacing: 8) {
+                        ForEach(Array(Set(all.flatMap { $0.primary + $0.secondary })).filter { !$0.isEmpty }.sorted(), id: \.self) { muscle in
+                            Button { filter.muscle = muscle } label: {
+                                Text(muscle).font(.body.weight(.medium))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                    .padding(.horizontal, 12).padding(.vertical, 4)
+                                    .background(PlannerStyle.moss.opacity(0.09), in: RoundedRectangle(cornerRadius: 10))
+                            }.buttonStyle(.plain).foregroundStyle(PlannerStyle.ink)
+                                .accessibilityIdentifier("exercisesMuscle-" + muscle)
+                        }
+                    }.padding(.vertical, 4)
+                }
+                Section { createCustom }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden).background(PlannerStyle.paper)
+        .navigationTitle("Exercises")
+        .searchable(text: $filter.text, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search")
+        .task {
+            do { entries = try ExerciseCatalog.bundled().entries }
+            catch { issue = "The bundled catalog could not be opened. Your custom exercises are still available." }
+        }
+    }
+
+    private var createCustom: some View {
+        NavigationLink {
+            NewCustomExercise(planner: planner, onSaved: {
+                clear()
+                customOnly = true
+            })
+        } label: { Label("Create custom exercise", systemImage: "plus") }
+            .accessibilityIdentifier("newCustomExercise")
+    }
+
+    private var filters: some View {
+        Menu {
+            Toggle("Favorites only", isOn: $filter.favoritesOnly)
+            Menu("Muscle") {
+                selector("Muscle", values: all.flatMap { $0.primary + $0.secondary }, binding: $filter.muscle)
+            }
+            Menu("Equipment") {
+                selector("Equipment", values: all.flatMap(\.equipment), binding: $filter.equipment)
+            }
+            Menu("Movement") {
+                selector("Movement", values: all.map(\.movement), binding: $filter.movement)
+            }
+        } label: {
+            Label("Filters", systemImage: "line.3.horizontal.decrease")
+                .font(.body).frame(minHeight: 44).contentShape(Rectangle())
+        }
+        .accessibilityIdentifier("exercisesFilters")
+    }
+
+    private func selector(_ title: String, values: [String], binding: Binding<String>) -> some View {
+        Picker(title, selection: binding) {
+            Text("Any").tag("")
+            ForEach(Array(Set(values)).filter { !$0.isEmpty }.sorted(), id: \.self) { Text($0).tag($0) }
+        }
+    }
+
+    private func removal(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Text(title).font(.subheadline.weight(.medium))
+                    .fixedSize(horizontal: false, vertical: true)
+                Image(systemName: "xmark").font(.caption.weight(.semibold)).accessibilityHidden(true)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .frame(minHeight: 44)
+            .foregroundStyle(PlannerStyle.ink)
+            .background(PlannerStyle.moss.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+        }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove \(title) filter")
+            .accessibilityIdentifier("exercisesRemove-" + title)
+    }
+
+    private func clear() {
+        filter = CatalogFilter()
+        browseAll = false
+        customOnly = false
+    }
 }
 
 struct CatalogPicker: View {
@@ -373,6 +551,7 @@ private struct CatalogDetail: View {
 
 private struct NewCustomExercise: View {
     let planner: PlanningStore
+    var onSaved: () -> Void = {}
     @State private var plan = PlanExercise()
     @State private var issue: String?
     @Environment(\.dismiss) private var dismiss
@@ -386,7 +565,7 @@ private struct NewCustomExercise: View {
             Button("Save exercise") {
                 var saved = plan
                 saved.variantID = saved.id
-                do { try planner.saveCustomExercise(saved); dismiss() } catch { issue = error.localizedDescription }
+                do { try planner.saveCustomExercise(saved); onSaved(); dismiss() } catch { issue = error.localizedDescription }
             }.accessibilityIdentifier("saveCatalogCustom")
         }.navigationTitle("New custom exercise")
     }

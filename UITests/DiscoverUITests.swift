@@ -23,6 +23,12 @@ final class DiscoverUITests: XCTestCase {
     }
 
     private func search(_ text: String, in app: XCUIApplication) {
+        let field = app.searchFields["Search"].firstMatch
+        tap(field)
+        field.typeText(text)
+    }
+
+    private func searchPicker(_ text: String, in app: XCUIApplication) {
         let field = app.textFields["catalogSearch"]
         tap(field)
         field.typeText(text)
@@ -38,14 +44,20 @@ final class DiscoverUITests: XCTestCase {
     func testBundledSearchAndComparableAlternative() {
         let app = launchWithRoutine()
         tap(app.tabBars.buttons["Exercises"])
-        XCTAssertTrue(app.buttons["catalogRow-Barbell bench press"].waitForExistence(timeout: 5))
-        screenshot("Offline exercise catalog", in: app)
+        let field = app.searchFields["Search"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertTrue(field.isHittable)
+        XCTAssertLessThan(field.frame.maxY, app.frame.height * 0.38)
+        XCTAssertFalse(app.buttons["catalogRow-Barbell bench press"].exists)
+        XCTAssertFalse(app.staticTexts["Exercise library"].exists)
+        screenshot("Exercises browse with native search", in: app)
         search("bench press", in: app)
         let original = "Barbell bench press"
         let alternative = "Dumbbell bench press"
         XCTAssertFalse(app.buttons["catalogRow-Barbell row"].exists)
         tap(app.buttons["catalogRow-" + original])
         XCTAssertTrue(app.staticTexts[original].waitForExistence(timeout: 5))
+        XCTAssertFalse(field.isHittable)
         XCTAssertTrue(app.buttons["favoriteExercise"].exists)
         screenshot("Exercise detail gallery", in: app)
         tap(app.buttons["catalogFrame1"])
@@ -81,7 +93,7 @@ final class DiscoverUITests: XCTestCase {
         tap(swap)
         tap(app.buttons["browseCatalog"])
         let replacement = "Barbell front squat"
-        search(replacement, in: app)
+        searchPicker(replacement, in: app)
         tap(app.buttons["catalogRow-" + replacement])
         tap(app.buttons["useCatalogExercise"])
         tap(app.buttons["customSave"])
@@ -104,12 +116,17 @@ final class DiscoverUITests: XCTestCase {
         let app = launchWithRoutine()
         let name = "Test band march"
         tap(app.tabBars.buttons["Exercises"])
+        tap(app.buttons["exercisesMyExercises"])
+        XCTAssertTrue(app.staticTexts["No matching custom exercises"].waitForExistence(timeout: 5))
+        tap(app.buttons["exercisesClearFilters"])
+        search(name, in: app)
+        XCTAssertTrue(app.staticTexts["No matching exercises"].waitForExistence(timeout: 5))
         tap(app.buttons["newCustomExercise"])
         let nameField = app.textFields["customCatalogName"]
         tap(nameField)
+        XCTAssertFalse(app.searchFields["Search"].firstMatch.isHittable)
         nameField.typeText(name)
         tap(app.buttons["saveCatalogCustom"])
-        search(name, in: app)
         let row = app.buttons["catalogRow-" + name]
         tap(row)
         let favorite = app.buttons["favoriteExercise"]
@@ -120,8 +137,7 @@ final class DiscoverUITests: XCTestCase {
         app.terminate()
         app.launch()
         tap(app.tabBars.buttons["Exercises"])
-        tap(app.buttons["Filter exercises"])
-        tap(app.descendants(matching: .any)["Favorites only"].firstMatch)
+        tap(app.buttons["exercisesFavorites"])
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'catalogRow-'")).count, 1)
         tap(row)
@@ -135,5 +151,51 @@ final class DiscoverUITests: XCTestCase {
         search(name, in: secondProfile)
         XCTAssertTrue(secondProfile.staticTexts["No matching exercises"].waitForExistence(timeout: 5))
         XCTAssertFalse(secondProfile.buttons["catalogRow-" + name].exists)
+        XCTAssertTrue(secondProfile.buttons["newCustomExercise"].exists)
+    }
+
+    func testBrowseAndSearchWithAnOpenWorkout() {
+        let app = launchWithRoutine()
+        tap(app.buttons["weekday0"])
+        tap(app.buttons["startPlanned"])
+        tap(app.buttons["Close"])
+        tap(app.tabBars.buttons["Exercises"])
+        let resume = app.buttons["resumeAccessory"]
+        let field = app.searchFields["Search"].firstMatch
+        XCTAssertTrue(resume.waitForExistence(timeout: 5))
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertLessThan(field.frame.maxY, resume.frame.minY)
+        screenshot("Exercises with the workout Resume bar", in: app)
+
+        tap(app.buttons["exercisesMuscle-Chest"])
+        let bench = app.buttons["catalogRow-Barbell bench press"]
+        XCTAssertTrue(bench.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["catalogRow-Barbell curl"].exists)
+        tap(app.buttons["exercisesFilters"])
+        let equipment = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Equipment")).firstMatch
+        XCTAssertTrue(equipment.waitForExistence(timeout: 5), app.debugDescription)
+        tap(equipment)
+        tap(app.buttons["Barbell"].firstMatch)
+        XCTAssertTrue(app.buttons["exercisesRemove-Equipment: Barbell"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["catalogRow-Dumbbell bench press"].exists)
+        tap(app.buttons["exercisesRemove-Equipment: Barbell"])
+        search("bench press", in: app)
+        XCTAssertTrue(bench.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        XCTAssertLessThan(field.frame.maxY, app.frame.height * 0.38)
+        screenshot("Native search active with muscle filter", in: app)
+        field.typeText("\n")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(resume.waitForExistence(timeout: 5))
+        tap(app.buttons["exercisesRemove-Chest"])
+        tap(app.buttons["exercisesClearFilters"])
+        XCTAssertTrue(app.buttons["exercisesBrowseAll"].waitForExistence(timeout: 5))
+        tap(app.buttons["exercisesBrowseAll"])
+        XCTAssertTrue(bench.waitForExistence(timeout: 5))
+        tap(resume)
+        tap(app.buttons["reviewSession"])
+        tap(app.buttons["Discard empty workout"])
+        tap(app.buttons["Discard workout"].firstMatch)
     }
 }
