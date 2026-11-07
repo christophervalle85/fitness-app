@@ -21,15 +21,13 @@ struct RoutinesScreen: View {
             ForEach(plans.filter { !$0.archived }) { plan in
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
+                        if plan.id == active {
+                            Label("Active routine", systemImage: "checkmark.circle.fill")
+                                .font(.caption.weight(.semibold)).foregroundStyle(PlannerStyle.blue)
+                        }
                         HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(plan.name).font(.system(.title, design: .serif, weight: .medium))
-                                    .fixedSize(horizontal: false, vertical: true)
-                                if plan.id == active {
-                                    Label("Active routine", systemImage: "checkmark.circle.fill")
-                                        .font(.caption.weight(.semibold)).foregroundStyle(PlannerStyle.blue)
-                                }
-                            }
+                            Text(plan.name).font(.system(.title, design: .serif, weight: .medium))
+                                .fixedSize(horizontal: false, vertical: true)
                             Spacer(minLength: 8)
                             routineMenu(plan)
                         }

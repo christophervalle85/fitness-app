@@ -57,7 +57,29 @@ final class WeekformUITests: XCTestCase {
 
         tap(app.buttons["routineActions"])
         tap(app.buttons["editRoutine"])
+        tap(app.navigationBars.buttons["Cancel"])
+        XCTAssertTrue(routines.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Discard draft"].exists)
+
+        tap(app.buttons["routineActions"])
+        tap(app.buttons["editRoutine"])
         let name = app.textFields["routineName"]
+        tap(name)
+        name.typeText(" draft")
+        tap(app.navigationBars.buttons["Cancel"])
+        let keepEditing = app.buttons["Keep editing"]
+        XCTAssertTrue(keepEditing.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        capture("Inline discard choice", in: app)
+        tap(keepEditing)
+        XCTAssertTrue((name.value as? String)?.hasSuffix(" draft") == true)
+        tap(app.navigationBars.buttons["Cancel"])
+        tap(app.buttons["Discard draft"])
+        XCTAssertTrue(routines.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Three-day strength"].exists)
+
+        tap(app.buttons["routineActions"])
+        tap(app.buttons["editRoutine"])
         tap(name)
         name.typeText(" revised")
         let editedName = name.value as? String ?? ""
@@ -176,6 +198,10 @@ final class WeekformUITests: XCTestCase {
         tap(app.buttons["Duplicate"])
         XCTAssertTrue(copy.waitForExistence(timeout: 5))
         XCTAssertEqual(original.frame.midX, copy.frame.midX, accuracy: 1)
+        let activeTitle = app.staticTexts["Three-day strength"]
+        let copyTitle = app.staticTexts["Three-day strength (copy)"]
+        XCTAssertLessThan(app.staticTexts["Active routine"].frame.maxY, activeTitle.frame.minY)
+        XCTAssertEqual(original.frame.minY - activeTitle.frame.minY, copy.frame.minY - copyTitle.frame.minY, accuracy: 1)
         capture("Aligned routine actions", in: app)
 
         tap(copy)

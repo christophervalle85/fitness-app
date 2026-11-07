@@ -89,7 +89,6 @@ struct PlannerRoot: View {
     @State private var loadFailed = false
     @State private var errorMessage: String?
     @State private var retry: (() -> Void)?
-    @State private var discardAlert = false
     @State private var tab = "Plan"
     @State private var restoreGeneration = UUID()
     #if WEEKFORM_DEVELOPMENT
@@ -160,7 +159,8 @@ struct PlannerRoot: View {
                             guard store.editorStep == "edit", editing.id == value.id, editing != value else { return }
                             editing = value
                             perform { try store.update(value, step: "edit") }
-                        }), onReview: { changeStep("review") }, onCancel: { discardAlert = true })
+                        }), needsDiscardConfirmation: { !store.plans.contains(editing) },
+                            onReview: { changeStep("review") }, onDiscard: discard)
                     case "review":
                         ReviewWeek(plan: editing, editingExisting: store.plans.contains { $0.id == editing.id },
                                    additionalRoutine: isReturningRoutineEditor, activateNew: $activateNewRoutine,
@@ -237,10 +237,6 @@ struct PlannerRoot: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding().background(.regularMaterial)
             }
-        }
-        .confirmationDialog("Discard this draft?", isPresented: $discardAlert, titleVisibility: .visible) {
-            Button("Discard draft", role: .destructive, action: discard)
-            Button("Keep editing", role: .cancel) {}
         }
         #if WEEKFORM_DEVELOPMENT
         .sheet(isPresented: $developer) {
