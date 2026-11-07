@@ -195,14 +195,18 @@ final class WeekformUITests: XCTestCase {
         let confirmDelete = app.alerts["Delete this routine?"].buttons["confirmDeleteRoutine"].firstMatch
         tap(original)
         XCTAssertTrue(app.buttons["editRoutine"].exists)
+        XCTAssertTrue(app.buttons["Archive"].exists)
         tap(app.buttons["Duplicate"])
         XCTAssertTrue(copy.waitForExistence(timeout: 5))
         XCTAssertEqual(original.frame.midX, copy.frame.midX, accuracy: 1)
         let activeTitle = app.staticTexts["Three-day strength"]
         let copyTitle = app.staticTexts["Three-day strength (copy)"]
-        XCTAssertLessThan(app.staticTexts["Active routine"].frame.maxY, activeTitle.frame.minY)
-        XCTAssertEqual(original.frame.minY - activeTitle.frame.minY, copy.frame.minY - copyTitle.frame.minY, accuracy: 1)
-        capture("Aligned routine actions", in: app)
+        let badge = app.staticTexts["Active routine"]
+        XCTAssertLessThan(badge.frame.maxY, activeTitle.frame.minY)
+        XCTAssertLessThanOrEqual(original.frame.maxY, activeTitle.frame.minY)
+        XCTAssertEqual(original.frame.midY, badge.frame.midY, accuracy: 2)
+        XCTAssertEqual(copy.frame.minY, copyTitle.frame.minY, accuracy: 2)
+        capture("Active routine menu above the name", in: app)
 
         tap(copy)
         tap(app.buttons["deleteRoutine"])
@@ -226,6 +230,35 @@ final class WeekformUITests: XCTestCase {
         tap(app.buttons["Discard draft"])
         XCTAssertTrue(app.tabBars.buttons["Routines"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.tabBars.buttons["Routines"].isSelected)
+    }
+
+    func testRoutinesTitleStaysVisibleWhileScrolling() {
+        let app = launch()
+        tap(app.buttons["chooseStarter"])
+        tap(app.buttons["starterGeneral"])
+        tap(app.buttons["reviewWeek"])
+        tap(app.buttons["confirmRoutine"])
+        let routines = app.tabBars.buttons["Routines"]
+        tap(routines)
+
+        let menu = app.buttons["More actions for Three-day strength"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        let header = app.navigationBars["Routines"]
+        XCTAssertTrue(header.waitForExistence(timeout: 5))
+        for _ in 0..<5 {
+            tap(menu)
+            tap(app.buttons["Duplicate"])
+        }
+        let firstRowY = menu.frame.midY
+        app.swipeUp()
+        XCTAssertTrue(!menu.isHittable || menu.frame.midY < firstRowY - 40, "The routine list should scroll.")
+        XCTAssertTrue(header.exists)
+        XCTAssertTrue(routines.isSelected)
+        capture("Routines after scrolling", in: app)
+
+        app.swipeDown()
+        XCTAssertTrue(menu.isHittable)
+        XCTAssertTrue(header.exists)
     }
 
     func testManualDraftResumesAndBecomesAnActiveRoutine() {
