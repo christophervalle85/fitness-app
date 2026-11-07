@@ -23,6 +23,17 @@ final class ProgressUITests: XCTestCase {
         app.launch()
         tap(app.buttons["chooseStarter"])
         tap(app.buttons["starterGeneral"])
+        let exercise = "Barbell bench press"
+        tap(app.buttons["day0"])
+        tap(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Squat")).firstMatch)
+        tap(app.buttons["Choose from exercise library"])
+        let catalogSearch = app.textFields["catalogSearch"]
+        tap(catalogSearch)
+        catalogSearch.typeText(exercise)
+        tap(app.buttons["catalogRow-" + exercise])
+        tap(app.buttons["useCatalogExercise"])
+        tap(app.navigationBars.buttons["Done"])
+        tap(app.navigationBars.buttons.element(boundBy: 0))
         tap(app.buttons["reviewWeek"])
         tap(app.buttons["confirmRoutine"])
         tap(app.buttons["weekday0"])
@@ -35,48 +46,103 @@ final class ProgressUITests: XCTestCase {
         tap(load)
         load.typeText("25")
         if app.buttons["dismissSetKeyboard"].isHittable { tap(app.buttons["dismissSetKeyboard"]) }
+        let loggedDate = Date.now.formatted(.dateTime.month(.abbreviated).day().year())
         tap(app.buttons["confirmSet0"])
         tap(app.buttons["reviewSession"])
         tap(app.buttons["finishPartial"])
 
-        func tapOverviewControl(_ element: XCUIElement) {
+        func revealOverviewControl(_ element: XCUIElement) {
             for _ in 0..<5 where !element.isHittable { app.swipeUp() }
             if !element.isHittable {
                 for _ in 0..<5 where !element.isHittable { app.swipeDown() }
             }
-            tap(element)
+            XCTAssertTrue(element.isHittable)
         }
         func openProgress() {
             tap(app.tabBars.buttons["Progress"])
             XCTAssertTrue(app.navigationBars["Progress"].waitForExistence(timeout: 10))
         }
+        let routineRecord = app.buttons["progressExerciseRecord-" + exercise]
         func openRecord() {
-            tapOverviewControl(app.buttons["progressRecords"])
-            tap(app.buttons["recordGroup0"])
+            revealOverviewControl(routineRecord)
+            tap(routineRecord)
+        }
+        func setUnit(_ unit: String) {
+            tap(app.buttons["progressSettings"])
+            XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+            let option = app.segmentedControls["weightUnit"].buttons[unit]
+            tap(option)
+            XCTAssertTrue(option.isSelected)
+            tap(app.navigationBars["Settings"].buttons.element(boundBy: 0))
+            XCTAssertTrue(app.navigationBars["Progress"].waitForExistence(timeout: 5))
         }
         func openLoggedSet() {
-            tapOverviewControl(app.buttons["progressHistory"])
+            let history = app.buttons["progressHistory"]
+            revealOverviewControl(history)
+            tap(history)
             tap(app.buttons["historySession0"])
             tap(app.buttons["historySet0-0"])
         }
         func backToProgress() {
-            tap(app.navigationBars.buttons.element(boundBy: 0))
-            tap(app.navigationBars.buttons.element(boundBy: 0))
-            XCTAssertTrue(app.navigationBars["Progress"].waitForExistence(timeout: 5))
+            let overview = app.navigationBars["Progress"]
+            for _ in 0..<3 where !overview.exists {
+                tap(app.navigationBars.buttons.element(boundBy: 0))
+            }
+            XCTAssertTrue(overview.waitForExistence(timeout: 5))
         }
 
         openProgress()
         capture("Progress overview", in: app)
-        openRecord()
+        XCTAssertFalse(app.segmentedControls["weightUnit"].exists)
+        XCTAssertFalse(app.staticTexts["Includes dated workouts and upcoming days in your current routine."].exists)
+        XCTAssertFalse(app.buttons["recentSession0"].exists)
+        XCTAssertFalse(app.buttons["progressRecords"].exists)
+        XCTAssertFalse(app.staticTexts["Best logged working sets"].exists)
+        XCTAssertEqual(app.buttons.matching(identifier: "progressHistory").count, 1)
+        let chart = app.descendants(matching: .any)["progressActivityChart"].firstMatch
+        XCTAssertTrue(chart.waitForExistence(timeout: 5))
+        let earlierDay = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.28, dy: 0.45))
+        let finalDay = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.45))
+        earlierDay.tap()
+        XCTAssertTrue(app.staticTexts["No sessions logged."].waitForExistence(timeout: 5), app.debugDescription)
+        earlierDay.press(forDuration: 0.1, thenDragTo: finalDay)
+        XCTAssertTrue(app.buttons["progressDaySession0"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["progressActivityDay"].firstMatch.exists)
+        let selectedDate = app.descendants(matching: .any)["progressSelectedDate"].firstMatch
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: .now)!
+        chart.coordinate(withNormalizedOffset: CGVector(dx: 0.78, dy: 0.45)).tap()
+        XCTAssertTrue(app.staticTexts["No sessions logged."].waitForExistence(timeout: 5))
+        XCTAssertEqual(selectedDate.label, yesterday.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
+        finalDay.tap()
+        let daySession = app.buttons["progressDaySession0"]
+        XCTAssertTrue(daySession.waitForExistence(timeout: 5))
+        XCTAssertTrue(daySession.label.contains("Partial"))
+        XCTAssertFalse(daySession.label.contains(Date.now.formatted(date: .abbreviated, time: .omitted)))
+        capture("Selected day on the activity chart", in: app)
+        let chartTop = chart.frame.minY
+        let scrollStart = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))
+        scrollStart.press(forDuration: 0.08, thenDragTo: scrollStart.withOffset(CGVector(dx: 0, dy: -150)))
+        XCTAssertLessThan(chart.frame.minY, chartTop - 20, "Vertical swipes should scroll Progress.")
+        revealOverviewControl(routineRecord)
+        XCTAssertTrue(app.staticTexts["progressExerciseMuscle-Chest"].exists)
+        XCTAssertFalse(app.staticTexts["Monday"].exists)
+        XCTAssertTrue(routineRecord.label.contains("25"))
+        XCTAssertTrue(routineRecord.label.contains(loggedDate))
+        capture("Exercise record rows by muscle", in: app)
+        tap(routineRecord)
+        XCTAssertTrue(app.navigationBars[exercise].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["exerciseWorkoutTrend"].firstMatch.waitForExistence(timeout: 5))
+        capture("Exercise trend from the routine", in: app)
         XCTAssertTrue(app.staticTexts["25 lb · 10 reps"].firstMatch.waitForExistence(timeout: 5))
-        capture("Exercise record", in: app)
         backToProgress()
 
-        tapOverviewControl(app.segmentedControls["weightUnit"].buttons["kg"])
+        setUnit("kg")
+        revealOverviewControl(routineRecord)
+        XCTAssertTrue(routineRecord.label.contains("11.34"))
         openRecord()
         XCTAssertTrue(app.staticTexts["11.34 kg · 10 reps"].firstMatch.waitForExistence(timeout: 5))
         backToProgress()
-        tapOverviewControl(app.segmentedControls["weightUnit"].buttons["lb"])
+        setUnit("lb")
 
         openLoggedSet()
         capture("Correct a working set", in: app)
@@ -97,7 +163,35 @@ final class ProgressUITests: XCTestCase {
         app.terminate()
         app.launch()
         openProgress()
-        tapOverviewControl(app.buttons["progressRecords"])
-        XCTAssertTrue(app.staticTexts["No exercise records"].waitForExistence(timeout: 5))
+        let emptyRecord = app.descendants(matching: .any)["progressExerciseRecord-" + exercise].firstMatch
+        revealOverviewControl(emptyRecord)
+        XCTAssertFalse(routineRecord.exists)
+        XCTAssertTrue(emptyRecord.label.contains("No result logged"))
+        XCTAssertFalse(emptyRecord.label.contains(loggedDate))
+        capture("Exercise record row without a result", in: app)
+    }
+
+    func testEmptyActivityAndSettingsDestinations() {
+        let app = XCUIApplication()
+        app.launchEnvironment["WEEKFORM_UI_TEST_RUN"] = UUID().uuidString
+        app.launch()
+        tap(app.buttons["chooseStarter"])
+        tap(app.buttons["starterGeneral"])
+        tap(app.buttons["reviewWeek"])
+        tap(app.buttons["confirmRoutine"])
+        tap(app.tabBars.buttons["Progress"])
+        XCTAssertTrue(app.staticTexts["No finished workouts in the last seven days."].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["progressActivityChart"].firstMatch.exists)
+        XCTAssertFalse(app.buttons["backupRecovery"].exists)
+        capture("Progress before the first workout", in: app)
+
+        tap(app.buttons["progressSettings"])
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+        capture("Progress settings", in: app)
+        tap(app.buttons["Lock Screen privacy"])
+        XCTAssertTrue(app.navigationBars["Lock Screen privacy"].waitForExistence(timeout: 5))
+        tap(app.navigationBars["Lock Screen privacy"].buttons.element(boundBy: 0))
+        tap(app.buttons["backupRecovery"])
+        XCTAssertTrue(app.navigationBars["Backup and export"].waitForExistence(timeout: 5))
     }
 }

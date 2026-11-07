@@ -140,7 +140,7 @@ struct PlannerRoot: View {
                     Tab("Progress", systemImage: "chart.xyaxis.line", value: "Progress") {
                         NavigationStack {
                             ProgressScreen(store: training, activePlan: store.plans.first { $0.id == store.activeID },
-                                           unit: store.weightUnit, setUnit: { try store.setWeightUnit($0) }) {
+                                           unit: { store.weightUnit }, setUnit: { try store.setWeightUnit($0) }) {
                                 recoveryScreen
                             }
                         }

@@ -58,19 +58,45 @@ struct ProgressSet: Identifiable {
     let seconds: Int?
 }
 
+struct ExerciseWorkoutPoint: Identifiable {
+    var id: UUID { result.sessionID }
+    let date: Date
+    let result: ProgressSet
+}
+
 struct ExerciseRecords: Identifiable {
     let id: RecordIdentity
     let name: String
     var basis: LoadBasis { id.basis }
     var side: String? { id.side }
-    var trend: [ProgressSet]
+    let trend: [ProgressSet]
+    let workoutPoints: [ExerciseWorkoutPoint]
     let heaviest: ProgressSet?
     let repBests: [ProgressSet]
 
-    init(id: RecordIdentity, name: String, rows: [ProgressSet]) {
+    var overviewResult: ProgressSet? {
+        switch basis {
+        case .bodyweight: trend.max { ($0.reps ?? 0) < ($1.reps ?? 0) }
+        case .timed: trend.max { ($0.seconds ?? 0) < ($1.seconds ?? 0) }
+        case .assisted: trend.last
+        default: heaviest
+        }
+    }
+
+    init(id: RecordIdentity, name: String, rows: [ProgressSet], workoutDates: [UUID: Date]) {
         self.id = id
         self.name = name
         trend = rows.sorted { a, b in a.date == b.date ? a.id.uuidString < b.id.uuidString : a.date < b.date }
+        var byWorkout: [UUID: ProgressSet] = [:]
+        for row in trend {
+            if let previous = byWorkout[row.sessionID], !Self.prefers(row, over: previous, basis: id.basis) { continue }
+            byWorkout[row.sessionID] = row
+        }
+        workoutPoints = byWorkout.values.map { row in
+            ExerciseWorkoutPoint(date: workoutDates[row.sessionID] ?? row.date, result: row)
+        }.sorted { a, b in
+            a.date == b.date ? a.id.uuidString < b.id.uuidString : a.date < b.date
+        }
         guard ![.timed, .assisted, .bodyweight].contains(id.basis) else {
             heaviest = nil
             repBests = []
@@ -85,6 +111,20 @@ struct ExerciseRecords: Identifiable {
         }
         heaviest = best
         repBests = byReps.keys.sorted().compactMap { byReps[$0] }
+    }
+
+    private static func prefers(_ row: ProgressSet, over previous: ProgressSet, basis: LoadBasis) -> Bool {
+        // The input is already ordered by set time and ID, so replacing an equal
+        // representative keeps the latest set and breaks timestamp ties consistently.
+        switch basis {
+        case .bodyweight: return (row.reps ?? 0) >= (previous.reps ?? 0)
+        case .timed: return (row.seconds ?? 0) >= (previous.seconds ?? 0)
+        case .assisted: return true
+        default:
+            guard let weight = row.kg, let oldWeight = previous.kg else { return false }
+            if WeightUnits.equal(weight, oldWeight) { return (row.reps ?? 0) >= (previous.reps ?? 0) }
+            return weight > oldWeight
+        }
     }
 
     private static func improves(weight: Double, reps: Int, over previous: ProgressSet?) -> Bool {
@@ -102,34 +142,76 @@ struct ProgressionSuggestion: Identifiable {
     let kg: Double
 }
 
+struct ProgressActivityDay: Identifiable {
+    let date: Date
+    let sessions: [TrainingSession]
+    var id: Date { date }
+}
+
+struct RoutineProgressGroup: Identifiable {
+    var id: String { name }
+    let name: String
+    let exercises: [RoutineExerciseProgress]
+}
+
+struct RoutineExerciseIdentity: Hashable {
+    let variant: UUID
+    let name: String
+    let convention: String
+
+    init(_ prescription: PlanExercise) {
+        variant = prescription.variantID ?? prescription.id
+        name = prescription.name
+        convention = prescription.convention
+    }
+}
+
+struct RoutineExerciseProgress: Identifiable {
+    var id: RoutineExerciseIdentity { RoutineExerciseIdentity(prescription) }
+    let prescription: PlanExercise
+    let catalogEntry: CatalogEntry?
+    let records: [ExerciseRecords]
+}
+
 struct ProgressMetrics {
     let history: [TrainingSession]
+    let activityDays: [ProgressActivityDay]
     let sessionCount: Int
     let cardioCount: Int
     let cardioSeconds: Int
     let adherence: (fulfilled: Int, scheduled: Int)
     let knownAdherence: (fulfilled: Int, scheduled: Int)
     let records: [ExerciseRecords]
+    let routineGroups: [RoutineProgressGroup]
     let suggestions: [ProgressionSuggestion]
 
-    init(sessions: [TrainingSession], occurrences: [TrainingOccurrence], activePlan: WeekPlan? = nil, asOf: Date = Date()) {
+    init(sessions: [TrainingSession], occurrences: [TrainingOccurrence], activePlan: WeekPlan? = nil,
+         asOf: Date = Date(), catalog: [CatalogEntry] = []) {
         history = sessions.filter { $0.finishedAt != nil }.sorted {
             if $0.startedAt == $1.startedAt { return $0.id.uuidString < $1.id.uuidString }
             return $0.startedAt > $1.startedAt
         }
-        sessionCount = history.count
-        let cardio = history.filter(\.isCardio).compactMap(\.cardio)
+        let today = CivilTrainingDay(asOf)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let sessionsByDay = Dictionary(grouping: history) { $0.performedDay.date }
+        activityDays = (-6...0).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: offset, to: today.date) else { return nil }
+            let day = CivilTrainingDay(date).date
+            return ProgressActivityDay(date: day, sessions: sessionsByDay[day] ?? [])
+        }
+        let recentSessions = activityDays.flatMap(\.sessions)
+        sessionCount = recentSessions.count
+        let cardio = recentSessions.filter(\.isCardio).compactMap(\.cardio)
         cardioCount = cardio.count
         cardioSeconds = cardio.reduce(0) { $0 + min(Int.max - $0, max(0, $1.seconds)) }
 
         let linked = Dictionary(grouping: sessions.filter { $0.occurrenceID != nil }) { $0.occurrenceID! }
         let done = Set(occurrences.filter { Self.fulfilled($0, by: linked[$0.id] ?? []) }.map(\.id))
-        let today = CivilTrainingDay(asOf)
         let known = occurrences.filter { $0.scheduledDay.date <= today.date }
         knownAdherence = (known.filter { done.contains($0.id) }.count, known.count)
         var scheduled = 0
         var fulfilled = 0
-        let calendar = Calendar(identifier: .gregorian)
         let weekStart = calendar.date(byAdding: .day, value: -today.mondayIndex, to: today.date)!
         for offset in 0..<7 {
             guard let date = calendar.date(byAdding: .day, value: offset, to: weekStart) else { continue }
@@ -176,7 +258,8 @@ struct ProgressMetrics {
                 attempts[key] = (attempted, Self.suggestion(exercise, session: session, occurrence: occurrence))
             }
         }
-        records = points.map { ExerciseRecords(id: $0.key, name: titles[$0.key] ?? "", rows: $0.value) }.sorted {
+        let workoutDates = Dictionary(sessions.map { ($0.id, $0.startedAt) }, uniquingKeysWith: { first, _ in first })
+        records = points.map { ExerciseRecords(id: $0.key, name: titles[$0.key] ?? "", rows: $0.value, workoutDates: workoutDates) }.sorted {
             if $0.name != $1.name { return $0.name.localizedStandardCompare($1.name) == .orderedAscending }
             if $0.id.variant != $1.id.variant { return $0.id.variant.uuidString < $1.id.variant.uuidString }
             if $0.id.convention != $1.id.convention { return $0.id.convention < $1.id.convention }
@@ -186,7 +269,39 @@ struct ProgressMetrics {
             }
             return ($0.side ?? "") < ($1.side ?? "")
         }
+        routineGroups = Self.routineGroups(plan: activePlan, catalog: catalog, records: records)
         suggestions = attempts.values.compactMap(\.suggestion).sorted { $0.date > $1.date }
+    }
+
+    private static func routineGroups(plan: WeekPlan?, catalog: [CatalogEntry], records: [ExerciseRecords]) -> [RoutineProgressGroup] {
+        guard let plan, !plan.archived else { return [] }
+        let entries = Dictionary(catalog.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let prescriptions = Dictionary(grouping: plan.days.flatMap(\.exercises), by: RoutineExerciseIdentity.init)
+        let recordsByVariant = Dictionary(grouping: records, by: \.id.variant)
+        let exercises = prescriptions.compactMap { identity, group -> RoutineExerciseProgress? in
+            guard let prescription = group.first else { return nil }
+            let profiles = Set(group.map(\.id))
+            let matches = recordsByVariant[identity.variant, default: []].filter { record in
+                record.name == identity.name && record.id.convention == identity.convention &&
+                    (record.id.machineProfile.map(profiles.contains) ?? true)
+            }
+            return RoutineExerciseProgress(prescription: prescription, catalogEntry: entries[identity.variant], records: matches)
+        }.sorted { first, second in
+            let comparison = first.prescription.name.localizedStandardCompare(second.prescription.name)
+            if comparison != .orderedSame { return comparison == .orderedAscending }
+            return first.prescription.id.uuidString < second.prescription.id.uuidString
+        }
+
+        let other = "Other exercises"
+        let muscles = Dictionary(grouping: exercises) { exercise in
+            guard let primary = exercise.catalogEntry?.primary.first?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !primary.isEmpty else { return other }
+            return primary
+        }
+        let sorted = muscles.filter { $0.key != other }.sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
+        var groups = sorted.map { RoutineProgressGroup(name: $0.key, exercises: $0.value) }
+        if let exercises = muscles[other] { groups.append(RoutineProgressGroup(name: other, exercises: exercises)) }
+        return groups
     }
 
     private static func fulfilled(_ occurrence: TrainingOccurrence, by sessions: [TrainingSession]) -> Bool {

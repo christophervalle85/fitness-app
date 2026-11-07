@@ -230,8 +230,8 @@ private struct CatalogBrowser: View {
     }
 }
 
-private struct CatalogThumbnail: View {
-    let media: CatalogMedia
+struct CatalogThumbnail: View {
+    let media: CatalogMedia?
     @State private var thumbnail: UIImage?
 
     var body: some View {
@@ -240,9 +240,14 @@ private struct CatalogThumbnail: View {
                 Image(uiImage: thumbnail).resizable().scaledToFit().padding(5)
                     .frame(width: 68, height: 68).background(.white, in: RoundedRectangle(cornerRadius: 9))
                     .accessibilityHidden(true)
+            } else {
+                Image(systemName: "dumbbell").font(.title2).foregroundStyle(PlannerStyle.moss)
+                    .frame(width: 68, height: 68)
+                    .background(PlannerStyle.moss.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
+                    .accessibilityHidden(true)
             }
-        }.task(id: media.file) {
-            guard let url = media.localURL,
+        }.task(id: media?.file) {
+            guard let media, let url = media.localURL,
                   let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { thumbnail = nil; return }
             let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
                                             kCGImageSourceCreateThumbnailWithTransform: true,

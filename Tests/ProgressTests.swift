@@ -117,6 +117,133 @@ struct ProgressTests {
         #expect(result.cardioSeconds == 240)
     }
 
+    @Test func activityUsesSevenCivilDaysAndKeepsOlderSessionsInHistory() throws {
+        let calendar = Calendar.current
+        let today = try #require(calendar.date(byAdding: .day, value: 8, to: monday))
+        let first = try #require(calendar.date(byAdding: .day, value: -6, to: today))
+        let previous = try #require(calendar.date(byAdding: .day, value: -7, to: today))
+        let tomorrow = try #require(calendar.date(byAdding: .day, value: 1, to: today))
+        var older = session([], on: previous)
+        older.isCardio = true
+        older.cardio = CardioResult(seconds: 600)
+        var corrected = session([], on: previous)
+        corrected.performedDay = CivilTrainingDay(first)
+        corrected.isCardio = true
+        corrected.cardio = CardioResult(seconds: 120)
+        var partial = session([], on: today)
+        partial.partial = true
+        var open = session([], on: today)
+        open.finishedAt = nil
+        let future = session([], on: tomorrow)
+
+        let metrics = ProgressMetrics(sessions: [older, corrected, partial, open, future], occurrences: [], asOf: today)
+        #expect(metrics.activityDays.count == 7)
+        #expect(metrics.activityDays.first.map { CivilTrainingDay($0.date) } == CivilTrainingDay(first))
+        #expect(metrics.activityDays.first?.sessions.map(\.id) == [corrected.id])
+        #expect(metrics.activityDays.last?.sessions.map(\.id) == [partial.id])
+        #expect(metrics.sessionCount == 2)
+        #expect(metrics.cardioCount == 1)
+        #expect(metrics.cardioSeconds == 120)
+        #expect(Set(metrics.history.map(\.id)) == [older.id, corrected.id, partial.id, future.id])
+    }
+
+    @Test func workoutTrendUsesHeaviestWorkingSetPerSessionInWorkoutOrder() throws {
+        let exercise = PlanExercise(name: "Press")
+        let nextWorkout = monday.addingTimeInterval(300)
+        let equalLoad = row(8, 60 / 0.45359237, unit: "lb", on: monday.addingTimeInterval(60))
+        let moreReps = row(10, 60, on: monday.addingTimeInterval(30))
+        let warmup = row(5, 80, on: monday, warmup: true)
+        let first = session([TrainingExercise(prescription: exercise, basis: .external,
+                                              sets: [equalLoad, moreReps, warmup])], on: monday)
+        let lighter = row(12, 40, on: nextWorkout)
+        var second = session([TrainingExercise(prescription: exercise, basis: .external,
+                                               sets: [lighter])], on: nextWorkout)
+        second.partial = true
+        let record = try #require(ProgressMetrics(sessions: [second, first], occurrences: []).records.first)
+        #expect(record.workoutPoints.map(\.id) == [first.id, second.id])
+        #expect(record.workoutPoints.map(\.date) == [monday, nextWorkout])
+        #expect(record.workoutPoints.map(\.result.id) == [moreReps.id, lighter.id])
+        #expect(record.trend.count == 3)
+        #expect(record.overviewResult?.id == moreReps.id)
+        #expect(record.overviewResult?.date == moreReps.confirmedAt)
+
+        var corrected = first
+        corrected.exercises[0].sets[1].actual.load = 55
+        let updated = try #require(ProgressMetrics(sessions: [second, corrected], occurrences: []).records.first)
+        #expect(updated.workoutPoints.map(\.result.id) == [equalLoad.id, lighter.id])
+        #expect(updated.workoutPoints.map(\.date) == [monday, nextWorkout])
+    }
+
+    @Test func workoutTrendUsesRecordingSpecificMeasures() {
+        let earlier = monday.addingTimeInterval(10)
+        let later = monday.addingTimeInterval(20)
+        let bodyweight = TrainingExercise(prescription: PlanExercise(name: "Push-up"), basis: .bodyweight, sets: [
+            TrainingSet(actual: SetActual(reps: 12), confirmedAt: earlier),
+            TrainingSet(actual: SetActual(reps: 8), confirmedAt: later)
+        ])
+        let timed = TrainingExercise(prescription: PlanExercise(name: "Hold", timed: true), basis: .timed, sets: [
+            TrainingSet(actual: SetActual(seconds: 30), confirmedAt: earlier),
+            TrainingSet(actual: SetActual(seconds: 20), confirmedAt: later)
+        ])
+        let assisted = TrainingExercise(prescription: PlanExercise(name: "Pull-up"), basis: .assisted, sets: [
+            row(6, 40, on: earlier), row(6, 20, on: later)
+        ])
+        let records = ProgressMetrics(sessions: [session([bodyweight, timed, assisted], on: monday)], occurrences: []).records
+        #expect(records.first { $0.basis == .bodyweight }?.workoutPoints.first?.result.reps == 12)
+        #expect(records.first { $0.basis == .timed }?.workoutPoints.first?.result.seconds == 30)
+        #expect(records.first { $0.basis == .assisted }?.workoutPoints.first?.result.kg == 20)
+        #expect(records.first { $0.basis == .bodyweight }?.overviewResult?.reps == 12)
+        #expect(records.first { $0.basis == .timed }?.overviewResult?.seconds == 30)
+        #expect(records.first { $0.basis == .assisted }?.overviewResult?.date == later)
+    }
+
+    @Test func routineCardsDeduplicateExercisesAndKeepRecordingSeriesSeparate() throws {
+        let variant = UUID()
+        let planned = PlanExercise(variantID: variant, name: "Row", convention: "Per side")
+        var repeated = planned
+        repeated.id = UUID()
+        let noHistory = PlanExercise(name: "Press")
+        var plan = WeekPlan(name: "Training week")
+        plan.days[0] = PlanDay(name: "Pull A", exercises: [planned, noHistory])
+        plan.days[3] = PlanDay(name: "Pull B", exercises: [repeated])
+        let logged = TrainingExercise(prescription: planned, basis: .unilateral, sets: [
+            TrainingSet(actual: SetActual(reps: 8, load: 15, rightReps: 10, rightLoad: 20, unit: "kg"), confirmedAt: monday)
+        ])
+        var substitution = TrainingExercise(prescription: PlanExercise(variantID: UUID(), name: "Row", convention: "Per side"),
+                                            basis: .external, sets: [row(8, 70, on: monday)])
+        substitution.replacedPrescription = planned
+        let alternateBasis = TrainingExercise(prescription: planned, basis: .external, sets: [row(8, 35, on: monday)])
+        var otherMachine = planned
+        otherMachine.id = UUID()
+        let unrelatedMachine = TrainingExercise(prescription: otherMachine, basis: .machine, sets: [row(8, 50, on: monday)])
+        let firstProfile = TrainingExercise(prescription: planned, basis: .machine, sets: [row(8, 40, on: monday)])
+        let secondProfile = TrainingExercise(prescription: repeated, basis: .machine, sets: [row(8, 45, on: monday)])
+        let metrics = ProgressMetrics(sessions: [session([logged, substitution, alternateBasis, unrelatedMachine, firstProfile, secondProfile], on: monday)],
+                                       occurrences: [], activePlan: plan)
+        let other = try #require(metrics.routineGroups.first)
+        #expect(metrics.routineGroups.map(\.name) == ["Other exercises"])
+        #expect(other.exercises.map(\.prescription.name) == ["Press", "Row"])
+        #expect(other.exercises.first?.records.isEmpty == true)
+        let results = try #require(other.exercises.last?.records)
+        #expect(results.count == 5)
+        #expect(Set(results.compactMap { $0.overviewResult?.kg }) == [15, 20, 35, 40, 45])
+        #expect(metrics.records.count == 7)
+    }
+
+    @Test func exerciseGroupsUseFirstPrimaryCatalogTagAndKeepUnknownExercises() throws {
+        let catalog = try ExerciseCatalog.bundled().entries
+        let press = try #require(catalog.first { $0.name == "Barbell bench press" })
+        let squat = try #require(catalog.first { $0.name == "Barbell front squat" })
+        var plan = WeekPlan(name: "Strength")
+        plan.days[0] = PlanDay(name: "Workout", exercises: [squat.prescription, PlanExercise(name: press.name), press.prescription])
+        let groups = ProgressMetrics(sessions: [], occurrences: [], activePlan: plan, catalog: catalog).routineGroups
+        #expect(groups.map(\.name) == ["Chest", "Quads", "Other exercises"])
+        #expect(groups.first?.exercises.first?.catalogEntry?.id == press.id)
+        #expect(groups.first?.exercises.first?.catalogEntry?.media.first?.localURL != nil)
+        #expect(groups.last?.exercises.first?.catalogEntry == nil)
+        #expect(groups.flatMap(\.exercises).allSatisfy { $0.records.isEmpty })
+    }
+
     @Test func assignedExtraMustMeetOriginalPrescriptionAndUnitSuggestionsPreservePhysicalLoad() throws {
         let path = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: path) }
