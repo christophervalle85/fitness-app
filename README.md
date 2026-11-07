@@ -38,11 +38,11 @@ Each bundled image was checked visually against the named movement and its sourc
 
 ## Progress and recovery
 
-Open **Progress** to see this week’s fulfilled and scheduled workouts. **Training activity** charts finished sessions by performed date for the last seven days, alongside workout and cardio totals. **Last workout** opens the most recent finished session. In **Workout history**, select a session to correct its date, adjust a cardio result, or correct or undo a confirmed set. Records and schedule credit reflect the saved corrections.
+Open **Progress** to see this week’s completed and scheduled workout count with a completion bar. **Last 7 days** charts finished sessions by performed date; session count, cardio session count and cardio time cover the same seven-day window. Select a day in the bar chart or its day picker to inspect that day’s sessions. **Recent workouts** shows the two most recent finished sessions, and **View history** opens the full workout history. Select a session to correct its date, adjust a cardio result, or correct or undo a confirmed set. Records and schedule credit reflect the saved corrections.
 
-**Exercise records** shows comparable working sets over time, with rep-count bests where applicable. You can switch between pounds and kilograms for display. When every prescribed working set in an eligible exercise reaches the upper rep target at the same load in one session, Progress suggests choosing the next increment. You decide the new weight.
+**Exercise records** shows the exercise record with the latest confirmed set. Open it to inspect comparable working sets over time, with rep-count bests where applicable, or use **Find an exercise** to search your records. The **Settings** gear opens display units, Lock Screen privacy, and backup and export. Choose pounds or kilograms under **Record display unit**. When every prescribed working set in an eligible exercise reaches the upper rep target at the same load in one session, Progress suggests choosing the next increment. You decide the new weight.
 
-Use **Progress → Backup and export** to save a CSV for inspection or a versioned Weekform JSON backup for recovery. Keep a copy of the JSON somewhere you can access if you lose the phone. Restoring a backup replaces the current local profile after confirmation. Weekform validates the backup, reopens the staged data to check it, and keeps a copy of the profile from before the replacement. Use **Review pre-restore copy** to inspect that copy before deciding whether to switch back.
+Use **Progress → Settings → Backup and export** to save a CSV for inspection or a versioned Weekform JSON backup for recovery. Keep a copy of the JSON somewhere you can access if you lose the phone. Restoring a backup replaces the current local profile after confirmation. Weekform validates the backup, reopens the staged data to check it, and keeps a copy of the profile from before the replacement. Use **Review pre-restore copy** to inspect that copy before deciding whether to switch back.
 
 ## Local development
 
@@ -56,7 +56,7 @@ Starting a workout in Plan requests a Live Activity. The Lock Screen and expande
 
 The compact Dynamic Island displays elapsed rest numerically. The expanded view adds the target, set number and available actions. In the iOS 26.2 and 27.2 simulators, the expanded activity on the Home Screen showed 0:07 elapsed against a 1:30 target for set 2, with **Edit result** and **Start set** visible.
 
-Under **Progress → Lock Screen privacy**, **Show exercise name** and **Show set values** both default to off. Turn on both to confirm a set from the activity when its full actual values are visible and valid. If they are missing, hidden or too long to display, open the app to check and edit them.
+Under **Progress → Settings → Lock Screen privacy**, **Show exercise name** and **Show set values** both default to off. Turn on both to confirm a set from the activity when its full actual values are visible and valid. If they are missing, hidden or too long to display, open the app to check and edit them.
 
 **Confirm & rest** saves the displayed set and starts the configured rest interval. With **No timer**, **Confirm set** just saves the result. Elapsed rest can pass its target without logging a set. **Start set** ends that interval, and **Resume** continues paused rest. **Log final set** finishes the current exercise’s last set. **Next exercise** selects the next unfinished exercise. **Review workout** opens the summary, where finishing the session ends the activity. Repeated or outdated controls cannot credit the next set.
 

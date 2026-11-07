@@ -1,165 +1,293 @@
 import Charts
 import SwiftUI
+import UIKit
 
 struct ProgressScreen<Recovery: View>: View {
     let store: TrainingStore
     let activePlan: WeekPlan?
-    let unit: String
+    let unit: () -> String
     let setUnit: (String) throws -> Void
     @ViewBuilder var recovery: () -> Recovery
     @Environment(\.dynamicTypeSize) private var typeSize
-    @State private var issue: String?
-
     var body: some View {
         let metrics = ProgressMetrics(sessions: store.sessions, occurrences: store.occurrences, activePlan: activePlan)
+        let currentUnit = unit()
+        let latestRecord = metrics.records.max { ($0.trend.last?.date ?? .distantPast) < ($1.trend.last?.date ?? .distantPast) }
         List {
             Section {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 16) {
                     Text("This week’s schedule").font(.headline)
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text("\(metrics.adherence.fulfilled)").font(.system(.largeTitle, design: .rounded, weight: .heavy)).monospacedDigit()
-                        Text("of \(metrics.adherence.scheduled) fulfilled").font(.headline)
+                    if metrics.adherence.scheduled == 0 {
+                        Text("No workouts scheduled").font(.title2.bold())
+                        Text("Your planned workouts will appear here.").font(.subheadline)
+                    } else {
+                        Text("\(metrics.adherence.fulfilled) of \(metrics.adherence.scheduled) workouts complete")
+                            .font(.system(.title2, design: .rounded, weight: .bold)).monospacedDigit()
+                            .fixedSize(horizontal: false, vertical: true)
+                        GeometryReader { geometry in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.white.opacity(0.25))
+                                Capsule().fill(Color.white)
+                                    .frame(width: geometry.size.width * min(1, Double(metrics.adherence.fulfilled) / Double(metrics.adherence.scheduled)))
+                            }
+                        }.frame(height: 12).accessibilityHidden(true)
                     }
-                    ProgressView(value: Double(metrics.adherence.fulfilled), total: Double(max(1, metrics.adherence.scheduled)))
-                        .tint(Color.white)
-                }.foregroundStyle(Color.white).padding(.vertical, 8)
+                }.foregroundStyle(.white).padding(.vertical, 12)
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("Planned workouts fulfilled this week")
+                    .accessibilityLabel(metrics.adherence.scheduled == 0 ? "No workouts scheduled this week" : "Planned workouts fulfilled this week")
                     .accessibilityValue("\(metrics.adherence.fulfilled) of \(metrics.adherence.scheduled)")
                     .accessibilityIdentifier("adherence")
             } footer: { Text("Includes dated workouts and upcoming days in your current routine.") }
             .listRowBackground(PlannerStyle.forest)
-            Section("Training activity") {
-                TrainingActivityChart(sessions: metrics.history)
+            Section("Last 7 days") {
+                TrainingActivityChart(days: metrics.activityDays, store: store, unit: currentUnit)
                 let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 14)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
                 layout {
-                    total("Workouts", value: String(metrics.sessionCount))
+                    total("Sessions", value: String(metrics.sessionCount))
                     total("Cardio sessions", value: String(metrics.cardioCount))
                     total("Cardio time", value: elapsedString(TimeInterval(metrics.cardioSeconds)))
                 }.padding(.vertical, 6)
-
             }.listRowBackground(PlannerStyle.surface)
-            if let latest = metrics.history.first {
-                Section("Last workout") {
-                    NavigationLink {
-                        ProgressSession(store: store, id: latest.id, unit: unit)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(latest.name).font(.title3.bold())
-                            Text(latest.startedAt.formatted(date: .abbreviated, time: .shortened) + (latest.partial ? " · Partial" : ""))
-                                .font(.subheadline)
-                        }.padding(.vertical, 4)
-                    }
-                }.listRowBackground(PlannerStyle.surface)
-            }
-            Section {
+            Section("Recent workouts") {
+                if metrics.history.isEmpty { Text("Finish a workout to see it here.").foregroundStyle(.secondary) }
+                ForEach(Array(metrics.history.prefix(2).enumerated()), id: \.element.id) { index, session in
+                    NavigationLink { ProgressSession(store: store, id: session.id, unit: currentUnit) } label: {
+                        sessionLabel(session)
+                    }.accessibilityIdentifier("recentSession\(index)")
+                }
                 NavigationLink {
                     List {
-                        if metrics.history.isEmpty {
-                            ContentUnavailableView("No finished workouts", systemImage: "calendar", description: Text("Finish a workout to see its results here."))
-                        }
-                        ForEach(Array(metrics.history.enumerated()), id: \.element.id) { i, session in
-                            NavigationLink {
-                                ProgressSession(store: store, id: session.id, unit: unit)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(session.name).font(.headline)
-                                    Text(session.startedAt.formatted(date: .abbreviated, time: .shortened) + (session.partial ? " · Partial" : ""))
-                                        .font(.subheadline).foregroundStyle(.secondary)
-                                }
-                            }.accessibilityIdentifier("historySession\(i)")
+                        if metrics.history.isEmpty { Text("No finished workouts").foregroundStyle(.secondary) }
+                        ForEach(Array(metrics.history.enumerated()), id: \.element.id) { index, session in
+                            NavigationLink { ProgressSession(store: store, id: session.id, unit: currentUnit) } label: {
+                                sessionLabel(session)
+                            }.accessibilityIdentifier("historySession\(index)")
                         }
                     }.navigationTitle("Workout history")
-                } label: { Label("Workout history", systemImage: "clock.arrow.circlepath") }
+                } label: { Label("View history", systemImage: "clock.arrow.circlepath") }
                 .accessibilityIdentifier("progressHistory")
-                NavigationLink {
-                    List {
-                        if metrics.records.isEmpty {
-                            ContentUnavailableView("No exercise records", systemImage: "chart.xyaxis.line", description: Text("Confirm working sets to see your exercise history."))
+            }
+            Section("Exercise records") {
+                if let latest = latestRecord, let point = latest.trend.last {
+                    NavigationLink { RecordDetail(record: latest, unit: currentUnit) } label: {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(latest.name).font(.headline)
+                            Text(recordContext(latest)).font(.subheadline).foregroundStyle(.secondary)
+                            Text(progressResult(point, unit: currentUnit)).font(.body)
+                            Text(point.date, style: .date).font(.caption).foregroundStyle(.secondary)
                         }
-                        ForEach(Array(metrics.records.enumerated()), id: \.element.id) { i, record in
-                            NavigationLink {
-                                RecordDetail(record: record, unit: unit)
-                            } label: {
-                                VStack(alignment: .leading) {
-                                    Text(record.name).font(.headline)
-                                    Text(recordContext(record)).font(.subheadline).foregroundStyle(.secondary)
-                                }
-                            }.accessibilityIdentifier("recordGroup\(i)")
-                        }
-                    }.navigationTitle("Exercise records")
-                } label: { Label("Exercise records", systemImage: "chart.xyaxis.line") }
-                .accessibilityIdentifier("progressRecords")
+                    }.accessibilityIdentifier("latestExerciseRecord")
+                } else { Text("Confirm working sets to see your exercise records.").foregroundStyle(.secondary) }
+                NavigationLink { RecordSearch(records: metrics.records, unit: currentUnit) } label: {
+                    Label("Find an exercise", systemImage: "magnifyingglass")
+                }.accessibilityIdentifier("progressRecords")
             }
             if !metrics.suggestions.isEmpty {
                 Section("Progression suggestions") {
                     ForEach(metrics.suggestions) { suggestion in
                         VStack(alignment: .leading, spacing: 5) {
                             Text(suggestion.name).font(.headline)
-                            Text("All prescribed working sets reached the upper target at \(weightText(suggestion.kg, unit)). Choose your next available increment.")
+                            Text("All prescribed working sets reached the upper target at \(weightText(suggestion.kg, currentUnit)). Choose your next available increment.")
                             Text(suggestion.date, style: .date).font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
             }
-            Section("Settings") {
-                Text("Record display unit").font(.subheadline)
-                Picker("Record display unit", selection: Binding(get: { unit }, set: { value in
-                    do { try setUnit(value); issue = nil } catch { issue = error.localizedDescription }
-                })) {
-                    Text("lb").tag("lb")
-                    Text("kg").tag("kg")
-                }.pickerStyle(.segmented).accessibilityIdentifier("weightUnit")
-                if let issue { Text(issue) }
-                NavigationLink("Lock Screen privacy") { WorkoutPrivacySettings() }
-                NavigationLink { recovery() } label: { Label("Backup and export", systemImage: "externaldrive") }
-                    .accessibilityIdentifier("backupRecovery")
-            }
         }
         .scrollContentBackground(.hidden).background(PlannerStyle.paper)
         .navigationTitle("Progress")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    ProgressSettings(unit: unit, setUnit: setUnit, recovery: recovery)
+                } label: { Label("Settings", systemImage: "gearshape") }
+                    .accessibilityIdentifier("progressSettings")
+            }
+        }
     }
+
     private func total(_ label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(value).font(.system(.title3, design: .rounded, weight: .bold)).monospacedDigit()
             Text(label).font(.caption).foregroundStyle(.secondary)
         }.frame(maxWidth: .infinity, alignment: .leading).accessibilityElement(children: .combine)
     }
+}
 
+private struct ProgressSettings<Recovery: View>: View {
+    let unit: () -> String
+    let setUnit: (String) throws -> Void
+    @ViewBuilder var recovery: () -> Recovery
+    @State private var issue: String?
+    var body: some View {
+        let displayUnit = unit()
+        Form {
+            Section("Record display unit") {
+                Picker("Record display unit", selection: Binding(get: { displayUnit }, set: { value in
+                    do { try setUnit(value); issue = nil } catch { issue = error.localizedDescription }
+                })) {
+                    Text("lb").tag("lb")
+                    Text("kg").tag("kg")
+                }.pickerStyle(.segmented).accessibilityIdentifier("weightUnit")
+                if let issue { Text(issue) }
+            }
+            Section {
+                NavigationLink("Lock Screen privacy") { WorkoutPrivacySettings() }
+                NavigationLink { recovery() } label: { Label("Backup and export", systemImage: "externaldrive") }
+                    .accessibilityIdentifier("backupRecovery")
+            }
+        }.navigationTitle("Settings")
+            .scrollContentBackground(.hidden).background(PlannerStyle.paper)
+    }
+}
+
+private struct RecordSearch: View {
+    let records: [ExerciseRecords]
+    let unit: String
+    @State private var query = ""
+    var body: some View {
+        let terms = query.split(whereSeparator: \.isWhitespace)
+        let matches = records.enumerated().filter { _, record in
+            let text = record.name + " " + recordContext(record) + " " + record.id.convention
+            return terms.allSatisfy { text.localizedStandardContains(String($0)) }
+        }
+        List {
+            if matches.isEmpty { Text(records.isEmpty ? "No exercise records yet" : "No matching exercise records").foregroundStyle(.secondary) }
+            ForEach(matches, id: \.element.id) { index, record in
+                NavigationLink { RecordDetail(record: record, unit: unit) } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(record.name).font(.headline)
+                        Text(recordContext(record)).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }.accessibilityIdentifier("recordGroup\(index)")
+            }
+        }.navigationTitle("Exercise records")
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Find an exercise")
+            .scrollContentBackground(.hidden).background(PlannerStyle.paper)
+    }
 }
 
 private struct TrainingActivityChart: View {
-    let sessions: [TrainingSession]
-    private struct DayCount: Identifiable {
-        let date: Date
-        let count: Int
-        var id: Date { date }
+    let days: [ProgressActivityDay]
+    let store: TrainingStore
+    let unit: String
+    @State private var selectedDate: Date?
+    private var selected: ProgressActivityDay? {
+        if let selectedDate, let day = days.first(where: { CivilTrainingDay($0.date) == CivilTrainingDay(selectedDate) }) { return day }
+        return days.last
     }
-
     var body: some View {
-        let calendar = Calendar.autoupdatingCurrent
-        let today = calendar.startOfDay(for: .now)
-        let days = (0..<7).compactMap { offset -> DayCount? in
-            guard let day = calendar.date(byAdding: .day, value: offset - 6, to: today) else { return nil }
-            return DayCount(date: day, count: sessions.filter { $0.performedDay == CivilTrainingDay(day) }.count)
-        }
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Last 7 days").font(.headline)
-            if days.contains(where: { $0.count > 0 }) {
+        VStack(alignment: .leading, spacing: 12) {
+            if days.contains(where: { !$0.sessions.isEmpty }) {
                 Chart(days) { day in
-                    BarMark(x: .value("Day", day.date, unit: .day), y: .value("Finished workouts", day.count), width: .ratio(0.55))
-                        .cornerRadius(3).foregroundStyle(calendar.isDate(day.date, inSameDayAs: today) ? PlannerStyle.ochre : PlannerStyle.moss)
+                    BarMark(x: .value("Day", day.date, unit: .day), y: .value("Finished sessions", day.sessions.count), width: .ratio(0.55))
+                        .cornerRadius(3).foregroundStyle(day.id == selected?.id ? PlannerStyle.ochre : PlannerStyle.moss)
                         .accessibilityLabel(day.date.formatted(date: .complete, time: .omitted))
-                        .accessibilityValue("\(day.count) workouts")
+                        .accessibilityValue("\(day.sessions.count) finished sessions")
+                    if day.id == selected?.id {
+                        RuleMark(x: .value("Selected day", day.date, unit: .day))
+                            .foregroundStyle(PlannerStyle.ochre.opacity(0.5)).accessibilityHidden(true)
+                    }
+                }
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        if let plotFrame = proxy.plotFrame {
+                            let plot = geometry[plotFrame]
+                            Color.clear.contentShape(Rectangle())
+                                .simultaneousGesture(SpatialTapGesture().onEnded { value in
+                                    select(at: value.location, in: plot, proxy: proxy)
+                                })
+                                .gesture(ChartDayDrag { location in
+                                    select(at: location, in: plot, proxy: proxy)
+                                })
+                                .accessibilityHidden(true)
+                        }
+                    }
                 }
                 .chartXAxis { AxisMarks(values: days.map(\.date)) { _ in AxisValueLabel(format: .dateTime.weekday(.narrow)) } }
-                .chartYAxis { AxisMarks(position: .leading, values: .stride(by: max(1, Double(days.map(\.count).max() ?? 1) / 3).rounded(.up))) }
-                .frame(height: 104)
+                .chartYAxis { AxisMarks(position: .leading, values: .stride(by: max(1, Double(days.map { $0.sessions.count }.max() ?? 1) / 3).rounded(.up))) }
+                .frame(height: 140).accessibilityIdentifier("progressActivityChart")
+                if let selected {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Menu {
+                            ForEach(days) { day in
+                                Button {
+                                    selectedDate = day.date
+                                } label: {
+                                    if day.id == selected.id {
+                                        Label(day.date.formatted(date: .complete, time: .omitted), systemImage: "checkmark")
+                                    } else {
+                                        Text(day.date.formatted(date: .complete, time: .omitted))
+                                    }
+                                }
+                            }
+                        } label: {
+                            Label(selected.date.formatted(date: .complete, time: .omitted), systemImage: "chevron.up.chevron.down")
+                                .font(.subheadline.weight(.semibold)).frame(minHeight: 44)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Selected day")
+                        .accessibilityValue(selected.date.formatted(date: .complete, time: .omitted))
+                        .accessibilityIdentifier("progressActivityDay")
+                        Text(selected.sessions.count == 1 ? "1 finished session" : "\(selected.sessions.count) finished sessions")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                        ForEach(Array(selected.sessions.enumerated()), id: \.element.id) { index, session in
+                            NavigationLink { ProgressSession(store: store, id: session.id, unit: unit) } label: {
+                                sessionLabel(session)
+                            }.buttonStyle(.plain).accessibilityIdentifier("progressDaySession\(index)")
+                        }
+                    }
+                }
             } else {
-                Text("No finished workouts in the last seven days.").font(.subheadline)
+                Text("No finished workouts in the last seven days.").font(.subheadline).foregroundStyle(.secondary)
             }
         }.padding(.vertical, 6)
     }
+
+    private func select(at location: CGPoint, in plot: CGRect, proxy: ChartProxy) {
+        guard plot.contains(location), let date = proxy.value(atX: location.x - plot.minX, as: Date.self) else { return }
+        selectedDate = date
+    }
+}
+
+private struct ChartDayDrag: UIGestureRecognizerRepresentable {
+    let onSelection: (CGPoint) -> Void
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let recognizer = UIPanGestureRecognizer()
+        recognizer.maximumNumberOfTouches = 1
+        recognizer.delegate = context.coordinator
+        return recognizer
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
+        if [.began, .changed, .ended].contains(recognizer.state) {
+            onSelection(context.converter.localLocation)
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = gestureRecognizer as? UIPanGestureRecognizer else { return false }
+            let velocity = pan.velocity(in: pan.view)
+            return abs(velocity.x) > abs(velocity.y)
+        }
+    }
+}
+
+private func sessionLabel(_ session: TrainingSession) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+        Text(session.name).font(.headline)
+        Text(session.startedAt.formatted(date: .abbreviated, time: .shortened) + (session.partial ? " · Partial" : ""))
+            .font(.subheadline).foregroundStyle(.secondary)
+    }
+}
+
+private func progressResult(_ point: ProgressSet, unit: String) -> String {
+    [point.kg.map { weightText($0, unit) }, point.reps.map { "\($0) reps" }, point.seconds.map { "\($0) sec" }]
+        .compactMap { $0 }.joined(separator: " · ")
 }
 
 private func weightText(_ kg: Double, _ unit: String) -> String {
@@ -185,15 +313,11 @@ private func recordContext(_ record: ExerciseRecords) -> String {
 private struct RecordDetail: View {
     let record: ExerciseRecords
     let unit: String
-    private func result(_ point: ProgressSet) -> String {
-        [point.kg.map { weightText($0, unit) }, point.reps.map { "\($0) reps" }, point.seconds.map { "\($0) sec" }]
-            .compactMap { $0 }.joined(separator: " · ")
-    }
     var body: some View {
         List {
             Section(recordContext(record)) {
                 if let best = record.heaviest {
-                    LabeledContent("Heaviest working set", value: result(best))
+                    LabeledContent("Heaviest working set", value: progressResult(best, unit: unit))
                     Text(best.date.formatted(date: .abbreviated, time: .shortened)).font(.caption)
                 } else {
                     Text("\(record.trend.count) confirmed working sets")
@@ -203,7 +327,7 @@ private struct RecordDetail: View {
                 Section("Best by rep count") {
                     ForEach(record.repBests, id: \.id) { point in
                         VStack(alignment: .leading) {
-                            Text(result(point))
+                            Text(progressResult(point, unit: unit))
                             Text(point.date, style: .date).font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -223,7 +347,7 @@ private struct RecordDetail: View {
                     .foregroundStyle(PlannerStyle.moss).chartYAxisLabel(axis).frame(height: 150).accessibilityLabel(axis + " over time")
                 }
                 ForEach(record.trend.reversed(), id: \.id) { point in
-                    LabeledContent(point.date.formatted(date: .abbreviated, time: .shortened), value: result(point))
+                    LabeledContent(point.date.formatted(date: .abbreviated, time: .shortened), value: progressResult(point, unit: unit))
                 }
             }
         }.navigationTitle(record.name)
