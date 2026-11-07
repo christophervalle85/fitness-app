@@ -183,4 +183,85 @@ struct PlanningTests {
             #expect(store.plans.filter { !$0.archived }.isEmpty)
         }
     }
+
+    @Test func additionalRoutineCanBeSavedWithoutChangingTheActiveRoutine() throws {
+        try withDirectory { directory in
+            let store = PlanningStore(directory: directory)
+            try store.load()
+            let active = routine("Current week")
+            try store.begin(active, step: "review")
+            try store.confirm(active)
+
+            let additional = routine("Next week")
+            try store.begin(additional, step: "review")
+            try store.confirm(additional, activateNew: false)
+            try store.confirm(additional, activateNew: true) // A retry must not change the saved choice.
+
+            let reopened = PlanningStore(directory: directory)
+            try reopened.load()
+            #expect(reopened.plans.contains(additional))
+            #expect(reopened.activeID == active.id)
+            #expect(reopened.draft == nil)
+            #expect(reopened.step == "home")
+
+            let replacement = routine("Replacement week")
+            try reopened.begin(replacement, step: "review")
+            try reopened.confirm(replacement, activateNew: true)
+            #expect(reopened.activeID == replacement.id)
+        }
+    }
+
+    @Test func savingOrEditingAnInactiveRoutineCanLeaveTheScheduleEmpty() throws {
+        try withDirectory { directory in
+            let store = PlanningStore(directory: directory)
+            try store.load()
+            let first = routine("Previous week")
+            try store.begin(first, step: "review")
+            try store.confirm(first)
+            try store.archive(first.id)
+
+            var inactive = routine("Saved for later")
+            try store.begin(inactive, step: "review")
+            try store.confirm(inactive, activateNew: false)
+            #expect(store.activeID == nil)
+
+            inactive.name = "Renamed"
+            try store.begin(inactive, step: "review")
+            try store.confirm(inactive)
+            #expect(store.plans.contains(inactive))
+            #expect(store.activeID == nil)
+        }
+    }
+
+    @Test func failedDeletionKeepsTheRoutineAndActivationUntilRetry() throws {
+        try withDirectory { directory in
+            var failNext = false
+            let store = PlanningStore(directory: directory) {
+                if failNext { throw CocoaError(.fileWriteOutOfSpace) }
+            }
+            try store.load()
+            let plan = routine()
+            try store.begin(plan, step: "review")
+            try store.confirm(plan)
+            try store.duplicate(plan.id)
+            let copy = try #require(store.plans.last)
+            try store.archive(copy.id)
+
+            failNext = true
+            #expect(throws: CocoaError.self) { try store.deleteRoutine(plan.id) }
+            #expect(store.plans.contains(plan))
+            #expect(store.activeID == plan.id)
+            failNext = false
+            try store.deleteRoutine(copy.id)
+            #expect(store.plans == [plan])
+            #expect(store.activeID == plan.id)
+            try store.deleteRoutine(plan.id)
+
+            let reopened = PlanningStore(directory: directory)
+            try reopened.load()
+            #expect(reopened.plans.isEmpty)
+            #expect(reopened.activeID == nil)
+            #expect(reopened.step == "home")
+        }
+    }
 }

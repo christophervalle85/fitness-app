@@ -10,7 +10,7 @@ In the exercise editor, **Choose from exercise library** lets you select a speci
 
 **Plan** shows the workout or rest day for the selected date. Tap the month and year to choose a date from the calendar. Swipe left or right across the week to page between weeks while keeping the same weekday selected. VoiceOver actions on that title offer previous week, next week and return to today. Paging follows the gesture, and selected-day content settles gently; Reduce Motion disables the content fade. The week uses a dumbbell for scheduled work, a dash for a rest day and a checkmark when all planned work for the date is fulfilled.
 
-In **Routines**, you can edit, duplicate or archive a saved week and choose which is active. SwiftData keeps the planner on the device. Reopening the app resumes an unfinished draft or returns to Plan after confirmation.
+In **Routines**, open a saved routine’s three-dot card menu for **Edit**, **Make active**, **Duplicate**, **Archive** or **Delete**, as applicable. Archived routines offer **Duplicate** and **Delete**. Confirming **Delete routine** permanently removes the routine and its repeating schedule while keeping logged workouts and date-specific schedule entries. Deleting the active routine leaves Plan without an active routine until you choose one. Tap **New routine**, then **Start from scratch** or **Use a preset**. Additional routines save without changing your active routine by default; turn on **Use as my active routine** during review to activate the new routine when saving. Saving returns you to Routines. SwiftData keeps the planner on the device, and reopening the app resumes an unfinished draft.
 
 ## Train
 

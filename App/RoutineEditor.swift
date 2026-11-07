@@ -11,12 +11,15 @@ private struct EditorPaper: ViewModifier {
 
 struct RoutineEditor: View {
     @Binding var plan: WeekPlan
+    let needsDiscardConfirmation: () -> Bool
     let onReview: () -> Void
-    let onCancel: () -> Void
+    let onDiscard: () -> Void
 
     @State private var showingVariants = false
     @State private var attemptedReview = false
+    @State private var confirmingDiscard = false
     @FocusState private var nameFocused: Bool
+    @AccessibilityFocusState private var discardPromptFocused: Bool
 
     private var unresolved: Int {
         plan.days.flatMap(\.exercises).filter { !$0.choices.isEmpty && $0.name.isEmpty }.count
@@ -80,25 +83,12 @@ struct RoutineEditor: View {
         .modifier(EditorPaper())
         .navigationTitle("Edit your week")
         .safeAreaInset(edge: .bottom) {
-            VStack(alignment: .leading, spacing: 8) {
-                if attemptedReview, let issue = plan.validationMessage {
-                    Label(issue, systemImage: "info.circle")
-                        .font(.subheadline).accessibilityIdentifier("routineGuidance")
-                    if unresolved > 0 {
-                        Button("Choose remaining variants") { showingVariants = true }
-                            .accessibilityIdentifier("resolveVariants")
-                    }
+            Group {
+                if confirmingDiscard {
+                    discardControls
+                } else {
+                    reviewControls
                 }
-                Button {
-                    nameFocused = false
-                    attemptedReview = true
-                    if plan.validationMessage == nil { onReview() }
-                } label: {
-                    Text("Review week").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 3)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .accessibilityIdentifier("reviewWeek")
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 8)
@@ -106,11 +96,58 @@ struct RoutineEditor: View {
         }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel", action: onCancel)
+                Button("Cancel") {
+                    nameFocused = false
+                    if needsDiscardConfirmation() {
+                        confirmingDiscard = true
+                    } else {
+                        onDiscard()
+                    }
+                }
             }
         }
         .sheet(isPresented: $showingVariants) {
             NavigationStack { VariantChoices(plan: $plan) }
+        }
+    }
+
+    private var reviewControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if attemptedReview, let issue = plan.validationMessage {
+                Label(issue, systemImage: "info.circle")
+                    .font(.subheadline).accessibilityIdentifier("routineGuidance")
+                if unresolved > 0 {
+                    Button("Choose remaining variants") { showingVariants = true }
+                        .accessibilityIdentifier("resolveVariants")
+                }
+            }
+            Button {
+                nameFocused = false
+                attemptedReview = true
+                if plan.validationMessage == nil { onReview() }
+            } label: {
+                Text("Review week").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 3)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .accessibilityIdentifier("reviewWeek")
+        }
+    }
+
+    private var discardControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Discard this draft?")
+                .font(.subheadline.weight(.semibold))
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityFocused($discardPromptFocused)
+                .onAppear { discardPromptFocused = true }
+            HStack(spacing: 12) {
+                Button("Keep editing") { confirmingDiscard = false }
+                Spacer(minLength: 0)
+                Button("Discard draft", role: .destructive, action: onDiscard)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
         }
     }
 }

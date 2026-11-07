@@ -52,6 +52,16 @@ final class PlanningStore {
     private(set) var step = "welcome"
     private(set) var profileID: UUID?
 
+    var isLibraryDraft: Bool { step == "libraryEdit" || step == "libraryReview" }
+
+    var editorStep: String {
+        switch step {
+        case "libraryEdit": "edit"
+        case "libraryReview": "review"
+        default: step
+        }
+    }
+
     @ObservationIgnored private let directory: URL
     @ObservationIgnored private let beforeSave: () throws -> Void
     @ObservationIgnored private var container: ModelContainer?
@@ -112,16 +122,21 @@ final class PlanningStore {
     }
 
     func begin(_ plan: WeekPlan, step: String) throws {
-        try persistDraft(plan, step: step)
+        let fromEmptyLibrary = self.step == "home" && plans.isEmpty && step == "edit"
+        try persistDraft(plan, step: fromEmptyLibrary ? "libraryEdit" : step)
     }
 
     func update(_ plan: WeekPlan, step: String) throws {
         guard draft?.id == plan.id else { throw PlanningError("This editor is no longer open.") }
-        try persistDraft(plan, step: step)
+        if isLibraryDraft, step == "edit" || step == "review" {
+            try persistDraft(plan, step: step == "edit" ? "libraryEdit" : "libraryReview")
+        } else {
+            try persistDraft(plan, step: step)
+        }
     }
 
     private func persistDraft(_ plan: WeekPlan, step: String) throws {
-        guard ["welcome", "starters", "edit", "review"].contains(step) else {
+        guard ["welcome", "starters", "edit", "review", "libraryEdit", "libraryReview"].contains(step) else {
             throw PlanningError("This setup step could not be saved.")
         }
         guard !plan.archived, !plans.contains(where: { $0.id == plan.id && $0.archived }) else {
@@ -135,7 +150,7 @@ final class PlanningStore {
         draft = plan
     }
 
-    func confirm(_ plan: WeekPlan) throws {
+    func confirm(_ plan: WeekPlan, activateNew: Bool = true) throws {
         // A delayed retry must not close or overwrite a newer editor.
         if draft != plan, plans.contains(plan) { return }
         guard draft == plan else { throw PlanningError("Review the latest saved draft before confirming it.") }
@@ -153,7 +168,7 @@ final class PlanningStore {
                 context.insert(row)
                 inserted = row
             }
-            if index == nil || profile.activeID == nil { profile.activeID = plan.id }
+            if index == nil, activateNew { profile.activeID = plan.id }
             profile.draft = nil
             profile.step = "home"
         }
@@ -169,7 +184,7 @@ final class PlanningStore {
     func discard() throws {
         try save { _, profile in
             profile.draft = nil
-            profile.step = plans.isEmpty ? "welcome" : "home"
+            profile.step = plans.isEmpty && !isLibraryDraft ? "welcome" : "home"
         }
         draft = nil
     }
@@ -230,6 +245,18 @@ final class PlanningStore {
         }
         if draft?.id == id { draft = nil }
         plans[index] = plan
+    }
+
+    func deleteRoutine(_ id: UUID) throws {
+        guard step == "home", let index = plans.firstIndex(where: { $0.id == id }) else {
+            throw PlanningError("Open Routines and select a saved routine to delete.")
+        }
+        try save { context, profile in
+            context.delete(routines[index])
+            if profile.activeID == id { profile.activeID = nil }
+        }
+        routines.remove(at: index)
+        plans.remove(at: index)
     }
 
     #if WEEKFORM_DEVELOPMENT
