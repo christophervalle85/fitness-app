@@ -248,26 +248,62 @@ final class TrainingStore {
                                            isCardio: cardio))
     }
 
-    func scheduleCardio(name: String, date: Date, goalSeconds: Int) throws {
+    func scheduleCardio(name: String, date: Date, goalSeconds: Int, id: UUID = UUID()) throws {
         guard goalSeconds > 0 else { throw TrainingError("Enter a positive duration goal.") }
         let day = CivilTrainingDay(date)
-        try commit(occurrence: TrainingOccurrence(name: try nonempty(name), sourceDay: day, scheduledDay: day, cardioGoalSeconds: goalSeconds))
+        let name = try nonempty(name)
+        if let existing = occurrences.first(where: { $0.id == id }) {
+            guard existing.planID == nil, existing.sourceDay == day, existing.cardioGoalSeconds == goalSeconds, existing.name == name else {
+                throw TrainingError("This action already scheduled a different workout.")
+            }
+            return
+        }
+        try commit(occurrence: TrainingOccurrence(id: id, name: name, sourceDay: day, scheduledDay: day, cardioGoalSeconds: goalSeconds))
+    }
+
+    func move(plan: WeekPlan, date: Date, to destination: Date) throws {
+        let occurrence = try planned(plan, date)
+        let target = CivilTrainingDay(destination)
+        if occurrence.scheduledDay == target { return }
+        guard isScheduled(occurrence, on: date) else { throw TrainingError("This workout moved to another date.") }
+        try move(occurrence, to: target)
     }
 
     func move(_ occurrenceID: UUID, to date: Date) throws {
-        guard var occurrence = occurrences.first(where: { $0.id == occurrenceID }), !occurrence.skipped else {
+        guard let occurrence = occurrences.first(where: { $0.id == occurrenceID }) else {
             throw TrainingError("Choose a scheduled workout.")
         }
-        occurrence.scheduledDay = CivilTrainingDay(date)
+        try move(occurrence, to: CivilTrainingDay(date))
+    }
+
+    private func move(_ original: TrainingOccurrence, to day: CivilTrainingDay) throws {
+        guard !original.skipped else { throw TrainingError("This workout was skipped.") }
+        guard original.scheduledDay != day else { return }
+        var occurrence = original
+        occurrence.scheduledDay = day
+        // For a repeating workout the first materialization and its date
+        // override are one write. A failed save cannot leave a partial override.
         try commit(occurrence: occurrence)
     }
 
+    func skip(plan: WeekPlan, date: Date) throws {
+        let occurrence = try planned(plan, date)
+        guard isScheduled(occurrence, on: date) else { throw TrainingError("This workout moved to another date.") }
+        try skip(occurrence)
+    }
+
     func skip(_ occurrenceID: UUID) throws {
-        guard var occurrence = occurrences.first(where: { $0.id == occurrenceID }) else { throw TrainingError("Choose a scheduled workout.") }
-        let progress = progress(for: occurrence)
-        guard progress.completed < progress.total, active?.occurrenceID != occurrenceID else {
+        guard let occurrence = occurrences.first(where: { $0.id == occurrenceID }) else { throw TrainingError("Choose a scheduled workout.") }
+        try skip(occurrence)
+    }
+
+    private func skip(_ original: TrainingOccurrence) throws {
+        guard !original.skipped else { return }
+        let progress = progress(for: original)
+        guard progress.completed < progress.total, active?.occurrenceID != original.id else {
             throw TrainingError("Only an unfinished workout without an active session can be skipped.")
         }
+        var occurrence = original
         occurrence.skipped = true
         try commit(occurrence: occurrence)
     }

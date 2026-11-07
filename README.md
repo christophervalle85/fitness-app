@@ -8,19 +8,23 @@ On first launch, choose **Build my routine** for a blank week or **Choose a star
 
 In the exercise editor, **Choose from exercise library** lets you select a specific variant and its recording method. Check the targets after switching between reps and duration. For unresolved starter choices, open **Review library matches** to preview exact catalog matches by weekday. Tap **Use these choices** to apply the displayed suggestions. Choose any remaining equipment or grip variants individually, or enter a custom exercise. The editor shows which choices still need attention. In **Review your week**, tap each weekday to check its prescription, cardio goal or rest day before choosing **Save and use routine**.
 
-**Today** shows the active routine’s prescription or rest day for the selected date. In **Routines**, you can edit, duplicate or archive a saved week, create another one, and choose which is active. SwiftData keeps the planner on the device. Reopening the app resumes an unfinished draft or returns to Today after confirmation.
+**Plan** shows the workout or rest day for the selected date. Tap the month and year to choose a date from the calendar. Swipe left or right across the week to page between weeks while keeping the same weekday selected. VoiceOver actions on that title offer previous week, next week and return to today. Paging follows the gesture, and selected-day content settles gently; Reduce Motion disables the content fade. The week uses a dumbbell for scheduled work, a dash for a rest day and a checkmark when all planned work for the date is fulfilled.
+
+In **Routines**, you can edit, duplicate or archive a saved week and choose which is active. SwiftData keeps the planner on the device. Reopening the app resumes an unfinished draft or returns to Plan after confirmation.
 
 ## Train
 
-From **Today**, start the planned workout, an **Extra workout**, or **Cardio**. You can save several sessions on one day and resume one open workout at a time. To train ahead, select the scheduled date and tap **Do this workout today**. The plan keeps its scheduled date and the session records when you trained. To reschedule that one workout, use **Change schedule**.
+From **Plan**, start a planned workout or use **Extra workout** or **Log cardio** to record an unscheduled session. To train ahead, select the scheduled date and tap **Do this workout today**. The plan keeps its date and the session records when you trained. To change the scheduled date instead, tap **Reschedule**, choose a date, and tap **Move workout**. That screen also lets you explicitly skip the workout.
+
+You can save several sessions in one day and keep one open at a time. On its scheduled date, resume a linked session from its workout card. On other dates or tabs, the **Resume** bar shows the current exercise, planned date (or **Unscheduled**) and actual start date. Selecting a different planned workout opens the current session’s review. Choose **Cancel switch** to keep the current workout, explicitly finish it, or discard it if it is empty. If the new workout fails to start after the first one closes, **Retry** retries only the new start.
 
 The active workout fills the screen. Its checklist highlights the current set and shows how many sets you have completed for that exercise. Check the actual reps, seconds or load, then confirm the set. Use the exercise controls to add an exercise, change rest or swap the remaining sets. You can edit or undo a result. **Start set** ends the rest interval.
 
-Tap **Review** to open the workout summary. You can finish a partial session and continue the planned workout later. Its checklist shows sets completed earlier alongside the remaining work. On finish, Weekform returns to Today and selects the planned date for a linked workout or the performed date for an extra session. The calendar shows a checkmark when all workouts planned for that date are fulfilled. Reduce Motion turns off the completion bounce.
+Tap **Review** to open the workout summary. You can finish a partial session and continue the planned workout later. Its checklist shows sets completed earlier alongside the remaining work. On finish, Weekform returns to Plan and selects the planned date for a linked workout or the performed date for an extra session. The calendar shows a checkmark when all workouts planned for that date are fulfilled. Reduce Motion turns off the completion bounce.
 
-For repeating cardio, set a duration goal on the weekday in the routine editor. For a single date, use **Schedule a cardio activity** on Today. Set the goal in minutes. After training, enter the seconds you actually completed, add distance if desired, and tap **Confirm activity**. A shorter confirmed duration counts as partial. Additional confirmed sessions assigned to that same goal can complete it.
+For repeating cardio, set a duration goal on the weekday in the routine editor. For a single date, tap **Add cardio** on Plan. Choose **Walking**, **Running**, **Cycling** or **Custom**, then set the duration in minutes and the date. Tap **Schedule activity** to add it to the plan. After training, enter the seconds you actually completed, add distance if desired, and tap **Confirm activity**. A shorter confirmed duration counts as partial. Additional confirmed sessions assigned to that same goal can complete it.
 
-Today lists a planned workout once and groups its contributing sessions under **Workout sessions**. Expand the group to inspect each session separately, even when two sessions completed the same plan. Extra workouts appear under **Activity on this date**. To give one plan credit, open the saved entry, choose **Assign to planned work**, and select the date and a matching uncredited set or cardio goal.
+Plan lists a planned workout once and groups its contributing sessions under **Workout sessions**. Expand the group to inspect each session separately, even when two sessions completed the same plan. Extra workouts appear under **Activity on this date**. To give one plan credit, open the saved entry, choose **Assign to planned work**, and select the date and a matching uncredited set or cardio goal.
 
 ## Exercise catalog
 
@@ -44,11 +48,11 @@ Use **Progress → Backup and export** to save a CSV for inspection or a version
 
 For an optional private starter, put a local JSON file matching the `WeekPlan` model in `DevelopmentPrivate/LocalStarter.json` and rebuild in Debug. Give it seven ordered days, starting with Monday. It appears under **Choose a starter**. Git ignores JSON files in that directory. The build copies the file into the Debug app when present and excludes it from Release. Keep Debug builds containing a private starter for personal testing.
 
-Open **Developer tools** from the Debug welcome screen, Today or Routines. **Replay onboarding** starts a new draft and keeps saved routines. **Reset planner test data** asks for confirmation before clearing the routines and draft for this installation. Use reset only with disposable test data. Release builds open the same weekly planner and omit the developer tools.
+Open **Developer tools** from the Debug welcome screen, Plan or Routines. **Replay onboarding** starts a new draft and keeps saved routines. **Reset planner test data** asks for confirmation before clearing the routines and draft for this installation. Use reset only with disposable test data. Release builds open the same weekly planner and omit the developer tools.
 
 ## Use the workout Live Activity
 
-Starting a workout in Today requests a Live Activity. The Lock Screen and expanded Dynamic Island can show actions for the current set when iOS allows them. The in-app workout remains available if the activity is dismissed or the device cannot show it.
+Starting a workout in Plan requests a Live Activity. The Lock Screen and expanded Dynamic Island can show actions for the current set when iOS allows them. The in-app workout remains available if the activity is dismissed or the device cannot show it.
 
 The compact Dynamic Island displays elapsed rest numerically. The expanded view adds the target, set number and available actions. In the iOS 26.2 and 27.2 simulators, the expanded activity on the Home Screen showed 0:07 elapsed against a 1:30 target for set 2, with **Edit result** and **Start set** visible.
 

@@ -18,7 +18,7 @@ final class DiscoverUITests: XCTestCase {
         tap(app.buttons["starterGeneral"])
         tap(app.buttons["reviewWeek"])
         tap(app.buttons["confirmRoutine"])
-        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.tabBars.buttons["Plan"].waitForExistence(timeout: 10))
         return app
     }
 
@@ -97,7 +97,7 @@ final class DiscoverUITests: XCTestCase {
         // End this run's Live Activity so SpringBoard can present the next workout.
         tap(app.buttons["reviewSession"])
         tap(app.buttons["finishPartial"])
-        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.tabBars.buttons["Plan"].waitForExistence(timeout: 10))
     }
 
     func testCustomExerciseFavoritePersistsAndStaysWithItsProfile() {

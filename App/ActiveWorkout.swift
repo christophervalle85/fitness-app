@@ -5,8 +5,12 @@ struct ActiveWorkout: View {
     var planner: PlanningStore? = nil
     var route: WorkoutLiveRoute? = nil
     var routeEvent: UUID? = nil
+    var reviewOnOpen = false
+    var switchTargetName: String? = nil
     let onClose: () -> Void
     var onFinished: ((TrainingSession) -> Void)? = nil
+    var onDiscarded: ((UUID) -> Void)? = nil
+    var onCancelSwitch: (() -> Void)? = nil
     var applyToRoutine: ((PlanExercise, PlanExercise) throws -> Void)? = nil
     var routineExercises: [PlanExercise] = []
 
@@ -15,6 +19,7 @@ struct ActiveWorkout: View {
     @State private var changedFuture: UUID?
     @State private var confirmingDiscard = false
     @State private var reviewing = false
+    @State private var didOpenSwitchReview = false
     @State private var chosenRow: UUID?
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -106,6 +111,10 @@ struct ActiveWorkout: View {
                             guard !route.review else { return }
                             chosenRow = route.setID
                             await Task.yield()
+                        } else if reviewOnOpen && !didOpenSwitchReview {
+                            didOpenSwitchReview = true
+                            reviewing = true
+                            return
                         }
                         if let id = route?.setID ?? currentRowID { scroll.scrollTo(id, anchor: .center) }
                     }
@@ -131,6 +140,9 @@ struct ActiveWorkout: View {
                     }.background(PlannerStyle.surface)
                 }
                 .navigationDestination(isPresented: $reviewing) { summary(session) }
+                .onChange(of: reviewing) { previous, current in
+                    if previous && !current && didOpenSwitchReview && store.active?.id == session.id { onCancelSwitch?() }
+                }
                 .sheet(item: $panel) { panel in
                     NavigationStack {
                         switch panel {
@@ -346,6 +358,12 @@ struct ActiveWorkout: View {
         let allConfirmed = session.isCardio ? cardioComplete : rows.contains { $0.confirmedAt != nil } && rows.allSatisfy { $0.optional == true || $0.confirmedAt != nil }
         let hasResult = session.cardio != nil || rows.contains { $0.confirmedAt != nil }
         return List {
+            if let switchTargetName {
+                Section("Switch workouts") {
+                    Text("Finish \(session.name) before starting \(switchTargetName).")
+                    Button("Cancel switch", action: onClose).accessibilityIdentifier("cancelWorkoutSwitch")
+                }
+            }
             TrainingSummaryContent(session: session)
             if let occurrenceProgress {
                 Section("Scheduled workout") {
@@ -362,12 +380,15 @@ struct ActiveWorkout: View {
                 Button("Discard empty workout", role: .destructive) { confirmingDiscard = true }
                     .confirmationDialog("Discard this empty workout?", isPresented: $confirmingDiscard, titleVisibility: .visible) {
                         Button("Discard workout", role: .destructive) {
-                            run { try store.cancelEmpty(sessionID: session.id); onClose() }
+                            run {
+                                try store.cancelEmpty(sessionID: session.id)
+                                if let onDiscarded { onDiscarded(session.id) } else { onClose() }
+                            }
                         }
                     }
             }
         }
-        .navigationTitle("Workout summary")
+        .navigationTitle("Workout summary").navigationBarTitleDisplayMode(.inline)
         .scrollContentBackground(.hidden).background(PlannerStyle.paper)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(alignment: .leading, spacing: 8) {
