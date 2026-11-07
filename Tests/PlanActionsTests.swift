@@ -168,4 +168,94 @@ struct PlanActionsTests {
             #expect(store.progress(for: activity).completed == 0)
         }
     }
+
+    @Test func planStateTracksActiveSessionAndRemainingCredit() throws {
+        try withDirectory { directory in
+            let store = TrainingStore(directory: directory, now: { monday })
+            try store.load(profileID: UUID())
+            let id = try store.materialize(plan: week, date: monday)
+            let workout = try #require(store.occurrences.first)
+            #expect(store.planState(for: workout) == .notStarted)
+            try store.startOccurrence(id)
+            let session = try #require(store.active)
+            #expect(store.planState(for: workout) == .inProgress)
+            let first = try #require(session.exercises.first?.sets.first)
+            try store.confirm(sessionID: session.id, setID: first.id, actual: SetActual(reps: 8, load: 15),
+                              revision: first.revision, commandID: UUID())
+            try store.finish(sessionID: session.id, partial: true)
+            #expect(store.planState(for: workout) == .inProgress)
+            try store.startOccurrence(id)
+            let resumed = try #require(store.active)
+            let last = try #require(resumed.exercises.first?.sets.first)
+            try store.confirm(sessionID: resumed.id, setID: last.id, actual: SetActual(reps: 8, load: 15),
+                              revision: last.revision, commandID: UUID())
+            #expect(store.planState(for: workout) == .inProgress)
+            try store.finish(sessionID: resumed.id, partial: false)
+            #expect(store.planState(for: workout) == .finished)
+
+            let nextWeek = Calendar.current.date(byAdding: .day, value: 7, to: monday)!
+            try store.skip(plan: week, date: nextWeek)
+            let skipped = try #require(store.occurrences.first { $0.skipped })
+            #expect(store.planState(for: skipped) == .skipped)
+        }
+    }
+
+    @Test func removeAdditionalCardioPreservesSavedResultsAndRollsBackOnFailure() throws {
+        try withDirectory { directory in
+            let planner = PlanningStore(directory: directory.appending(path: "planning"))
+            try planner.load()
+            let owner = try #require(planner.profileID)
+            var fail = false
+            let store = TrainingStore(directory: directory, now: { monday }, beforeSave: {
+                if fail { throw CocoaError(.fileWriteOutOfSpace) }
+            })
+            try store.load(profileID: owner)
+            var routine = week
+            routine.days[0] = PlanDay(name: "Routine walk", cardioGoalSeconds: 300)
+            let routineID = try store.materialize(plan: routine, date: monday)
+            let id = UUID()
+            try store.scheduleCardio(name: "Extra walk", date: monday, goalSeconds: 300, id: id)
+            try store.startOccurrence(id)
+            let active = try #require(store.active)
+            let extra = try #require(store.occurrences.first { $0.id == id })
+            #expect(!store.canRemoveAdditionalActivity(extra))
+            #expect(throws: TrainingError.self) { try store.removeAdditionalActivity(id) }
+            try store.recordCardio(sessionID: active.id, result: CardioResult(seconds: 100))
+            try store.finish(sessionID: active.id, partial: true)
+            try store.startOccurrence(id)
+            let continuation = try #require(store.active)
+            try store.recordCardio(sessionID: continuation.id, result: CardioResult(seconds: 200))
+            try store.finish(sessionID: continuation.id, partial: false)
+            let original = store.sessions
+            #expect(store.canRemoveAdditionalActivity(extra))
+            #expect(throws: TrainingError.self) { try store.removeAdditionalActivity(routineID) }
+            fail = true
+            #expect(throws: CocoaError.self) { try store.removeAdditionalActivity(id) }
+            #expect(store.sessions == original && store.occurrences.contains { $0.id == id })
+            let reloaded = TrainingStore(directory: directory)
+            try reloaded.load(profileID: owner)
+            #expect(reloaded.sessions.count == original.count && reloaded.sessions.allSatisfy { original.contains($0) })
+            #expect(reloaded.occurrences.contains { $0.id == id })
+
+            fail = false
+            try store.removeAdditionalActivity(id)
+            let expected = original.map { session in
+                var saved = session
+                saved.occurrenceID = nil
+                return saved
+            }
+            #expect(store.sessions == expected)
+            #expect(store.occurrences.map(\.id) == [routineID])
+            #expect(throws: TrainingError.self) { try reloaded.removeAdditionalActivity(id) }
+            try reloaded.load(profileID: owner)
+            #expect(Set(reloaded.sessions.map(\.id)) == Set(expected.map(\.id)))
+            #expect(reloaded.sessions.allSatisfy { expected.contains($0) })
+            #expect(reloaded.occurrences.map(\.id) == [routineID])
+            let backup = try WorkoutBackup(planner, reloaded)
+            let encoded = try backup.encoded()
+            let restored = try JSONDecoder().decode(WorkoutBackup.self, from: encoded)
+            try restored.validate()
+            #expect(restored == backup)
+        }
+    }
 }
