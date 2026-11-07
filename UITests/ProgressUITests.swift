@@ -17,6 +17,10 @@ final class ProgressUITests: XCTestCase {
         add(attachment)
     }
 
+    private func assertProgressTitleVisible(in app: XCUIApplication, line: UInt = #line) {
+        XCTAssertTrue(app.navigationBars["Progress"].waitForExistence(timeout: 5), line: line)
+    }
+
     func testHistoryCorrectionRecalculatesRecordsAndUndoRemovesLastRecord() {
         let app = XCUIApplication()
         app.launchEnvironment["WEEKFORM_UI_TEST_RUN"] = UUID().uuidString
@@ -58,9 +62,11 @@ final class ProgressUITests: XCTestCase {
             }
             XCTAssertTrue(element.isHittable)
         }
+        let settings = app.navigationBars.buttons["progressSettings"]
         func openProgress() {
             tap(app.tabBars.buttons["Progress"])
-            XCTAssertTrue(app.navigationBars["Progress"].waitForExistence(timeout: 10))
+            XCTAssertTrue(settings.waitForExistence(timeout: 10))
+            assertProgressTitleVisible(in: app)
         }
         let routineRecord = app.buttons["progressExerciseRecord-" + exercise]
         func openRecord() {
@@ -68,13 +74,13 @@ final class ProgressUITests: XCTestCase {
             tap(routineRecord)
         }
         func setUnit(_ unit: String) {
-            tap(app.buttons["progressSettings"])
+            tap(settings)
             XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
             let option = app.segmentedControls["weightUnit"].buttons[unit]
             tap(option)
             XCTAssertTrue(option.isSelected)
             tap(app.navigationBars["Settings"].buttons.element(boundBy: 0))
-            XCTAssertTrue(app.navigationBars["Progress"].waitForExistence(timeout: 5))
+            XCTAssertTrue(settings.waitForExistence(timeout: 5))
         }
         func openLoggedSet() {
             let history = app.buttons["progressHistory"]
@@ -84,11 +90,11 @@ final class ProgressUITests: XCTestCase {
             tap(app.buttons["historySet0-0"])
         }
         func backToProgress() {
-            let overview = app.navigationBars["Progress"]
-            for _ in 0..<3 where !overview.exists {
+            for _ in 0..<3 where !settings.isHittable {
                 tap(app.navigationBars.buttons.element(boundBy: 0))
             }
-            XCTAssertTrue(overview.waitForExistence(timeout: 5))
+            XCTAssertTrue(settings.isHittable)
+            assertProgressTitleVisible(in: app)
         }
 
         openProgress()
@@ -99,6 +105,8 @@ final class ProgressUITests: XCTestCase {
         XCTAssertFalse(app.buttons["progressRecords"].exists)
         XCTAssertFalse(app.staticTexts["Best logged working sets"].exists)
         XCTAssertEqual(app.buttons.matching(identifier: "progressHistory").count, 1)
+        XCTAssertEqual(app.buttons["progressHistory"].label, "Workout history")
+        XCTAssertFalse(app.staticTexts["View workout history"].exists)
         let chart = app.descendants(matching: .any)["progressActivityChart"].firstMatch
         XCTAssertTrue(chart.waitForExistence(timeout: 5))
         let earlierDay = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.28, dy: 0.45))
@@ -123,6 +131,7 @@ final class ProgressUITests: XCTestCase {
         let scrollStart = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))
         scrollStart.press(forDuration: 0.08, thenDragTo: scrollStart.withOffset(CGVector(dx: 0, dy: -150)))
         XCTAssertLessThan(chart.frame.minY, chartTop - 20, "Vertical swipes should scroll Progress.")
+        assertProgressTitleVisible(in: app)
         revealOverviewControl(routineRecord)
         XCTAssertTrue(app.staticTexts["progressExerciseMuscle-Chest"].exists)
         XCTAssertFalse(app.staticTexts["Monday"].exists)
@@ -167,6 +176,7 @@ final class ProgressUITests: XCTestCase {
         revealOverviewControl(emptyRecord)
         XCTAssertFalse(routineRecord.exists)
         XCTAssertTrue(emptyRecord.label.contains("No result logged"))
+        XCTAssertTrue(emptyRecord.label.contains("Date unavailable"))
         XCTAssertFalse(emptyRecord.label.contains(loggedDate))
         capture("Exercise record row without a result", in: app)
     }
@@ -180,14 +190,46 @@ final class ProgressUITests: XCTestCase {
         tap(app.buttons["reviewWeek"])
         tap(app.buttons["confirmRoutine"])
         tap(app.tabBars.buttons["Progress"])
-        XCTAssertTrue(app.staticTexts["No finished workouts in the last seven days."].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.descendants(matching: .any)["progressActivityChart"].firstMatch.exists)
+        let chart = app.descendants(matching: .any)["progressActivityChart"].firstMatch
+        XCTAssertTrue(chart.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["No finished workouts in the last seven days."].exists)
+        XCTAssertFalse(app.staticTexts["No sessions logged."].exists)
+        let selectedDate = app.descendants(matching: .any)["progressSelectedDate"].firstMatch
+        let firstDay = Calendar.current.date(byAdding: .day, value: -6, to: .now)!
+        chart.coordinate(withNormalizedOffset: CGVector(dx: 0.06, dy: 0.45)).tap()
+        XCTAssertEqual(selectedDate.label, firstDay.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
+        XCTAssertFalse(app.buttons["progressDaySession0"].exists)
+        assertProgressTitleVisible(in: app)
+        let emptyRecord = app.descendants(matching: .any)["progressExerciseRecord-Hip hinge"].firstMatch
+        XCTAssertTrue(emptyRecord.waitForExistence(timeout: 5))
+        XCTAssertTrue(emptyRecord.label.contains("pounds"))
+        XCTAssertTrue(emptyRecord.label.contains("Date unavailable"))
         XCTAssertFalse(app.buttons["backupRecovery"].exists)
         capture("Progress before the first workout", in: app)
+
+        let history = app.buttons["progressHistory"]
+        let activityHeading = app.staticTexts["Last 7 days"]
+        XCTAssertTrue(history.isHittable)
+        XCTAssertEqual(history.label, "Workout history")
+        XCTAssertGreaterThanOrEqual(history.frame.width, 43.99)
+        XCTAssertGreaterThanOrEqual(history.frame.height, 43.99)
+        XCTAssertGreaterThan(history.frame.minX, activityHeading.frame.maxX)
+        XCTAssertEqual(history.frame.midY, activityHeading.frame.midY, accuracy: 2)
+        tap(history)
+        XCTAssertTrue(app.navigationBars["Workout history"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No finished workouts"].exists)
+        tap(app.navigationBars["Workout history"].buttons.element(boundBy: 0))
+        assertProgressTitleVisible(in: app)
 
         tap(app.buttons["progressSettings"])
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
         capture("Progress settings", in: app)
+        tap(app.segmentedControls["weightUnit"].buttons["kg"])
+        tap(app.navigationBars["Settings"].buttons.element(boundBy: 0))
+        XCTAssertTrue(emptyRecord.waitForExistence(timeout: 5))
+        XCTAssertTrue(emptyRecord.label.contains("kg"))
+        assertProgressTitleVisible(in: app)
+        tap(app.buttons["progressSettings"])
         tap(app.buttons["Lock Screen privacy"])
         XCTAssertTrue(app.navigationBars["Lock Screen privacy"].waitForExistence(timeout: 5))
         tap(app.navigationBars["Lock Screen privacy"].buttons.element(boundBy: 0))

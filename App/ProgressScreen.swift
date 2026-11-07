@@ -38,7 +38,7 @@ struct ProgressScreen<Recovery: View>: View {
                     .accessibilityIdentifier("adherence")
             }
             .listRowBackground(PlannerStyle.forest)
-            Section("Last 7 days") {
+            Section {
                 TrainingActivityChart(days: metrics.activityDays, store: store, unit: currentUnit)
                 if metrics.sessionCount > 1 || metrics.cardioCount > 0 {
                     let sessions = metrics.sessionCount == 1 ? "1 session" : "\(metrics.sessionCount) sessions"
@@ -48,17 +48,32 @@ struct ProgressScreen<Recovery: View>: View {
                     Text("7-day total · \(sessions)\(cardio)")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
-                NavigationLink {
-                    List {
-                        if metrics.history.isEmpty { Text("No finished workouts").foregroundStyle(.secondary) }
-                        ForEach(Array(metrics.history.enumerated()), id: \.element.id) { index, session in
-                            NavigationLink { ProgressSession(store: store, id: session.id, unit: currentUnit) } label: {
-                                sessionLabel(session)
-                            }.accessibilityIdentifier("historySession\(index)")
-                        }
-                    }.navigationTitle("Workout history")
-                } label: { Label("View workout history", systemImage: "clock.arrow.circlepath") }
-                .accessibilityIdentifier("progressHistory")
+            } header: {
+                HStack {
+                    Text("Last 7 days").font(.subheadline.weight(.semibold))
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: 8)
+                    NavigationLink {
+                        List {
+                            if metrics.history.isEmpty { Text("No finished workouts").foregroundStyle(.secondary) }
+                            ForEach(Array(metrics.history.enumerated()), id: \.element.id) { index, session in
+                                NavigationLink { ProgressSession(store: store, id: session.id, unit: currentUnit) } label: {
+                                    sessionLabel(session)
+                                }.accessibilityIdentifier("historySession\(index)")
+                            }
+                        }.navigationTitle("Workout history")
+                    } label: {
+                        Image(systemName: "clock.arrow.circlepath").font(.body.weight(.medium))
+                            .foregroundStyle(PlannerStyle.moss)
+                            .frame(width: 34, height: 34)
+                            .background(PlannerStyle.moss.opacity(0.08), in: Circle())
+                            .frame(width: 44, height: 44).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Workout history")
+                    .accessibilityHint("Shows all saved workouts")
+                    .accessibilityIdentifier("progressHistory")
+                }.textCase(nil)
             }.listRowBackground(PlannerStyle.surface)
             ForEach(metrics.routineGroups) { group in
                 Section {
@@ -171,89 +186,87 @@ private struct TrainingActivityChart: View {
         days.firstIndex { $0.date == selectedDate } ?? days.indices.last
     }
     var body: some View {
+        let peak = days.map { $0.sessions.count }.max() ?? 0
         VStack(alignment: .leading, spacing: 12) {
-            if days.contains(where: { !$0.sessions.isEmpty }) {
-                Chart(days.indices, id: \.self) { index in
-                    let day = days[index]
-                    // Marks, ticks and touch selection share the center of each day's slot.
-                    BarMark(x: .value("Day slot", Double(index)), y: .value("Finished sessions", day.sessions.count), width: .fixed(22))
-                        .cornerRadius(3).foregroundStyle(PlannerStyle.moss)
-                        .accessibilityLabel(day.date.formatted(date: .complete, time: .omitted))
-                        .accessibilityValue("\(day.sessions.count) finished sessions")
-                }
-                .chartXScale(domain: -0.5...(Double(days.count) - 0.5))
-                .chartOverlay { proxy in
-                    GeometryReader { geometry in
-                        if let plotFrame = proxy.plotFrame {
-                            let plot = geometry[plotFrame]
-                            Color.clear.contentShape(Rectangle())
-                                .simultaneousGesture(SpatialTapGesture().onEnded { value in
-                                    select(at: value.location, in: plot, proxy: proxy)
-                                })
-                                .gesture(ChartDayDrag { location in
-                                    select(at: location, in: plot, proxy: proxy)
-                                })
-                                .accessibilityHidden(true)
-                            ForEach(days.indices, id: \.self) { index in
-                                if let x = proxy.position(forX: Double(index)) {
-                                    Text(days[index].date.formatted(.dateTime.weekday(typeSize.isAccessibilitySize ? .narrow : .abbreviated)))
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize()
-                                        .position(x: plot.minX + x, y: plot.maxY + 13)
-                                        .allowsHitTesting(false)
-                                        .accessibilityHidden(true)
-                                }
+            Chart(days.indices, id: \.self) { index in
+                let day = days[index]
+                // Marks, ticks and touch selection share the center of each day's slot.
+                BarMark(x: .value("Day slot", Double(index)), y: .value("Finished sessions", day.sessions.count), width: .fixed(22))
+                    .cornerRadius(3).foregroundStyle(PlannerStyle.moss)
+                    .accessibilityLabel(day.date.formatted(date: .complete, time: .omitted))
+                    .accessibilityValue("\(day.sessions.count) finished sessions")
+            }
+            .chartXScale(domain: -0.5...(Double(days.count) - 0.5))
+            .chartYScale(domain: 0...max(1, peak))
+            .chartOverlay { proxy in
+                GeometryReader { geometry in
+                    if let plotFrame = proxy.plotFrame {
+                        let plot = geometry[plotFrame]
+                        Color.clear.contentShape(Rectangle())
+                            .simultaneousGesture(SpatialTapGesture().onEnded { value in
+                                select(at: value.location, in: plot, proxy: proxy)
+                            })
+                            .gesture(ChartDayDrag { location in
+                                select(at: location, in: plot, proxy: proxy)
+                            })
+                            .accessibilityHidden(true)
+                        ForEach(days.indices, id: \.self) { index in
+                            if let x = proxy.position(forX: Double(index)) {
+                                Text(days[index].date.formatted(.dateTime.weekday(typeSize.isAccessibilitySize ? .narrow : .abbreviated)))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize()
+                                    .position(x: plot.minX + x, y: plot.maxY + 13)
+                                    .allowsHitTesting(false)
+                                    .accessibilityHidden(true)
                             }
                         }
                     }
                 }
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
-                .frame(height: 104)
-                .padding(.bottom, 26)
-                .accessibilityIdentifier("progressActivityChart")
-                if let index = selectedIndex {
-                    let selected = days[index]
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(selected.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
-                            .font(.caption.weight(.semibold)).foregroundStyle(PlannerStyle.moss)
-                            .accessibilityIdentifier("progressSelectedDate")
-                            .accessibilityAdjustableAction { direction in
-                                switch direction {
-                                case .increment: select(dayAt: index + 1)
-                                case .decrement: select(dayAt: index - 1)
-                                @unknown default: break
-                                }
+            }
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .frame(height: 104)
+            .padding(.bottom, 26)
+            .accessibilityIdentifier("progressActivityChart")
+            if let index = selectedIndex {
+                let selected = days[index]
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(selected.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
+                        .font(.caption.weight(.semibold)).foregroundStyle(PlannerStyle.moss)
+                        .accessibilityIdentifier("progressSelectedDate")
+                        .accessibilityAdjustableAction { direction in
+                            switch direction {
+                            case .increment: select(dayAt: index + 1)
+                            case .decrement: select(dayAt: index - 1)
+                            @unknown default: break
                             }
-                        if selected.sessions.isEmpty {
-                            Text("No sessions logged.").font(.subheadline).foregroundStyle(.secondary)
                         }
-                        ForEach(Array(selected.sessions.prefix(2).enumerated()), id: \.element.id) { index, session in
-                            NavigationLink { ProgressSession(store: store, id: session.id, unit: unit) } label: {
-                                ViewThatFits(in: .horizontal) {
-                                    HStack(spacing: 8) { sessionSummary(session, showTime: selected.sessions.count > 1) }
-                                    VStack(alignment: .leading, spacing: 4) { sessionSummary(session, showTime: selected.sessions.count > 1) }
-                                }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
-                            }.buttonStyle(.plain).accessibilityIdentifier("progressDaySession\(index)")
-                        }
-                        if selected.sessions.count > 2 {
-                            NavigationLink {
-                                List {
-                                    ForEach(selected.sessions) { session in
-                                        NavigationLink { ProgressSession(store: store, id: session.id, unit: unit) } label: { sessionLabel(session) }
-                                    }
-                                }.navigationTitle(selected.date.formatted(.dateTime.month(.abbreviated).day()))
-                            } label: {
-                                Label("View all \(selected.sessions.count) sessions", systemImage: "list.bullet")
-                                    .font(.subheadline.weight(.medium)).foregroundStyle(PlannerStyle.moss)
-                                    .frame(minHeight: 44)
-                            }.buttonStyle(.plain).accessibilityIdentifier("progressDayHistory")
-                        }
+                    if peak > 0 && selected.sessions.isEmpty {
+                        Text("No sessions logged.").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    ForEach(Array(selected.sessions.prefix(2).enumerated()), id: \.element.id) { index, session in
+                        NavigationLink { ProgressSession(store: store, id: session.id, unit: unit) } label: {
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: 8) { sessionSummary(session, showTime: selected.sessions.count > 1) }
+                                VStack(alignment: .leading, spacing: 4) { sessionSummary(session, showTime: selected.sessions.count > 1) }
+                            }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityIdentifier("progressDaySession\(index)")
+                    }
+                    if selected.sessions.count > 2 {
+                        NavigationLink {
+                            List {
+                                ForEach(selected.sessions) { session in
+                                    NavigationLink { ProgressSession(store: store, id: session.id, unit: unit) } label: { sessionLabel(session) }
+                                }
+                            }.navigationTitle(selected.date.formatted(.dateTime.month(.abbreviated).day()))
+                        } label: {
+                            Label("View all \(selected.sessions.count) sessions", systemImage: "list.bullet")
+                                .font(.subheadline.weight(.medium)).foregroundStyle(PlannerStyle.moss)
+                                .frame(minHeight: 44)
+                        }.buttonStyle(.plain).accessibilityIdentifier("progressDayHistory")
                     }
                 }
-            } else {
-                Text("No finished workouts in the last seven days.").font(.subheadline).foregroundStyle(.secondary)
             }
         }.padding(.vertical, 6)
     }
@@ -349,8 +362,7 @@ private struct ExerciseRecordRow: View {
                 Text(exercise.prescription.name).font(.headline)
                     .fixedSize(horizontal: false, vertical: true)
                 if exercise.records.isEmpty {
-                    Text("N/A").font(.title3.weight(.semibold)).foregroundStyle(PlannerStyle.moss)
-                        .accessibilityLabel("No result logged")
+                    RecordMeasurement(point: nil, basis: LoadBasis(exercise.prescription), unit: unit)
                 } else {
                     ForEach(Array(exercise.records.enumerated()), id: \.element.id) { index, record in
                         RecordOverviewValue(record: record, unit: unit, series: exercise.records.count > 1 ? index + 1 : nil)
@@ -373,36 +385,48 @@ private struct RecordOverviewValue: View {
                 Text(record.id.machineProfile == nil ? name : "\(name) · Profile \(series)")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            if let point = record.overviewResult {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline, spacing: 4) { measurement(point) }
-                    VStack(alignment: .leading, spacing: 1) { measurement(point) }
-                }
-                Text(point.date, format: .dateTime.month(.abbreviated).day().year()).font(.caption).foregroundStyle(.secondary)
-            } else {
-                Text("N/A").font(.title3.weight(.semibold)).foregroundStyle(PlannerStyle.moss)
-                    .accessibilityLabel("No result logged")
+            RecordMeasurement(point: record.overviewResult, basis: record.basis, unit: unit)
+        }
+    }
+}
+
+private struct RecordMeasurement: View {
+    let point: ProgressSet?
+    let basis: LoadBasis
+    let unit: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) { measurement }
+                VStack(alignment: .leading, spacing: 1) { measurement }
             }
+            Group {
+                if let point { Text(point.date, format: .dateTime.month(.abbreviated).day().year()) }
+                else { Text("N/A").accessibilityLabel("Date unavailable") }
+            }.font(.caption).foregroundStyle(.secondary)
         }
     }
 
-    @ViewBuilder private func measurement(_ point: ProgressSet) -> some View {
-        let value: String = switch record.basis {
-        case .bodyweight: point.reps?.formatted() ?? "N/A"
-        case .timed: point.seconds?.formatted() ?? "N/A"
-        default: point.kg.map { weightNumber($0, unit) } ?? "N/A"
+    @ViewBuilder private var measurement: some View {
+        let value: String? = switch basis {
+        case .bodyweight: point?.reps?.formatted()
+        case .timed: point?.seconds?.formatted()
+        default: point?.kg.map { weightNumber($0, unit) }
         }
-        let qualifier: String = switch record.basis {
+        let qualifier: String = switch basis {
         case .bodyweight: "reps"
         case .timed: "sec"
-        case .dumbbell: "\(unit) per dumbbell"
-        case .machine: "\(unit) on machine"
-        case .added: "\(unit) added"
-        case .assisted: "\(unit) latest assistance"
-        default: unit
+        case .dumbbell where value != nil: "\(unit) per dumbbell"
+        case .machine where value != nil: "\(unit) on machine"
+        case .added where value != nil: "\(unit) added"
+        case .assisted where value != nil: "\(unit) latest assistance"
+        default: value == nil && unit == "lb" ? "lbs" : unit
         }
-        Text(value).font(.title2.weight(.bold)).monospacedDigit().foregroundStyle(PlannerStyle.moss)
+        Text(value ?? "N/A").font(.title2.weight(.bold)).monospacedDigit().foregroundStyle(PlannerStyle.moss)
+            .accessibilityLabel(value ?? "No result logged")
         Text(qualifier).font(.caption.weight(.medium)).foregroundStyle(.secondary)
+            .accessibilityLabel(qualifier == "lbs" ? "pounds" : qualifier)
     }
 }
 
