@@ -64,7 +64,7 @@ struct RoutinesScreen: View {
                 }
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Routines")
         .scrollContentBackground(.hidden).background(PlannerStyle.paper)
         .safeAreaInset(edge: .bottom) {
             NavigationLink {

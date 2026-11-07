@@ -232,7 +232,7 @@ final class WeekformUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Routines"].isSelected)
     }
 
-    func testRoutinesTitleStaysHiddenWhileScrolling() {
+    func testRoutinesTitleStaysVisibleWhileScrolling() {
         let app = launch()
         tap(app.buttons["chooseStarter"])
         tap(app.buttons["starterGeneral"])
@@ -243,9 +243,8 @@ final class WeekformUITests: XCTestCase {
 
         let menu = app.buttons["More actions for Three-day strength"]
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
-        let header = app.navigationBars.staticTexts["Routines"]
-        XCTAssertFalse(header.exists)
-        XCTAssertFalse(app.navigationBars["Routines"].exists)
+        let header = app.navigationBars["Routines"]
+        XCTAssertTrue(header.waitForExistence(timeout: 5))
         for _ in 0..<5 {
             tap(menu)
             tap(app.buttons["Duplicate"])
@@ -253,14 +252,13 @@ final class WeekformUITests: XCTestCase {
         let firstRowY = menu.frame.midY
         app.swipeUp()
         XCTAssertTrue(!menu.isHittable || menu.frame.midY < firstRowY - 40, "The routine list should scroll.")
-        XCTAssertFalse(header.exists)
-        XCTAssertFalse(app.navigationBars["Routines"].exists)
+        XCTAssertTrue(header.exists)
         XCTAssertTrue(routines.isSelected)
         capture("Routines after scrolling", in: app)
 
         app.swipeDown()
         XCTAssertTrue(menu.isHittable)
-        XCTAssertFalse(header.exists)
+        XCTAssertTrue(header.exists)
     }
 
     func testManualDraftResumesAndBecomesAnActiveRoutine() {
