@@ -100,7 +100,10 @@ final class ProgressUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["0 finished sessions"].waitForExistence(timeout: 5))
         XCTAssertEqual(selectedDate.label, yesterday.formatted(date: .complete, time: .omitted))
         finalDay.tap()
-        XCTAssertTrue(app.buttons["progressDaySession0"].waitForExistence(timeout: 5))
+        let daySession = app.buttons["progressDaySession0"]
+        XCTAssertTrue(daySession.waitForExistence(timeout: 5))
+        XCTAssertTrue(daySession.label.contains("Partial"))
+        XCTAssertFalse(daySession.label.contains(Date.now.formatted(date: .abbreviated, time: .omitted)))
         capture("Selected day on the activity chart", in: app)
         let chartTop = chart.frame.minY
         let scrollStart = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))

@@ -183,13 +183,9 @@ private struct TrainingActivityChart: View {
                     let day = days[index]
                     // Marks, ticks and touch selection share the center of each day's slot.
                     BarMark(x: .value("Day slot", Double(index)), y: .value("Finished sessions", day.sessions.count), width: .fixed(22))
-                        .cornerRadius(3).foregroundStyle(index == selectedIndex ? PlannerStyle.ochre : PlannerStyle.moss)
+                        .cornerRadius(3).foregroundStyle(PlannerStyle.moss)
                         .accessibilityLabel(day.date.formatted(date: .complete, time: .omitted))
                         .accessibilityValue("\(day.sessions.count) finished sessions")
-                    if index == selectedIndex {
-                        RuleMark(x: .value("Selected day", Double(index)))
-                            .foregroundStyle(PlannerStyle.ochre.opacity(0.5)).accessibilityHidden(true)
-                    }
                 }
                 .chartXScale(domain: -0.5...(Double(days.count) - 0.5))
                 .chartOverlay { proxy in
@@ -240,7 +236,12 @@ private struct TrainingActivityChart: View {
                             .font(.subheadline).foregroundStyle(.secondary)
                         ForEach(Array(selected.sessions.enumerated()), id: \.element.id) { index, session in
                             NavigationLink { ProgressSession(store: store, id: session.id, unit: unit) } label: {
-                                sessionLabel(session)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(session.name).font(.headline)
+                                    if session.partial {
+                                        Text("Partial").font(.subheadline).foregroundStyle(.secondary)
+                                    }
+                                }
                             }.buttonStyle(.plain).accessibilityIdentifier("progressDaySession\(index)")
                         }
                     }
