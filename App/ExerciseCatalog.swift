@@ -72,6 +72,63 @@ struct ExerciseCatalog {
         return Self(entries: entries)
     }
 
+    func search(_ query: String) -> [CatalogEntry] {
+        let words = Self.words(in: query)
+        guard !words.isEmpty else { return [] }
+
+        let aliases = ["pec": "chest", "pecs": "chest", "abdominals": "abs", "quadriceps": "quads"]
+        let terms = words.map { aliases[$0] ?? $0 }
+        let phrase = terms.joined(separator: " ")
+        func muscleKeys(_ names: [String]) -> Set<String> {
+            Set(names.map { Self.words(in: $0).joined(separator: " ") }.filter { !$0.isEmpty })
+        }
+        let primaryMuscles = muscleKeys(entries.flatMap(\.primary))
+        let muscleNames = primaryMuscles.union(muscleKeys(entries.flatMap(\.secondary)))
+        let secondaryOnly = muscleNames.subtracting(primaryMuscles)
+        let groups: [String: Set<String>] = [
+            "back": ["back", "lats", "lower back", "middle back", "trapezius"],
+            "legs": ["legs", "quads", "hamstrings", "calves", "glutes"]
+        ]
+        if let group = groups[phrase] {
+            return entries.filter { entry in
+                let targets = muscleKeys(entry.primary).union(muscleKeys(entry.secondary).intersection(secondaryOnly))
+                return !targets.isDisjoint(with: group)
+            }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        }
+        let requestedMuscles = muscleNames.filter { " \(phrase) ".contains(" \($0) ") }
+        let isMuscleOnly = requestedMuscles.contains(phrase)
+
+        func containsTerms(_ fields: [String]) -> Bool {
+            terms.allSatisfy { term in fields.contains { $0.hasPrefix(term) } }
+        }
+
+        return entries.compactMap { entry -> (entry: CatalogEntry, rank: Int)? in
+            let name = Self.words(in: entry.name)
+            // A full exercise name is unambiguous unless it is also a bare muscle query.
+            if name == words && !isMuscleOnly { return (entry, 0) }
+            // Saved custom exercises have a name but no muscle metadata.
+            if entry.source.isEmpty, !isMuscleOnly, words.allSatisfy({ term in name.contains { $0.hasPrefix(term) } }) {
+                return (entry, 1)
+            }
+
+            let secondaryMatches = muscleKeys(entry.secondary).intersection(secondaryOnly).intersection(requestedMuscles)
+            guard requestedMuscles.isSubset(of: muscleKeys(entry.primary).union(secondaryMatches)) else { return nil }
+            if containsTerms(name) { return (entry, 1) }
+
+            let metadata = ([entry.movement] + entry.primary + entry.equipment).flatMap { Self.words(in: $0) }
+                + secondaryMatches.flatMap { Self.words(in: $0) }
+            return containsTerms(name + metadata) ? (entry, 2) : nil
+        }.sorted {
+            $0.rank == $1.rank ? $0.entry.name.localizedStandardCompare($1.entry.name) == .orderedAscending : $0.rank < $1.rank
+        }.map(\.entry)
+    }
+
+    private static func words(in text: String) -> [String] {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init)
+    }
+
     func alternatives(to source: CatalogEntry, filter: CatalogFilter = CatalogFilter(), favorites: Set<UUID> = []) -> [(entry: CatalogEntry, reason: String)] {
         let target = Set(source.primary)
         return entries.compactMap { candidate -> (CatalogEntry, String, Int)? in

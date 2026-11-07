@@ -4,7 +4,57 @@ import SwiftUI
 struct ExercisesScreen: View {
     let planner: PlanningStore
     let training: TrainingStore
-    var body: some View { CatalogBrowser(planner: planner, training: training) }
+    var body: some View { ExerciseSearch(planner: planner, training: training) }
+}
+
+private struct ExerciseSearch: View {
+    let planner: PlanningStore
+    let training: TrainingStore
+    @State private var entries: [CatalogEntry] = []
+    @State private var issue: String?
+    @State private var query = ""
+
+    var body: some View {
+        let custom = planner.customExercises.map(CatalogEntry.custom)
+        let all = entries + custom.filter { item in !entries.contains { $0.id == item.id } }
+        let catalog = ExerciseCatalog(entries: all)
+        let meaningfulQuery = query.contains { $0.isLetter || $0.isNumber }
+        let results = meaningfulQuery ? catalog.search(query) : []
+        List {
+            if meaningfulQuery {
+                if let issue { Text(issue).foregroundStyle(.secondary) }
+                if results.isEmpty {
+                    Text("No matching exercises").foregroundStyle(.secondary)
+                        .accessibilityIdentifier("exercisesNoMatches")
+                }
+                ForEach(results) { entry in
+                    NavigationLink {
+                        CatalogDetail(entry: entry, catalog: catalog, planner: planner, training: training, select: nil)
+                    } label: {
+                        HStack(spacing: 12) {
+                            if let media = entry.media.first { CatalogThumbnail(media: media) }
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(entry.name).font(.headline)
+                                Text(entry.source.isEmpty ? "Custom exercise" : (entry.primary + entry.equipment).joined(separator: " · "))
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }
+                            if planner.favoriteExerciseIDs.contains(entry.id) {
+                                Image(systemName: "star.fill").foregroundStyle(PlannerStyle.moss).accessibilityLabel("Favorite")
+                            }
+                        }.padding(.vertical, 3)
+                    }.accessibilityIdentifier("catalogRow-" + entry.name)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden).background(PlannerStyle.paper)
+        .navigationTitle("Exercises")
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search")
+        .task {
+            do { entries = try ExerciseCatalog.bundled().entries }
+            catch { issue = "The bundled catalog could not be opened. Your custom exercises are still available." }
+        }
+    }
 }
 
 struct CatalogPicker: View {
