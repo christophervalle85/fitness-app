@@ -136,7 +136,7 @@ struct ProgressScreen<Recovery: View>: View {
             }
         }
         .scrollContentBackground(.hidden).background(PlannerStyle.paper)
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Progress")
         .task { catalog = (try? ExerciseCatalog.bundled().entries) ?? [] }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

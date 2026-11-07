@@ -17,9 +17,8 @@ final class ProgressUITests: XCTestCase {
         add(attachment)
     }
 
-    private func assertProgressTitleHidden(in app: XCUIApplication, line: UInt = #line) {
-        XCTAssertFalse(app.navigationBars["Progress"].exists, line: line)
-        XCTAssertFalse(app.navigationBars.staticTexts["Progress"].exists, line: line)
+    private func assertProgressTitleVisible(in app: XCUIApplication, line: UInt = #line) {
+        XCTAssertTrue(app.navigationBars["Progress"].waitForExistence(timeout: 5), line: line)
     }
 
     func testHistoryCorrectionRecalculatesRecordsAndUndoRemovesLastRecord() {
@@ -67,7 +66,7 @@ final class ProgressUITests: XCTestCase {
         func openProgress() {
             tap(app.tabBars.buttons["Progress"])
             XCTAssertTrue(settings.waitForExistence(timeout: 10))
-            assertProgressTitleHidden(in: app)
+            assertProgressTitleVisible(in: app)
         }
         let routineRecord = app.buttons["progressExerciseRecord-" + exercise]
         func openRecord() {
@@ -95,7 +94,7 @@ final class ProgressUITests: XCTestCase {
                 tap(app.navigationBars.buttons.element(boundBy: 0))
             }
             XCTAssertTrue(settings.isHittable)
-            assertProgressTitleHidden(in: app)
+            assertProgressTitleVisible(in: app)
         }
 
         openProgress()
@@ -132,7 +131,7 @@ final class ProgressUITests: XCTestCase {
         let scrollStart = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))
         scrollStart.press(forDuration: 0.08, thenDragTo: scrollStart.withOffset(CGVector(dx: 0, dy: -150)))
         XCTAssertLessThan(chart.frame.minY, chartTop - 20, "Vertical swipes should scroll Progress.")
-        assertProgressTitleHidden(in: app)
+        assertProgressTitleVisible(in: app)
         revealOverviewControl(routineRecord)
         XCTAssertTrue(app.staticTexts["progressExerciseMuscle-Chest"].exists)
         XCTAssertFalse(app.staticTexts["Monday"].exists)
@@ -200,7 +199,7 @@ final class ProgressUITests: XCTestCase {
         chart.coordinate(withNormalizedOffset: CGVector(dx: 0.06, dy: 0.45)).tap()
         XCTAssertEqual(selectedDate.label, firstDay.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
         XCTAssertFalse(app.buttons["progressDaySession0"].exists)
-        assertProgressTitleHidden(in: app)
+        assertProgressTitleVisible(in: app)
         let emptyRecord = app.descendants(matching: .any)["progressExerciseRecord-Hip hinge"].firstMatch
         XCTAssertTrue(emptyRecord.waitForExistence(timeout: 5))
         XCTAssertTrue(emptyRecord.label.contains("pounds"))
@@ -220,7 +219,7 @@ final class ProgressUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Workout history"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["No finished workouts"].exists)
         tap(app.navigationBars["Workout history"].buttons.element(boundBy: 0))
-        assertProgressTitleHidden(in: app)
+        assertProgressTitleVisible(in: app)
 
         tap(app.buttons["progressSettings"])
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
@@ -229,7 +228,7 @@ final class ProgressUITests: XCTestCase {
         tap(app.navigationBars["Settings"].buttons.element(boundBy: 0))
         XCTAssertTrue(emptyRecord.waitForExistence(timeout: 5))
         XCTAssertTrue(emptyRecord.label.contains("kg"))
-        assertProgressTitleHidden(in: app)
+        assertProgressTitleVisible(in: app)
         tap(app.buttons["progressSettings"])
         tap(app.buttons["Lock Screen privacy"])
         XCTAssertTrue(app.navigationBars["Lock Screen privacy"].waitForExistence(timeout: 5))
