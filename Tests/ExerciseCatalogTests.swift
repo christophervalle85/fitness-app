@@ -35,6 +35,23 @@ struct ExerciseCatalogTests {
         #expect(catalog.search("inch").isEmpty)
     }
 
+    @Test func bundledSearchCoversEveryMuscleAndBroadGroups() throws {
+        let catalog = try ExerciseCatalog.bundled()
+        let muscles = Set(catalog.entries.flatMap { $0.primary + $0.secondary })
+        #expect(!muscles.isEmpty)
+        for muscle in muscles {
+            let primary = catalog.entries.filter { $0.primary.contains(muscle) }
+            let expected = primary.isEmpty ? catalog.entries.filter { $0.secondary.contains(muscle) } : primary
+            #expect(Set(catalog.search(muscle).map(\.id)) == Set(expected.map(\.id)), "Search for \(muscle)")
+        }
+        #expect(catalog.search("brachialis dumbbell").allSatisfy { $0.equipment.contains("Dumbbell") })
+        #expect(!catalog.search("brachialis dumbbell").isEmpty)
+        #expect(catalog.search("back").contains { $0.primary.contains("Lats") })
+        #expect(catalog.search("legs").contains { $0.primary.contains("Quads") })
+        #expect(catalog.search("legs").contains { $0.primary.contains("Calves") })
+        #expect(catalog.search("back extension").first?.name == "Roman chair back extension")
+    }
+
     @Test func filtersCombineSearchMuscleMovementEquipmentAndFavorite() {
         let press = entry("Incline press", muscle: "Chest", movement: "Push", equipment: "Dumbbells")
         let filter = CatalogFilter(text: "incline DUMB", muscle: "Chest", movement: "Push", equipment: "Dumbbells", favoritesOnly: true)

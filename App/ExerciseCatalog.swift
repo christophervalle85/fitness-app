@@ -79,8 +79,22 @@ struct ExerciseCatalog {
         let aliases = ["pec": "chest", "pecs": "chest", "abdominals": "abs", "quadriceps": "quads"]
         let terms = words.map { aliases[$0] ?? $0 }
         let phrase = terms.joined(separator: " ")
-        let muscleNames = Set(entries.flatMap { $0.primary + $0.secondary }
-            .map { Self.words(in: $0).joined(separator: " ") }.filter { !$0.isEmpty })
+        func muscleKeys(_ names: [String]) -> Set<String> {
+            Set(names.map { Self.words(in: $0).joined(separator: " ") }.filter { !$0.isEmpty })
+        }
+        let primaryMuscles = muscleKeys(entries.flatMap(\.primary))
+        let muscleNames = primaryMuscles.union(muscleKeys(entries.flatMap(\.secondary)))
+        let secondaryOnly = muscleNames.subtracting(primaryMuscles)
+        let groups: [String: Set<String>] = [
+            "back": ["back", "lats", "lower back", "middle back", "trapezius"],
+            "legs": ["legs", "quads", "hamstrings", "calves", "glutes"]
+        ]
+        if let group = groups[phrase] {
+            return entries.filter { entry in
+                let targets = muscleKeys(entry.primary).union(muscleKeys(entry.secondary).intersection(secondaryOnly))
+                return !targets.isDisjoint(with: group)
+            }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        }
         let requestedMuscles = muscleNames.filter { " \(phrase) ".contains(" \($0) ") }
         let isMuscleOnly = requestedMuscles.contains(phrase)
 
@@ -97,11 +111,12 @@ struct ExerciseCatalog {
                 return (entry, 1)
             }
 
-            let primary = Set(entry.primary.map { Self.words(in: $0).joined(separator: " ") })
-            guard requestedMuscles.isSubset(of: primary) else { return nil }
+            let secondaryMatches = muscleKeys(entry.secondary).intersection(secondaryOnly).intersection(requestedMuscles)
+            guard requestedMuscles.isSubset(of: muscleKeys(entry.primary).union(secondaryMatches)) else { return nil }
             if containsTerms(name) { return (entry, 1) }
 
             let metadata = ([entry.movement] + entry.primary + entry.equipment).flatMap { Self.words(in: $0) }
+                + secondaryMatches.flatMap { Self.words(in: $0) }
             return containsTerms(name + metadata) ? (entry, 2) : nil
         }.sorted {
             $0.rank == $1.rank ? $0.entry.name.localizedStandardCompare($1.entry.name) == .orderedAscending : $0.rank < $1.rank
