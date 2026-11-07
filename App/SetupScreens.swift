@@ -40,9 +40,50 @@ struct WelcomeScreen<Recovery: View>: View {
     }
 }
 
+struct NewRoutineScreen: View {
+    let manual: () -> Void
+    let preset: (WeekPlan) -> Void
+
+    var body: some View {
+        List {
+            Section {
+                Button(action: manual) {
+                    HStack(spacing: 8) {
+                        choice("Start from scratch", detail: "Choose your days and add exercises.", icon: "plus")
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.forward")
+                            .font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
+                    }.contentShape(Rectangle())
+                }.buttonStyle(.plain).accessibilityIdentifier("startFromScratch")
+                NavigationLink {
+                    StarterPicker(select: preset, title: "Choose a preset", sectionTitle: "Preset routines")
+                } label: {
+                    choice("Use a preset", detail: "Customize an existing weekly routine.", icon: "rectangle.stack")
+                }.accessibilityIdentifier("usePreset")
+            }
+        }
+        .navigationTitle("New routine")
+        .scrollContentBackground(.hidden).background(PlannerStyle.paper)
+    }
+
+    private func choice(_ title: String, detail: String, icon: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon).font(.body).foregroundStyle(PlannerStyle.moss)
+                .frame(width: 24).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title).font(.headline).foregroundStyle(.primary)
+                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+            }
+        }.padding(.vertical, 12).frame(minHeight: 44)
+    }
+}
+
 struct StarterPicker: View {
     let select: (WeekPlan) -> Void
-    let back: () -> Void
+    var back: (() -> Void)? = nil
+    var title: String = "Choose a starter"
+    var sectionTitle: String = "Starter routines"
     #if WEEKFORM_DEVELOPMENT
     @State private var privatePlan: WeekPlan?
     @State private var fixtureError = false
@@ -58,13 +99,13 @@ struct StarterPicker: View {
                 Text("The local starter could not be opened. Check its development file and rebuild.")
             }
             #endif
-            Section("Starter routines") {
+            Section(sectionTitle) {
                 starter(Starters.general(), detail: "3 training days · Editable strength template", id: "starterGeneral")
             }
         }
         .scrollContentBackground(.hidden).background(PlannerStyle.paper)
-        .navigationTitle("Choose a starter")
-        .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Back", action: back) } }
+        .navigationTitle(title)
+        .toolbar { if let back { ToolbarItem(placement: .topBarLeading) { Button("Back", action: back) } } }
         #if WEEKFORM_DEVELOPMENT
         .task { do { privatePlan = try Starters.local() } catch { fixtureError = true } }
         #endif
@@ -87,6 +128,8 @@ struct StarterPicker: View {
 struct ReviewWeek: View {
     let plan: WeekPlan
     let editingExisting: Bool
+    var additionalRoutine = false
+    @Binding var activateNew: Bool
     let goBack: () -> Void
     let save: () -> Void
 
@@ -134,6 +177,14 @@ struct ReviewWeek: View {
                     }.frame(maxWidth: .infinity, alignment: .leading).padding(18)
                         .background(PlannerStyle.surface, in: RoundedRectangle(cornerRadius: 18))
                 }
+                if additionalRoutine && !editingExisting {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Use as my active routine", isOn: $activateNew)
+                            .accessibilityIdentifier("activateNewRoutine")
+                        Text("When off, your active routine stays unchanged.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }.padding(18).background(PlannerStyle.surface, in: RoundedRectangle(cornerRadius: 18))
+                }
                 Label(plan.restSeconds.map { "\($0)s between sets" } ?? "Rest timer off", systemImage: "timer")
                     .font(.subheadline).foregroundStyle(.secondary)
             }.padding(20).frame(maxWidth: 600).frame(maxWidth: .infinity)
@@ -142,7 +193,7 @@ struct ReviewWeek: View {
         .navigationTitle("Review your week")
         .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Back", action: goBack) } }
         .safeAreaInset(edge: .bottom) {
-            Button(action: save) { Text(editingExisting ? "Save changes" : "Save and use routine").frame(maxWidth: .infinity) }
+            Button(action: save) { Text(editingExisting ? "Save changes" : (additionalRoutine && !activateNew ? "Save routine" : "Save and use routine")).frame(maxWidth: .infinity) }
                 .controlSize(.large).buttonStyle(.borderedProminent).padding()
                 .background(.regularMaterial).accessibilityIdentifier("confirmRoutine")
         }

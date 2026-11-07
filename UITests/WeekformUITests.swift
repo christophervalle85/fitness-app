@@ -55,7 +55,8 @@ final class WeekformUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Three-day strength"].waitForExistence(timeout: 5))
         capture("Routines", in: app)
 
-        tap(app.buttons["Edit routine"])
+        tap(app.buttons["routineActions"])
+        tap(app.buttons["editRoutine"])
         let name = app.textFields["routineName"]
         tap(name)
         name.typeText(" revised")
@@ -63,12 +64,142 @@ final class WeekformUITests: XCTestCase {
         XCTAssertTrue(editedName.contains("revised"))
         tap(app.buttons["reviewWeek"])
         tap(app.buttons["confirmRoutine"])
+        XCTAssertTrue(routines.waitForExistence(timeout: 10))
+        XCTAssertTrue(routines.isSelected)
         XCTAssertTrue(app.staticTexts[editedName].waitForExistence(timeout: 10))
 
         app.terminate()
         app.launch()
         XCTAssertTrue(planTab.waitForExistence(timeout: 10))
         XCTAssertTrue(planTab.isSelected)
+    }
+
+    func testAdditionalRoutineUsesItsOwnFlowAndKeepsTheCurrentRoutineActive() {
+        let app = launch()
+        tap(app.buttons["chooseStarter"])
+        tap(app.buttons["starterGeneral"])
+        tap(app.buttons["reviewWeek"])
+        tap(app.buttons["confirmRoutine"])
+        let routines = app.tabBars.buttons["Routines"]
+        tap(routines)
+        capture("Routine card actions", in: app)
+
+        tap(app.buttons["newRoutine"])
+        XCTAssertTrue(app.navigationBars["New routine"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["startFromScratch"].exists)
+        XCTAssertTrue(app.buttons["usePreset"].exists)
+        XCTAssertFalse(app.buttons["chooseStarter"].exists)
+        capture("New routine choices", in: app)
+
+        tap(app.buttons["startFromScratch"])
+        let name = app.textFields["routineName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        XCTAssertEqual(name.value as? String, name.placeholderValue)
+        tap(app.navigationBars.buttons["Cancel"])
+        tap(app.buttons["Discard draft"])
+        XCTAssertTrue(routines.waitForExistence(timeout: 5))
+        XCTAssertTrue(routines.isSelected)
+
+        tap(app.buttons["newRoutine"])
+        tap(app.buttons["usePreset"])
+        XCTAssertTrue(app.navigationBars["Choose a preset"].waitForExistence(timeout: 5))
+        tap(app.buttons["starterGeneral"])
+        tap(name)
+        name.typeText(" for later")
+        let newName = name.value as? String ?? ""
+        XCTAssertTrue(newName.hasSuffix(" for later"))
+        tap(app.buttons["reviewWeek"])
+
+        app.terminate()
+        app.launch()
+        let save = app.buttons["confirmRoutine"]
+        XCTAssertTrue(save.waitForExistence(timeout: 10))
+        XCTAssertEqual(save.label, "Save routine")
+        tap(save)
+        XCTAssertTrue(routines.waitForExistence(timeout: 5))
+        XCTAssertTrue(routines.isSelected)
+        XCTAssertTrue(app.staticTexts[newName].waitForExistence(timeout: 5))
+
+        let originalActions = app.buttons.matching(NSPredicate(
+            format: "identifier == %@ AND label == %@", "routineActions", "More actions for Three-day strength"
+        )).firstMatch
+        tap(originalActions)
+        XCTAssertTrue(app.buttons["Duplicate"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Make active"].exists)
+    }
+
+    func testAdditionalRoutineCanBeMadeActiveAtSave() {
+        let app = launch()
+        tap(app.buttons["chooseStarter"])
+        tap(app.buttons["starterGeneral"])
+        tap(app.buttons["reviewWeek"])
+        tap(app.buttons["confirmRoutine"])
+        let routines = app.tabBars.buttons["Routines"]
+        tap(routines)
+        tap(app.buttons["newRoutine"])
+        tap(app.buttons["usePreset"])
+        tap(app.buttons["starterGeneral"])
+        let name = app.textFields["routineName"]
+        tap(name)
+        name.typeText(" alternate")
+        tap(app.buttons["reviewWeek"])
+
+        let activate = app.switches["activateNewRoutine"]
+        if !activate.isHittable { app.swipeUp() }
+        tap(activate)
+        let save = app.buttons["confirmRoutine"]
+        XCTAssertEqual(save.label, "Save and use routine")
+        tap(save)
+        XCTAssertTrue(routines.waitForExistence(timeout: 5))
+        XCTAssertTrue(routines.isSelected)
+
+        let originalActions = app.buttons.matching(NSPredicate(
+            format: "identifier == %@ AND label == %@", "routineActions", "More actions for Three-day strength"
+        )).firstMatch
+        tap(originalActions)
+        XCTAssertTrue(app.buttons["Make active"].waitForExistence(timeout: 5))
+    }
+
+    func testRoutineMenuDeletesOnlyAfterConfirmation() {
+        let app = launch()
+        tap(app.buttons["chooseStarter"])
+        tap(app.buttons["starterGeneral"])
+        tap(app.buttons["reviewWeek"])
+        tap(app.buttons["confirmRoutine"])
+        tap(app.tabBars.buttons["Routines"])
+
+        let original = app.buttons["More actions for Three-day strength"]
+        let copy = app.buttons["More actions for Three-day strength (copy)"]
+        let confirmDelete = app.alerts["Delete this routine?"].buttons["confirmDeleteRoutine"].firstMatch
+        tap(original)
+        XCTAssertTrue(app.buttons["editRoutine"].exists)
+        tap(app.buttons["Duplicate"])
+        XCTAssertTrue(copy.waitForExistence(timeout: 5))
+        XCTAssertEqual(original.frame.midX, copy.frame.midX, accuracy: 1)
+        capture("Aligned routine actions", in: app)
+
+        tap(copy)
+        tap(app.buttons["deleteRoutine"])
+        tap(app.buttons["Cancel"])
+        XCTAssertTrue(copy.exists)
+        tap(copy)
+        tap(app.buttons["deleteRoutine"])
+        tap(confirmDelete)
+        XCTAssertTrue(copy.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(original.exists)
+
+        tap(original)
+        tap(app.buttons["deleteRoutine"])
+        tap(confirmDelete)
+        XCTAssertTrue(original.waitForNonExistence(timeout: 5))
+        tap(app.buttons["newRoutine"])
+        tap(app.buttons["startFromScratch"])
+        app.terminate()
+        app.launch()
+        tap(app.navigationBars.buttons["Cancel"])
+        tap(app.buttons["Discard draft"])
+        XCTAssertTrue(app.tabBars.buttons["Routines"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["Routines"].isSelected)
     }
 
     func testManualDraftResumesAndBecomesAnActiveRoutine() {

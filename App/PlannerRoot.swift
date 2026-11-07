@@ -84,6 +84,7 @@ struct PlannerRoot: View {
     @State private var finishPulse = 0
     @State private var pendingCelebration = false
     @State private var editing = WeekPlan()
+    @State private var activateNewRoutine = false
     @State private var loaded = false
     @State private var loadFailed = false
     @State private var errorMessage: String?
@@ -124,11 +125,13 @@ struct PlannerRoot: View {
                     Tab("Routines", systemImage: "square.stack.3d.up", value: "Routines") {
                         NavigationStack {
                             RoutinesScreen(plans: store.plans, active: store.activeID,
-                                           newPlan: { begin(WeekPlan(), "welcome") },
+                                           newPlan: { begin(WeekPlan(), "edit") },
+                                           usePreset: { begin($0, "edit") },
                                            edit: { begin($0, "edit") },
                                            activate: { id in perform { try store.activate(id) } },
                                            duplicate: { id in perform { try store.duplicate(id) } },
-                                           archive: { id in perform { try store.archive(id) } })
+                                           archive: { id in perform { try store.archive(id) } },
+                                           delete: { id in perform { try store.deleteRoutine(id) } })
                                 .toolbar { developerButton }
                         }
                     }
@@ -150,20 +153,25 @@ struct PlannerRoot: View {
             } else {
                 NavigationStack {
                     Group {
-                    switch store.step {
+                    switch store.editorStep {
                     case "edit":
                         RoutineEditor(plan: Binding(get: { editing }, set: { value in
                             // A resigning text field can deliver a final write after review opens.
-                            guard store.step == "edit", editing.id == value.id, editing != value else { return }
+                            guard store.editorStep == "edit", editing.id == value.id, editing != value else { return }
                             editing = value
                             perform { try store.update(value, step: "edit") }
                         }), onReview: { changeStep("review") }, onCancel: { discardAlert = true })
                     case "review":
                         ReviewWeek(plan: editing, editingExisting: store.plans.contains { $0.id == editing.id },
+                                   additionalRoutine: isReturningRoutineEditor, activateNew: $activateNewRoutine,
                                    goBack: { changeStep("edit") }, save: {
+                            let plan = editing
+                            let returning = isReturningRoutineEditor
+                            let activate = !returning || activateNewRoutine
+                            let destination = returning ? "Routines" : "Plan"
                             perform {
-                                try store.confirm(editing)
-                                tab = "Plan"
+                                try store.confirm(plan, activateNew: activate)
+                                tab = destination
                             }
                         })
                     case "starters":
@@ -182,7 +190,7 @@ struct PlannerRoot: View {
                     }
                     }
                     .toolbar {
-                        if ["edit", "review", "starters"].contains(store.step) {
+                        if !isReturningRoutineEditor && ["edit", "review", "starters"].contains(store.editorStep) {
                             ToolbarItem(placement: .topBarTrailing) {
                                 NavigationLink { recoveryScreen } label: { Label("Backup and restore", systemImage: "externaldrive") }
                                     .accessibilityIdentifier("setupRecovery")
@@ -455,6 +463,7 @@ struct PlannerRoot: View {
             if let owner = store.profileID {
                 do { try training.load(profileID: owner) } catch { loadFailed = true; throw error }
             }
+            activateNewRoutine = false
             if let draft = store.draft { editing = draft }
             loaded = true
             openPendingRoute()
@@ -464,6 +473,7 @@ struct PlannerRoot: View {
     private func begin(_ plan: WeekPlan, _ step: String) {
         perform {
             try store.begin(plan, step: step)
+            activateNewRoutine = false
             editing = plan
         }
     }
@@ -472,9 +482,15 @@ struct PlannerRoot: View {
         perform { try store.update(editing, step: step) }
     }
 
+    private var isReturningRoutineEditor: Bool {
+        !store.plans.isEmpty || store.isLibraryDraft
+    }
+
     private func discard() {
+        let returning = isReturningRoutineEditor
         perform {
             try store.discard()
+            if returning { tab = "Routines" }
             editing = WeekPlan()
         }
     }
