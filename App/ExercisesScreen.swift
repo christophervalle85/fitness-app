@@ -48,7 +48,7 @@ private struct ExerciseSearch: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden).background(PlannerStyle.paper)
-        .navigationTitle("Exercises")
+        .navigationTitle("Search Exercises")
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search")
         .task {
             do { entries = try ExerciseCatalog.bundled().entries }
