@@ -83,6 +83,7 @@ final class ProgressUITests: XCTestCase {
         openProgress()
         capture("Progress overview", in: app)
         XCTAssertFalse(app.segmentedControls["weightUnit"].exists)
+        XCTAssertFalse(app.staticTexts["Includes dated workouts and upcoming days in your current routine."].exists)
         XCTAssertTrue(app.buttons["recentSession0"].exists)
         let chart = app.descendants(matching: .any)["progressActivityChart"].firstMatch
         XCTAssertTrue(chart.waitForExistence(timeout: 5))
@@ -92,15 +93,13 @@ final class ProgressUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["0 finished sessions"].waitForExistence(timeout: 5), app.debugDescription)
         earlierDay.press(forDuration: 0.1, thenDragTo: finalDay)
         XCTAssertTrue(app.staticTexts["1 finished session"].waitForExistence(timeout: 5))
-        let dayPicker = app.descendants(matching: .any)["progressActivityDay"].firstMatch
-        XCTAssertTrue(dayPicker.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["progressActivityDay"].firstMatch.exists)
+        let selectedDate = app.descendants(matching: .any)["progressSelectedDate"].firstMatch
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: .now)!
-        tap(dayPicker)
-        tap(app.buttons[yesterday.formatted(date: .complete, time: .omitted)].firstMatch)
+        chart.coordinate(withNormalizedOffset: CGVector(dx: 0.78, dy: 0.45)).tap()
         XCTAssertTrue(app.staticTexts["0 finished sessions"].waitForExistence(timeout: 5))
-        tap(dayPicker)
-        let today = Date.now.formatted(date: .complete, time: .omitted)
-        tap(app.buttons[today].firstMatch)
+        XCTAssertEqual(selectedDate.label, yesterday.formatted(date: .complete, time: .omitted))
+        finalDay.tap()
         XCTAssertTrue(app.buttons["progressDaySession0"].waitForExistence(timeout: 5))
         capture("Selected day on the activity chart", in: app)
         let chartTop = chart.frame.minY

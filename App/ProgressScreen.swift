@@ -37,7 +37,7 @@ struct ProgressScreen<Recovery: View>: View {
                     .accessibilityLabel(metrics.adherence.scheduled == 0 ? "No workouts scheduled this week" : "Planned workouts fulfilled this week")
                     .accessibilityValue("\(metrics.adherence.fulfilled) of \(metrics.adherence.scheduled)")
                     .accessibilityIdentifier("adherence")
-            } footer: { Text("Includes dated workouts and upcoming days in your current routine.") }
+            }
             .listRowBackground(PlannerStyle.forest)
             Section("Last 7 days") {
                 TrainingActivityChart(days: metrics.activityDays, store: store, unit: currentUnit)
@@ -171,24 +171,27 @@ private struct TrainingActivityChart: View {
     let days: [ProgressActivityDay]
     let store: TrainingStore
     let unit: String
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selectedDate: Date?
-    private var selected: ProgressActivityDay? {
-        if let selectedDate, let day = days.first(where: { CivilTrainingDay($0.date) == CivilTrainingDay(selectedDate) }) { return day }
-        return days.last
+    private var selectedIndex: Int? {
+        days.firstIndex { $0.date == selectedDate } ?? days.indices.last
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if days.contains(where: { !$0.sessions.isEmpty }) {
-                Chart(days) { day in
-                    BarMark(x: .value("Day", day.date, unit: .day), y: .value("Finished sessions", day.sessions.count), width: .ratio(0.55))
-                        .cornerRadius(3).foregroundStyle(day.id == selected?.id ? PlannerStyle.ochre : PlannerStyle.moss)
+                Chart(days.indices, id: \.self) { index in
+                    let day = days[index]
+                    // Marks, ticks and touch selection share the center of each day's slot.
+                    BarMark(x: .value("Day slot", Double(index)), y: .value("Finished sessions", day.sessions.count), width: .ratio(0.55))
+                        .cornerRadius(3).foregroundStyle(index == selectedIndex ? PlannerStyle.ochre : PlannerStyle.moss)
                         .accessibilityLabel(day.date.formatted(date: .complete, time: .omitted))
                         .accessibilityValue("\(day.sessions.count) finished sessions")
-                    if day.id == selected?.id {
-                        RuleMark(x: .value("Selected day", day.date, unit: .day))
+                    if index == selectedIndex {
+                        RuleMark(x: .value("Selected day", Double(index)))
                             .foregroundStyle(PlannerStyle.ochre.opacity(0.5)).accessibilityHidden(true)
                     }
                 }
+                .chartXScale(domain: -0.5...(Double(days.count) - 0.5))
                 .chartOverlay { proxy in
                     GeometryReader { geometry in
                         if let plotFrame = proxy.plotFrame {
@@ -204,31 +207,30 @@ private struct TrainingActivityChart: View {
                         }
                     }
                 }
-                .chartXAxis { AxisMarks(values: days.map(\.date)) { _ in AxisValueLabel(format: .dateTime.weekday(.narrow)) } }
-                .chartYAxis { AxisMarks(position: .leading, values: .stride(by: max(1, Double(days.map { $0.sessions.count }.max() ?? 1) / 3).rounded(.up))) }
+                .chartXAxis {
+                    AxisMarks(values: days.indices.map(Double.init)) { value in
+                        if let slot = value.as(Double.self), days.indices.contains(Int(slot)) {
+                            AxisValueLabel {
+                                Text(days[Int(slot)].date.formatted(.dateTime.weekday(typeSize.isAccessibilitySize ? .narrow : .abbreviated)))
+                            }
+                        }
+                    }
+                }
+                .chartYAxis(.hidden)
                 .frame(height: 140).accessibilityIdentifier("progressActivityChart")
-                if let selected {
+                if let index = selectedIndex {
+                    let selected = days[index]
                     VStack(alignment: .leading, spacing: 8) {
-                        Menu {
-                            ForEach(days) { day in
-                                Button {
-                                    selectedDate = day.date
-                                } label: {
-                                    if day.id == selected.id {
-                                        Label(day.date.formatted(date: .complete, time: .omitted), systemImage: "checkmark")
-                                    } else {
-                                        Text(day.date.formatted(date: .complete, time: .omitted))
-                                    }
+                        Text(selected.date.formatted(date: .complete, time: .omitted))
+                            .font(.subheadline.weight(.semibold))
+                            .accessibilityIdentifier("progressSelectedDate")
+                            .accessibilityAdjustableAction { direction in
+                                switch direction {
+                                case .increment: select(dayAt: index + 1)
+                                case .decrement: select(dayAt: index - 1)
+                                @unknown default: break
                                 }
                             }
-                        } label: {
-                            Label(selected.date.formatted(date: .complete, time: .omitted), systemImage: "chevron.up.chevron.down")
-                                .font(.subheadline.weight(.semibold)).frame(minHeight: 44)
-                        }
-                        .buttonStyle(.borderless)
-                        .accessibilityLabel("Selected day")
-                        .accessibilityValue(selected.date.formatted(date: .complete, time: .omitted))
-                        .accessibilityIdentifier("progressActivityDay")
                         Text(selected.sessions.count == 1 ? "1 finished session" : "\(selected.sessions.count) finished sessions")
                             .font(.subheadline).foregroundStyle(.secondary)
                         ForEach(Array(selected.sessions.enumerated()), id: \.element.id) { index, session in
@@ -245,8 +247,13 @@ private struct TrainingActivityChart: View {
     }
 
     private func select(at location: CGPoint, in plot: CGRect, proxy: ChartProxy) {
-        guard plot.contains(location), let date = proxy.value(atX: location.x - plot.minX, as: Date.self) else { return }
-        selectedDate = date
+        guard plot.contains(location), let slot = proxy.value(atX: location.x - plot.minX, as: Double.self) else { return }
+        select(dayAt: Int(slot.rounded()))
+    }
+
+    private func select(dayAt index: Int) {
+        guard days.indices.contains(index) else { return }
+        selectedDate = days[index].date
     }
 }
 
