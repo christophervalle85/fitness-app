@@ -84,21 +84,22 @@ final class ProgressUITests: XCTestCase {
         capture("Progress overview", in: app)
         XCTAssertFalse(app.segmentedControls["weightUnit"].exists)
         XCTAssertFalse(app.staticTexts["Includes dated workouts and upcoming days in your current routine."].exists)
-        XCTAssertTrue(app.buttons["recentSession0"].exists)
+        XCTAssertFalse(app.buttons["recentSession0"].exists)
+        XCTAssertEqual(app.buttons.matching(identifier: "progressHistory").count, 1)
         let chart = app.descendants(matching: .any)["progressActivityChart"].firstMatch
         XCTAssertTrue(chart.waitForExistence(timeout: 5))
         let earlierDay = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.28, dy: 0.45))
         let finalDay = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.45))
         earlierDay.tap()
-        XCTAssertTrue(app.staticTexts["0 finished sessions"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["No sessions logged."].waitForExistence(timeout: 5), app.debugDescription)
         earlierDay.press(forDuration: 0.1, thenDragTo: finalDay)
-        XCTAssertTrue(app.staticTexts["1 finished session"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["progressDaySession0"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any)["progressActivityDay"].firstMatch.exists)
         let selectedDate = app.descendants(matching: .any)["progressSelectedDate"].firstMatch
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: .now)!
         chart.coordinate(withNormalizedOffset: CGVector(dx: 0.78, dy: 0.45)).tap()
-        XCTAssertTrue(app.staticTexts["0 finished sessions"].waitForExistence(timeout: 5))
-        XCTAssertEqual(selectedDate.label, yesterday.formatted(date: .complete, time: .omitted))
+        XCTAssertTrue(app.staticTexts["No sessions logged."].waitForExistence(timeout: 5))
+        XCTAssertEqual(selectedDate.label, yesterday.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
         finalDay.tap()
         let daySession = app.buttons["progressDaySession0"]
         XCTAssertTrue(daySession.waitForExistence(timeout: 5))
@@ -109,6 +110,15 @@ final class ProgressUITests: XCTestCase {
         let scrollStart = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))
         scrollStart.press(forDuration: 0.08, thenDragTo: scrollStart.withOffset(CGVector(dx: 0, dy: -150)))
         XCTAssertLessThan(chart.frame.minY, chartTop - 20, "Vertical swipes should scroll Progress.")
+        let routineTrend = app.buttons["progressExerciseTrend0-0-0"]
+        for _ in 0..<5 where !routineTrend.isHittable { app.swipeUp() }
+        XCTAssertTrue(routineTrend.isHittable)
+        capture("Routine exercise progress", in: app)
+        tap(routineTrend)
+        XCTAssertTrue(app.navigationBars["Squat"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["exerciseWorkoutTrend"].firstMatch.waitForExistence(timeout: 5))
+        capture("Exercise trend from the routine", in: app)
+        backToProgress()
         openRecord()
         XCTAssertTrue(app.staticTexts["25 lb · 10 reps"].firstMatch.waitForExistence(timeout: 5))
         capture("Exercise record", in: app)
@@ -140,7 +150,7 @@ final class ProgressUITests: XCTestCase {
         app.launch()
         openProgress()
         tapOverviewControl(app.buttons["progressRecords"])
-        XCTAssertTrue(app.staticTexts["No exercise records yet"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No exercise progress yet"].waitForExistence(timeout: 5))
     }
 
     func testEmptyActivityAndSettingsDestinations() {
