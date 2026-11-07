@@ -164,6 +164,8 @@ struct ProgressTests {
         #expect(record.workoutPoints.map(\.date) == [monday, nextWorkout])
         #expect(record.workoutPoints.map(\.result.id) == [moreReps.id, lighter.id])
         #expect(record.trend.count == 3)
+        #expect(record.overviewResult?.id == moreReps.id)
+        #expect(record.overviewResult?.date == moreReps.confirmedAt)
 
         var corrected = first
         corrected.exercises[0].sets[1].actual.load = 55
@@ -190,9 +192,12 @@ struct ProgressTests {
         #expect(records.first { $0.basis == .bodyweight }?.workoutPoints.first?.result.reps == 12)
         #expect(records.first { $0.basis == .timed }?.workoutPoints.first?.result.seconds == 30)
         #expect(records.first { $0.basis == .assisted }?.workoutPoints.first?.result.kg == 20)
+        #expect(records.first { $0.basis == .bodyweight }?.overviewResult?.reps == 12)
+        #expect(records.first { $0.basis == .timed }?.overviewResult?.seconds == 30)
+        #expect(records.first { $0.basis == .assisted }?.overviewResult?.date == later)
     }
 
-    @Test func routineTrendsPreserveDayOrderAndSeparateExerciseIdentities() throws {
+    @Test func routineCardsDeduplicateExercisesAndKeepRecordingSeriesSeparate() throws {
         let variant = UUID()
         let planned = PlanExercise(variantID: variant, name: "Row", convention: "Per side")
         var repeated = planned
@@ -211,16 +216,32 @@ struct ProgressTests {
         var otherMachine = planned
         otherMachine.id = UUID()
         let unrelatedMachine = TrainingExercise(prescription: otherMachine, basis: .machine, sets: [row(8, 50, on: monday)])
-        let metrics = ProgressMetrics(sessions: [session([logged, substitution, alternateBasis, unrelatedMachine], on: monday)],
+        let firstProfile = TrainingExercise(prescription: planned, basis: .machine, sets: [row(8, 40, on: monday)])
+        let secondProfile = TrainingExercise(prescription: repeated, basis: .machine, sets: [row(8, 45, on: monday)])
+        let metrics = ProgressMetrics(sessions: [session([logged, substitution, alternateBasis, unrelatedMachine, firstProfile, secondProfile], on: monday)],
                                        occurrences: [], activePlan: plan)
-        #expect(metrics.routineDays.map(\.weekdayIndex) == [0, 3])
-        #expect(metrics.routineDays.first?.exercises.map(\.id) == [planned.id, noHistory.id])
-        #expect(metrics.routineDays.first?.exercises.last?.records.isEmpty == true)
-        let first = try #require(metrics.routineDays.first?.exercises.first?.records)
-        #expect(first.count == 3)
-        #expect(Set(first.compactMap { $0.workoutPoints.first?.result.kg }) == [15, 20, 35])
-        #expect(metrics.routineDays.last?.exercises.first?.records.map(\.id) == first.map(\.id))
-        #expect(metrics.records.count == 5)
+        let other = try #require(metrics.routineGroups.first)
+        #expect(metrics.routineGroups.map(\.name) == ["Other exercises"])
+        #expect(other.exercises.map(\.prescription.name) == ["Press", "Row"])
+        #expect(other.exercises.first?.records.isEmpty == true)
+        let results = try #require(other.exercises.last?.records)
+        #expect(results.count == 5)
+        #expect(Set(results.compactMap { $0.overviewResult?.kg }) == [15, 20, 35, 40, 45])
+        #expect(metrics.records.count == 7)
+    }
+
+    @Test func exerciseGroupsUseFirstPrimaryCatalogTagAndKeepUnknownExercises() throws {
+        let catalog = try ExerciseCatalog.bundled().entries
+        let press = try #require(catalog.first { $0.name == "Barbell bench press" })
+        let squat = try #require(catalog.first { $0.name == "Barbell front squat" })
+        var plan = WeekPlan(name: "Strength")
+        plan.days[0] = PlanDay(name: "Workout", exercises: [squat.prescription, PlanExercise(name: press.name), press.prescription])
+        let groups = ProgressMetrics(sessions: [], occurrences: [], activePlan: plan, catalog: catalog).routineGroups
+        #expect(groups.map(\.name) == ["Chest", "Quads", "Other exercises"])
+        #expect(groups.first?.exercises.first?.catalogEntry?.id == press.id)
+        #expect(groups.first?.exercises.first?.catalogEntry?.media.first?.localURL != nil)
+        #expect(groups.last?.exercises.first?.catalogEntry == nil)
+        #expect(groups.flatMap(\.exercises).allSatisfy { $0.records.isEmpty })
     }
 
     @Test func assignedExtraMustMeetOriginalPrescriptionAndUnitSuggestionsPreservePhysicalLoad() throws {

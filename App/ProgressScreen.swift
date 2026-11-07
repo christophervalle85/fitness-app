@@ -8,8 +8,9 @@ struct ProgressScreen<Recovery: View>: View {
     let unit: () -> String
     let setUnit: (String) throws -> Void
     @ViewBuilder var recovery: () -> Recovery
+    @State private var catalog: [CatalogEntry] = []
     var body: some View {
-        let metrics = ProgressMetrics(sessions: store.sessions, occurrences: store.occurrences, activePlan: activePlan)
+        let metrics = ProgressMetrics(sessions: store.sessions, occurrences: store.occurrences, activePlan: activePlan, catalog: catalog)
         let currentUnit = unit()
         List {
             Section {
@@ -59,44 +60,53 @@ struct ProgressScreen<Recovery: View>: View {
                 } label: { Label("View workout history", systemImage: "clock.arrow.circlepath") }
                 .accessibilityIdentifier("progressHistory")
             }.listRowBackground(PlannerStyle.surface)
-            ForEach(metrics.routineDays) { group in
+            ForEach(metrics.routineGroups) { group in
                 Section {
-                    ForEach(Array(group.exercises.enumerated()), id: \.element.id) { exerciseIndex, exercise in
-                        if exercise.records.isEmpty {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(exercise.prescription.name).font(.headline)
-                                Text("No logged working sets yet").font(.subheadline).foregroundStyle(.secondary)
-                            }.padding(.vertical, 6)
-                                .accessibilityIdentifier("progressExerciseTrend\(group.weekdayIndex)-\(exerciseIndex)-empty")
-                        } else {
-                            ForEach(Array(exercise.records.enumerated()), id: \.element.id) { seriesIndex, record in
-                                NavigationLink { RecordDetail(record: record, unit: currentUnit) } label: {
-                                    ExerciseTrendCard(record: record, unit: currentUnit)
-                                }.accessibilityIdentifier("progressExerciseTrend\(group.weekdayIndex)-\(exerciseIndex)-\(seriesIndex)")
+                    ForEach(group.exercises) { exercise in
+                        Group {
+                            if exercise.records.isEmpty {
+                                ExerciseRecordRow(exercise: exercise, unit: currentUnit)
+                                    .accessibilityElement(children: .combine)
+                            } else {
+                                NavigationLink {
+                                    if exercise.records.count == 1, let record = exercise.records.first {
+                                        RecordDetail(record: record, unit: currentUnit)
+                                    } else {
+                                        List {
+                                            ForEach(Array(exercise.records.enumerated()), id: \.element.id) { index, record in
+                                                NavigationLink { RecordDetail(record: record, unit: currentUnit) } label: {
+                                                    RecordOverviewValue(record: record, unit: currentUnit, series: index + 1)
+                                                }
+                                            }
+                                        }.navigationTitle(exercise.prescription.name)
+                                            .scrollContentBackground(.hidden).background(PlannerStyle.paper)
+                                    }
+                                } label: { ExerciseRecordRow(exercise: exercise, unit: currentUnit) }
                             }
                         }
+                        .accessibilityIdentifier("progressExerciseRecord-" + exercise.prescription.name)
+                        .listRowInsets(EdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 14))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(RoundedRectangle(cornerRadius: 17).fill(PlannerStyle.surface)
+                            .overlay { RoundedRectangle(cornerRadius: 17).strokeBorder(PlannerStyle.rule.opacity(0.28)) }
+                            .padding(.vertical, 3))
                     }
                 } header: {
-                    VStack(alignment: .leading, spacing: 8) {
-                        if group.id == metrics.routineDays.first?.id {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if group.id == metrics.routineGroups.first?.id {
                             Text("Exercise progress").font(.title3.bold()).foregroundStyle(.primary)
                                 .accessibilityAddTraits(.isHeader)
                         }
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(PlannerStyle.weekdays[group.weekdayIndex]).font(.caption)
-                            Text(group.day.name).font(.headline)
-                        }.accessibilityElement(children: .combine).accessibilityAddTraits(.isHeader)
-                            .accessibilityIdentifier("progressRoutineDay\(group.weekdayIndex)")
+                        Text(group.name).font(.headline).foregroundStyle(PlannerStyle.moss)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityIdentifier("progressExerciseMuscle-" + group.name)
                     }.textCase(nil)
                 }
             }
-            Section {
-                if metrics.routineDays.isEmpty { Text("Your routine’s exercise trends will appear here.").foregroundStyle(.secondary) }
-                NavigationLink { RecordSearch(records: metrics.records, unit: currentUnit) } label: {
-                    Label("Find an exercise", systemImage: "magnifyingglass")
-                }.accessibilityIdentifier("progressRecords")
-            } header: {
-                if metrics.routineDays.isEmpty { Text("Exercise progress") }
+            if metrics.routineGroups.isEmpty {
+                Section("Exercise progress") {
+                    Text("Your routine’s exercises will appear here.").foregroundStyle(.secondary)
+                }
             }
             if !metrics.suggestions.isEmpty {
                 Section("Progression suggestions") {
@@ -112,6 +122,7 @@ struct ProgressScreen<Recovery: View>: View {
         }
         .scrollContentBackground(.hidden).background(PlannerStyle.paper)
         .navigationTitle("Progress")
+        .task { catalog = (try? ExerciseCatalog.bundled().entries) ?? [] }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink {
@@ -146,32 +157,6 @@ private struct ProgressSettings<Recovery: View>: View {
                     .accessibilityIdentifier("backupRecovery")
             }
         }.navigationTitle("Settings")
-            .scrollContentBackground(.hidden).background(PlannerStyle.paper)
-    }
-}
-
-private struct RecordSearch: View {
-    let records: [ExerciseRecords]
-    let unit: String
-    @State private var query = ""
-    var body: some View {
-        let terms = query.split(whereSeparator: \.isWhitespace)
-        let matches = records.enumerated().filter { _, record in
-            let text = record.name + " " + recordContext(record) + " " + record.id.convention
-            return terms.allSatisfy { text.localizedStandardContains(String($0)) }
-        }
-        List {
-            if matches.isEmpty { Text(records.isEmpty ? "No exercise progress yet" : "No matching exercises").foregroundStyle(.secondary) }
-            ForEach(matches, id: \.element.id) { index, record in
-                NavigationLink { RecordDetail(record: record, unit: unit) } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(record.name).font(.headline)
-                        Text(recordContext(record)).font(.subheadline).foregroundStyle(.secondary)
-                    }
-                }.accessibilityIdentifier("recordGroup\(index)")
-            }
-        }.navigationTitle("Exercise progress")
-            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Find an exercise")
             .scrollContentBackground(.hidden).background(PlannerStyle.paper)
     }
 }
@@ -331,8 +316,11 @@ private func progressResult(_ point: ProgressSet, unit: String) -> String {
 }
 
 private func weightText(_ kg: Double, _ unit: String) -> String {
-    let value = WeightUnits.convert(kg, from: "kg", to: unit)
-    return "\(value.formatted(.number.precision(.fractionLength(0...3)))) \(unit)"
+    "\(weightNumber(kg, unit)) \(unit)"
+}
+
+private func weightNumber(_ kg: Double, _ unit: String) -> String {
+    WeightUnits.convert(kg, from: "kg", to: unit).formatted(.number.precision(.fractionLength(0...3)))
 }
 
 private func recordContext(_ record: ExerciseRecords) -> String {
@@ -350,42 +338,83 @@ private func recordContext(_ record: ExerciseRecords) -> String {
     return [name, record.side?.capitalized].compactMap { $0 }.joined(separator: " · ")
 }
 
-private struct ExerciseTrendCard: View {
-    let record: ExerciseRecords
+private struct ExerciseRecordRow: View {
+    let exercise: RoutineExerciseProgress
     let unit: String
-    @Environment(\.dynamicTypeSize) private var typeSize
-
     var body: some View {
-        let plot = ExerciseTrendPlot(record: record, unit: unit, expanded: false)
-        let layout = typeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
-            : AnyLayout(HStackLayout(spacing: 16))
-        layout {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(record.name).font(.headline)
-                Text(recordContext(record)).font(.caption).foregroundStyle(.secondary)
-                if let latest = record.workoutPoints.last {
-                    Text("\(plot.measure) · \(progressResult(latest.result, unit: unit))")
-                        .font(.subheadline.weight(.medium)).monospacedDigit()
+        HStack(spacing: 12) {
+            CatalogThumbnail(media: exercise.catalogEntry?.media.first)
+                .overlay { RoundedRectangle(cornerRadius: 9).strokeBorder(PlannerStyle.rule.opacity(0.32)) }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(exercise.prescription.name).font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+                if exercise.records.isEmpty {
+                    Text("N/A").font(.title3.weight(.semibold)).foregroundStyle(PlannerStyle.moss)
+                        .accessibilityLabel("No result logged")
+                } else {
+                    ForEach(Array(exercise.records.enumerated()), id: \.element.id) { index, record in
+                        RecordOverviewValue(record: record, unit: unit, series: exercise.records.count > 1 ? index + 1 : nil)
+                    }
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
-            plot
-                .frame(width: typeSize.isAccessibilitySize ? nil : 94)
-                .accessibilityHidden(true)
-        }.padding(.vertical, 10)
+        }.padding(.vertical, 6)
+    }
+}
+
+private struct RecordOverviewValue: View {
+    let record: ExerciseRecords
+    let unit: String
+    let series: Int?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if let series {
+                let name = recordContext(record)
+                Text(record.id.machineProfile == nil ? name : "\(name) · Profile \(series)")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if let point = record.overviewResult {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) { measurement(point) }
+                    VStack(alignment: .leading, spacing: 1) { measurement(point) }
+                }
+                Text(point.date, format: .dateTime.month(.abbreviated).day().year()).font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("N/A").font(.title3.weight(.semibold)).foregroundStyle(PlannerStyle.moss)
+                    .accessibilityLabel("No result logged")
+            }
+        }
+    }
+
+    @ViewBuilder private func measurement(_ point: ProgressSet) -> some View {
+        let value: String = switch record.basis {
+        case .bodyweight: point.reps?.formatted() ?? "N/A"
+        case .timed: point.seconds?.formatted() ?? "N/A"
+        default: point.kg.map { weightNumber($0, unit) } ?? "N/A"
+        }
+        let qualifier: String = switch record.basis {
+        case .bodyweight: "reps"
+        case .timed: "sec"
+        case .dumbbell: "\(unit) per dumbbell"
+        case .machine: "\(unit) on machine"
+        case .added: "\(unit) added"
+        case .assisted: "\(unit) latest assistance"
+        default: unit
+        }
+        Text(value).font(.title2.weight(.bold)).monospacedDigit().foregroundStyle(PlannerStyle.moss)
+        Text(qualifier).font(.caption.weight(.medium)).foregroundStyle(.secondary)
     }
 }
 
 private struct ExerciseTrendPlot: View {
     let record: ExerciseRecords
     let unit: String
-    let expanded: Bool
     var measure: String {
         switch record.basis {
-        case .timed: expanded ? "Longest working set · seconds" : "Longest hold"
-        case .bodyweight: expanded ? "Most reps in a working set" : "Most reps"
-        case .assisted: expanded ? "Latest working set assistance · \(unit)" : "Latest assistance"
-        default: expanded ? "Heaviest working set · \(unit)" : "Heaviest set"
+        case .timed: "Longest working set · seconds"
+        case .bodyweight: "Most reps in a working set"
+        case .assisted: "Latest working set assistance · \(unit)"
+        default: "Heaviest working set · \(unit)"
         }
     }
     private func value(_ point: ExerciseWorkoutPoint) -> Double? {
@@ -396,7 +425,7 @@ private struct ExerciseTrendPlot: View {
         }
     }
     var body: some View {
-        let points = expanded ? record.workoutPoints[...] : record.workoutPoints.suffix(12)
+        let points = record.workoutPoints
         Chart(points) { point in
             if let y = value(point), y.isFinite {
                 if points.count > 1 {
@@ -410,13 +439,13 @@ private struct ExerciseTrendPlot: View {
         }
         .foregroundStyle(PlannerStyle.moss)
         .chartXAxis {
-            if expanded && points.count > 1 { AxisMarks(values: .automatic(desiredCount: 3)) }
+            if points.count > 1 { AxisMarks(values: .automatic(desiredCount: 3)) }
         }
         .chartYAxis {
-            if expanded { AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) }
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 3))
         }
         .chartXScale(range: .plotDimension(padding: 5))
-        .frame(height: expanded ? 160 : 46)
+        .frame(height: 160)
     }
 }
 
@@ -426,7 +455,7 @@ private struct RecordDetail: View {
     var body: some View {
         List {
             Section("Workout trend") {
-                let chart = ExerciseTrendPlot(record: record, unit: unit, expanded: true)
+                let chart = ExerciseTrendPlot(record: record, unit: unit)
                 VStack(alignment: .leading, spacing: 10) {
                     Text(chart.measure).font(.subheadline.weight(.medium))
                     chart.accessibilityIdentifier("exerciseWorkoutTrend")

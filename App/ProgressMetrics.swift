@@ -74,6 +74,15 @@ struct ExerciseRecords: Identifiable {
     let heaviest: ProgressSet?
     let repBests: [ProgressSet]
 
+    var overviewResult: ProgressSet? {
+        switch basis {
+        case .bodyweight: trend.max { ($0.reps ?? 0) < ($1.reps ?? 0) }
+        case .timed: trend.max { ($0.seconds ?? 0) < ($1.seconds ?? 0) }
+        case .assisted: trend.last
+        default: heaviest
+        }
+    }
+
     init(id: RecordIdentity, name: String, rows: [ProgressSet], workoutDates: [UUID: Date]) {
         self.id = id
         self.name = name
@@ -139,16 +148,28 @@ struct ProgressActivityDay: Identifiable {
     var id: Date { date }
 }
 
-struct RoutineProgressDay: Identifiable {
-    var id: UUID { day.id }
-    let weekdayIndex: Int
-    let day: PlanDay
+struct RoutineProgressGroup: Identifiable {
+    var id: String { name }
+    let name: String
     let exercises: [RoutineExerciseProgress]
 }
 
+struct RoutineExerciseIdentity: Hashable {
+    let variant: UUID
+    let name: String
+    let convention: String
+
+    init(_ prescription: PlanExercise) {
+        variant = prescription.variantID ?? prescription.id
+        name = prescription.name
+        convention = prescription.convention
+    }
+}
+
 struct RoutineExerciseProgress: Identifiable {
-    var id: UUID { prescription.id }
+    var id: RoutineExerciseIdentity { RoutineExerciseIdentity(prescription) }
     let prescription: PlanExercise
+    let catalogEntry: CatalogEntry?
     let records: [ExerciseRecords]
 }
 
@@ -161,10 +182,11 @@ struct ProgressMetrics {
     let adherence: (fulfilled: Int, scheduled: Int)
     let knownAdherence: (fulfilled: Int, scheduled: Int)
     let records: [ExerciseRecords]
-    let routineDays: [RoutineProgressDay]
+    let routineGroups: [RoutineProgressGroup]
     let suggestions: [ProgressionSuggestion]
 
-    init(sessions: [TrainingSession], occurrences: [TrainingOccurrence], activePlan: WeekPlan? = nil, asOf: Date = Date()) {
+    init(sessions: [TrainingSession], occurrences: [TrainingOccurrence], activePlan: WeekPlan? = nil,
+         asOf: Date = Date(), catalog: [CatalogEntry] = []) {
         history = sessions.filter { $0.finishedAt != nil }.sorted {
             if $0.startedAt == $1.startedAt { return $0.id.uuidString < $1.id.uuidString }
             return $0.startedAt > $1.startedAt
@@ -247,23 +269,39 @@ struct ProgressMetrics {
             }
             return ($0.side ?? "") < ($1.side ?? "")
         }
-        if let activePlan, !activePlan.archived {
-            let byVariant = Dictionary(grouping: records, by: \.id.variant)
-            routineDays = activePlan.days.prefix(7).enumerated().compactMap { weekday, day in
-                guard !day.exercises.isEmpty else { return nil }
-                let exercises = day.exercises.map { prescription in
-                    let matches = byVariant[prescription.variantID ?? prescription.id, default: []].filter { record in
-                        record.name == prescription.name && record.id.convention == prescription.convention &&
-                            (record.id.machineProfile == nil || record.id.machineProfile == prescription.id)
-                    }
-                    return RoutineExerciseProgress(prescription: prescription, records: matches)
-                }
-                return RoutineProgressDay(weekdayIndex: weekday, day: day, exercises: exercises)
-            }
-        } else {
-            routineDays = []
-        }
+        routineGroups = Self.routineGroups(plan: activePlan, catalog: catalog, records: records)
         suggestions = attempts.values.compactMap(\.suggestion).sorted { $0.date > $1.date }
+    }
+
+    private static func routineGroups(plan: WeekPlan?, catalog: [CatalogEntry], records: [ExerciseRecords]) -> [RoutineProgressGroup] {
+        guard let plan, !plan.archived else { return [] }
+        let entries = Dictionary(catalog.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let prescriptions = Dictionary(grouping: plan.days.flatMap(\.exercises), by: RoutineExerciseIdentity.init)
+        let recordsByVariant = Dictionary(grouping: records, by: \.id.variant)
+        let exercises = prescriptions.compactMap { identity, group -> RoutineExerciseProgress? in
+            guard let prescription = group.first else { return nil }
+            let profiles = Set(group.map(\.id))
+            let matches = recordsByVariant[identity.variant, default: []].filter { record in
+                record.name == identity.name && record.id.convention == identity.convention &&
+                    (record.id.machineProfile.map(profiles.contains) ?? true)
+            }
+            return RoutineExerciseProgress(prescription: prescription, catalogEntry: entries[identity.variant], records: matches)
+        }.sorted { first, second in
+            let comparison = first.prescription.name.localizedStandardCompare(second.prescription.name)
+            if comparison != .orderedSame { return comparison == .orderedAscending }
+            return first.prescription.id.uuidString < second.prescription.id.uuidString
+        }
+
+        let other = "Other exercises"
+        let muscles = Dictionary(grouping: exercises) { exercise in
+            guard let primary = exercise.catalogEntry?.primary.first?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !primary.isEmpty else { return other }
+            return primary
+        }
+        let sorted = muscles.filter { $0.key != other }.sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
+        var groups = sorted.map { RoutineProgressGroup(name: $0.key, exercises: $0.value) }
+        if let exercises = muscles[other] { groups.append(RoutineProgressGroup(name: other, exercises: exercises)) }
+        return groups
     }
 
     private static func fulfilled(_ occurrence: TrainingOccurrence, by sessions: [TrainingSession]) -> Bool {
