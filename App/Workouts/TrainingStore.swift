@@ -169,27 +169,26 @@ final class TrainingStore {
     func isOriginal(_ occurrence: TrainingOccurrence, on date: Date) -> Bool { occurrence.sourceDay == CivilTrainingDay(date) }
     func isPerformed(_ session: TrainingSession, on date: Date) -> Bool { session.performedDay == CivilTrainingDay(date) }
 
+    private func credit(for occurrence: TrainingOccurrence) -> WorkoutCredit {
+        WorkoutCredit(for: occurrence, linkedSessions: sessions.filter { $0.occurrenceID == occurrence.id })
+    }
+
     func progress(for occurrence: TrainingOccurrence) -> (completed: Int, total: Int) {
-        let linked = sessions.filter { $0.occurrenceID == occurrence.id }
-        if let goal = occurrence.cardioGoalSeconds {
-            let seconds = linked.compactMap { $0.cardio?.seconds }.reduce(0) { $0 + min($1, Int.max - $0) }
-            return (min(seconds, goal), goal)
-        }
-        let ids = Set(occurrence.plannedSets.values.joined())
-        return (ids.intersection(creditedIDs(in: linked)).count, ids.count)
+        let progress = credit(for: occurrence)
+        return (progress.completed, progress.total)
     }
 
     func remainingSetIDs(for occurrence: TrainingOccurrence) -> Set<UUID> {
-        let credited = creditedIDs(in: sessions.filter { $0.occurrenceID == occurrence.id })
-        return Set(occurrence.plannedSets.values.joined()).subtracting(credited)
+        let credited = WorkoutCredit.creditedSetIDs(in: sessions.filter { $0.occurrenceID == occurrence.id })
+        return WorkoutCredit.plannedSetIDs(for: occurrence).subtracting(credited)
     }
 
     func status(for occurrence: TrainingOccurrence) -> String {
         if occurrence.skipped { return "Skipped" }
-        let (completed, total) = progress(for: occurrence)
-        guard total > 0, completed == total else { return completed > 0 ? "Partial" : "Scheduled" }
+        let progress = credit(for: occurrence)
+        guard progress.isFulfilled else { return progress.completed > 0 ? "Partial" : "Scheduled" }
         let contributors = sessions.filter {
-            $0.occurrenceID == occurrence.id && ($0.cardio != nil || !creditedIDs(in: [$0]).isEmpty)
+            $0.occurrenceID == occurrence.id && ($0.cardio != nil || !WorkoutCredit.creditedSetIDs(in: [$0]).isEmpty)
         }
         return contributors.allSatisfy { $0.performedDay.date < occurrence.date } ? "Done early" : "Done"
     }
@@ -197,18 +196,14 @@ final class TrainingStore {
     func planState(for occurrence: TrainingOccurrence) -> PlanWorkoutState {
         if occurrence.skipped { return .skipped }
         if openSession(for: occurrence.id) != nil { return .inProgress }
-        let (completed, total) = progress(for: occurrence)
-        if total > 0 && completed == total { return .finished }
-        return completed > 0 ? .inProgress : .notStarted
+        let progress = credit(for: occurrence)
+        if progress.isFulfilled { return .finished }
+        return progress.completed > 0 ? .inProgress : .notStarted
     }
 
     func slotProgress(for occurrence: TrainingOccurrence) -> [UUID: [Bool]] {
-        let credits = creditedIDs(in: sessions.filter { $0.occurrenceID == occurrence.id })
+        let credits = WorkoutCredit.creditedSetIDs(in: sessions.filter { $0.occurrenceID == occurrence.id })
         return occurrence.plannedSets.mapValues { $0.map(credits.contains) }
-    }
-
-    private func creditedIDs(in sessions: [TrainingSession]) -> Set<UUID> {
-        Set(sessions.flatMap(\.exercises).flatMap(\.sets).filter { $0.confirmedAt != nil && $0.warmup != true }.compactMap(\.plannedID))
     }
 
     private func planned(_ plan: WeekPlan, _ date: Date) throws -> TrainingOccurrence {
@@ -289,7 +284,7 @@ final class TrainingStore {
             guard exercise.matchesPlannedItem(target) else {
                 throw TrainingError("Choose a matching exercise and result type.")
             }
-            guard set.plannedID == nil, !creditedIDs(in: sessions.filter { $0.occurrenceID == occurrence.id }).contains(plannedSetID) else {
+            guard set.plannedID == nil, !WorkoutCredit.creditedSetIDs(in: sessions.filter { $0.occurrenceID == occurrence.id }).contains(plannedSetID) else {
                 throw TrainingError("This result or planned set already has a credit.")
             }
             session.exercises[i].sets[j].plannedID = plannedSetID
@@ -324,7 +319,7 @@ final class TrainingStore {
         var session = TrainingSession(name: occurrence.name, startedAt: instant, performedDay: CivilTrainingDay(instant),
                                       occurrenceID: occurrence.id, isCardio: occurrence.cardioGoalSeconds != nil,
                                       workoutDetailsChanged: false)
-        let credited = creditedIDs(in: sessions.filter { $0.occurrenceID == occurrence.id })
+        let credited = WorkoutCredit.creditedSetIDs(in: sessions.filter { $0.occurrenceID == occurrence.id })
         for prescription in occurrence.day?.exercises ?? [] {
             let original = occurrence.plannedSets[prescription.id] ?? []
             let pending = original.filter { !credited.contains($0) }
@@ -577,7 +572,7 @@ final class TrainingStore {
             let set = exercise.sets[j]
             guard set.revision == revision, set.confirmedAt == nil else { throw TrainingError("Review the latest set values.") }
             try actual.validate(for: exercise.basis)
-            if let planned = set.plannedID, creditedIDs(in: sessions.filter { $0.occurrenceID == session.occurrenceID }).contains(planned) {
+            if let planned = set.plannedID, WorkoutCredit.creditedSetIDs(in: sessions.filter { $0.occurrenceID == session.occurrenceID }).contains(planned) {
                 throw TrainingError("This planned set has already been credited.")
             }
             let instant = now()

@@ -171,6 +171,26 @@ struct PlanActionsTests {
         }
     }
 
+    @Test func planCardDistinguishesStartingContinuingAndResuming() {
+        let openID = UUID()
+        let fresh = PlanCardState(state: .notStarted, openSessionID: nil, isPastWeek: false)
+        let partial = PlanCardState(state: .inProgress, openSessionID: nil, isPastWeek: false)
+        let open = PlanCardState(state: .inProgress, openSessionID: openID, isPastWeek: false)
+        #expect(fresh.action == .startOccurrence && fresh.canMoveOrSkip)
+        #expect(partial.action == .continueWorkout && partial.canMoveOrSkip)
+        #expect(open.action == .resume(openID) && !open.canMoveOrSkip)
+        #expect(partial.status == "Partial" && open.status == "In progress")
+    }
+
+    @Test func pastAndClosedPlanCardsOfferOnlyEligibleActions() {
+        let past = PlanCardState(state: .inProgress, openSessionID: UUID(), isPastWeek: true)
+        let finished = PlanCardState(state: .finished, openSessionID: nil, isPastWeek: true)
+        let skipped = PlanCardState(state: .skipped, openSessionID: nil, isPastWeek: false)
+        #expect(past.action == nil && !past.canMoveOrSkip && !past.canReview)
+        #expect(finished.action == nil && !finished.canMoveOrSkip && finished.canReview)
+        #expect(skipped.action == nil && !skipped.canMoveOrSkip && !skipped.canReview)
+    }
+
     @Test func planStateTracksActiveSessionAndRemainingCredit() throws {
         try withDirectory { directory in
             let store = TrainingStore(directory: directory, now: { monday })

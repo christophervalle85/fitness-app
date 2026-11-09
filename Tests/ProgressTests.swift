@@ -117,6 +117,31 @@ struct ProgressTests {
         #expect(result.cardioSeconds == 240)
     }
 
+    @Test func cardioCreditSaturatesWhilePlanKeepsAnOpenWorkoutInProgress() throws {
+        let path = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: path) }
+        let store = TrainingStore(directory: path, now: { monday })
+        try store.load(profileID: UUID())
+        try store.scheduleCardio(name: "Walk", date: monday, goalSeconds: Int.max)
+        let occurrence = try #require(store.occurrences.first)
+        let first = try store.startOccurrence(occurrence.id)
+        try store.recordCardio(sessionID: first, result: CardioResult(seconds: Int.max - 10))
+        try store.finish(sessionID: first, partial: true)
+        let second = try store.startOccurrence(occurrence.id)
+        try store.recordCardio(sessionID: second, result: CardioResult(seconds: 20))
+
+        #expect(store.progress(for: occurrence).completed == Int.max)
+        #expect(store.planState(for: occurrence) == .inProgress)
+        let during = ProgressMetrics(sessions: store.sessions, occurrences: store.occurrences, asOf: monday)
+        #expect(during.adherence.fulfilled == 1)
+        #expect(during.cardioSeconds == Int.max - 10)
+
+        try store.finish(sessionID: second, partial: false)
+        let after = ProgressMetrics(sessions: store.sessions, occurrences: store.occurrences, asOf: monday)
+        #expect(store.planState(for: occurrence) == .finished)
+        #expect(after.cardioSeconds == Int.max)
+    }
+
     @Test func activityUsesSevenCivilDaysAndKeepsOlderSessionsInHistory() throws {
         let calendar = Calendar.current
         let today = try #require(calendar.date(byAdding: .day, value: 8, to: monday))

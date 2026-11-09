@@ -52,9 +52,9 @@ struct PlanScreen: View {
                         let day = plan.days[weekday]
                         let sourceDate = selected
                         PlannedWorkoutCard(name: day.name, day: day, goal: day.cardioGoalSeconds,
-                                           status: PlanWorkoutState.notStarted.rawValue, detail: nil, canStart: !isPastWeek,
-                                           startTitle: "Start", primaryID: "startPlanned", selected: sourceDate,
-                                           start: { requestPlanStart(.template(plan, sourceDate)) },
+                                           status: PlanWorkoutState.notStarted.rawValue, detail: nil,
+                                           primaryAction: isPastWeek ? nil : .startTemplate, selected: sourceDate,
+                                           start: { _ in requestPlanStart(.template(plan, sourceDate)) },
                                            move: isPastWeek ? nil : { target in
                                                try training.move(plan: plan, date: sourceDate, to: target)
                                                selected = target
@@ -63,25 +63,20 @@ struct PlanScreen: View {
                                            })
                     }
                     ForEach(datedWork) { entry in
-                        let state = training.planState(for: entry)
-                        let available = !isPastWeek && (state == .notStarted || state == .inProgress)
-                        let openSession = training.openSession(for: entry.id)
-                        let canChange = available && openSession == nil
-                        let hasPartialProgress = state == .inProgress && openSession == nil
-                        let startTitle = openSession != nil ? "Resume" : hasPartialProgress ? "Continue" : "Start"
+                        let card = PlanCardState(state: training.planState(for: entry),
+                                                 openSessionID: training.openSession(for: entry.id)?.id,
+                                                 isPastWeek: isPastWeek)
                         PlannedWorkoutCard(name: entry.name, day: entry.day, goal: entry.cardioGoalSeconds,
-                                           status: hasPartialProgress ? "Partial" : state.rawValue,
-                                           detail: detail(entry), credited: training.slotProgress(for: entry), canStart: available,
-                                           startTitle: startTitle, primaryID: openSession != nil ? "resumeWorkout" : "startOccurrence",
-                                           selected: selected,
-                                           start: {
-                                               if let openSession { openWorkout(openSession.id) }
+                                           status: card.status, detail: detail(entry), credited: training.slotProgress(for: entry),
+                                           primaryAction: card.action, selected: selected,
+                                           start: { action in
+                                               if case .resume(let id) = action { openWorkout(id) }
                                                else { requestPlanStart(.occurrence(entry.id)) }
                                            },
-                                           move: canChange ? { date in try training.move(entry.id, to: date); selected = date } : nil,
-                                           skip: canChange && entry.planID != nil ? { try training.skip(entry.id) } : nil,
+                                           move: card.canMoveOrSkip ? { date in try training.move(entry.id, to: date); selected = date } : nil,
+                                           skip: card.canMoveOrSkip && entry.planID != nil ? { try training.skip(entry.id) } : nil,
                                            remove: !isPastWeek && training.canRemoveAdditionalActivity(entry) ? { try training.removeAdditionalActivity(entry.id) } : nil,
-                                           review: state == .finished ? { reviewID = entry.id } : nil)
+                                           review: card.canReview ? { reviewID = entry.id } : nil)
                         let contributions = training.sessions.filter { $0.occurrenceID == entry.id && $0.finishedAt != nil }
                             .sorted { $0.startedAt < $1.startedAt }
                         if !contributions.isEmpty {
@@ -414,11 +409,9 @@ private struct PlannedWorkoutCard: View {
     let status: String
     let detail: String?
     var credited: [UUID: [Bool]] = [:]
-    let canStart: Bool
-    let startTitle: String
-    let primaryID: String
+    let primaryAction: PlanCardState.Action?
     let selected: Date
-    let start: () -> Void
+    let start: (PlanCardState.Action) -> Void
     let move: ((Date) throws -> Void)?
     let skip: (() throws -> Void)?
     var remove: (() throws -> Void)? = nil
@@ -494,11 +487,11 @@ private struct PlannedWorkoutCard: View {
                     Divider().padding(.leading, 18)
                 }
             }
-            if canStart {
-                Button(action: start) {
-                    Label(startTitle, systemImage: "play.fill").frame(maxWidth: .infinity)
+            if let primaryAction {
+                Button { start(primaryAction) } label: {
+                    Label(primaryAction.title, systemImage: "play.fill").frame(maxWidth: .infinity)
                 }.buttonStyle(.borderedProminent).controlSize(.large).padding(14)
-                    .accessibilityLabel("\(startTitle) \(name)").accessibilityIdentifier(primaryID)
+                    .accessibilityLabel("\(primaryAction.title) \(name)").accessibilityIdentifier(primaryAction.accessibilityID)
             }
             if let review {
                 Button(action: review) { Label("Review workout", systemImage: "checkmark.circle").frame(maxWidth: .infinity) }

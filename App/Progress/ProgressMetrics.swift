@@ -1,54 +1,5 @@
 import Foundation
 
-enum WeightUnits {
-    static let kilogramsPerPound = 0.45359237
-
-    static func convert(_ value: Double, from source: String, to destination: String) -> Double {
-        if source == destination { return value }
-        switch (source, destination) {
-        case ("lb", "kg"): return value * kilogramsPerPound
-        case ("kg", "lb"): return value / kilogramsPerPound
-        default: return .nan
-        }
-    }
-
-    static func equal(_ lhs: Double, _ rhs: Double) -> Bool {
-        abs(lhs - rhs) <= max(lhs.ulp, rhs.ulp) * 8
-    }
-}
-
-extension SetActual {
-    func converted(to target: String) -> SetActual {
-        guard unit != target else { return self }
-        var value = self
-        value.load = load.map { WeightUnits.convert($0, from: unit, to: target) }
-        value.rightLoad = rightLoad.map { WeightUnits.convert($0, from: unit, to: target) }
-        value.unit = target
-        return value
-    }
-}
-
-struct RecordIdentity: Hashable {
-    let variant: UUID
-    let name: String
-    let convention: String
-    let basis: LoadBasis
-    let machineProfile: UUID?
-    let side: String?
-
-    init(_ exercise: TrainingExercise, side: String? = nil) {
-        let p = exercise.prescription
-        variant = p.variantID ?? p.id
-        name = p.name
-        convention = p.convention
-        basis = exercise.basis
-        // Legacy rows have no equipment-profile ID. Within those rows the
-        // original prescription is the narrowest repeatable machine identity.
-        machineProfile = [.machine, .assisted].contains(exercise.basis) ? p.id : nil
-        self.side = side
-    }
-}
-
 struct ProgressSet: Identifiable {
     let id: UUID
     let sessionID: UUID
@@ -173,13 +124,6 @@ struct RoutineExerciseProgress: Identifiable {
     let records: [ExerciseRecords]
 }
 
-extension TrainingSession {
-    var isArchivedDraft: Bool {
-        finishedAt != nil && partial && (closedAtWeekBoundary == true || hasSavedContent) && cardio == nil &&
-            !exercises.contains { $0.sets.contains { $0.confirmedAt != nil } }
-    }
-}
-
 struct ProgressMetrics {
     let history: [TrainingSession]
     let activityDays: [ProgressActivityDay]
@@ -211,10 +155,12 @@ struct ProgressMetrics {
         sessionCount = recentSessions.count
         let cardio = recentSessions.filter(\.isCardio).compactMap(\.cardio)
         cardioCount = cardio.count
-        cardioSeconds = cardio.reduce(0) { $0 + min(Int.max - $0, max(0, $1.seconds)) }
+        cardioSeconds = WorkoutCredit.cardioSeconds(in: cardio)
 
         let linked = Dictionary(grouping: sessions.filter { $0.occurrenceID != nil }) { $0.occurrenceID! }
-        let done = Set(occurrences.filter { Self.fulfilled($0, by: linked[$0.id] ?? []) }.map(\.id))
+        let done = Set(occurrences.filter {
+            WorkoutCredit(for: $0, linkedSessions: linked[$0.id] ?? []).isFulfilled
+        }.map(\.id))
         let known = occurrences.filter { $0.scheduledDay.date <= today.date }
         knownAdherence = (known.filter { done.contains($0.id) }.count, known.count)
         var scheduled = 0
@@ -309,17 +255,6 @@ struct ProgressMetrics {
         var groups = sorted.map { RoutineProgressGroup(name: $0.key, exercises: $0.value) }
         if let exercises = muscles[other] { groups.append(RoutineProgressGroup(name: other, exercises: exercises)) }
         return groups
-    }
-
-    private static func fulfilled(_ occurrence: TrainingOccurrence, by sessions: [TrainingSession]) -> Bool {
-        guard !occurrence.skipped else { return false }
-        if let goal = occurrence.cardioGoalSeconds {
-            return goal > 0 && sessions.compactMap { $0.cardio?.seconds }.reduce(0) { $0 + min(Int.max - $0, max(0, $1)) } >= goal
-        }
-        let required = Set(occurrence.plannedSets.values.joined())
-        let credits = sessions.flatMap(\.exercises).flatMap(\.sets)
-            .filter { $0.confirmedAt != nil && $0.warmup != true }.compactMap(\.plannedID)
-        return !required.isEmpty && required.isSubset(of: Set(credits))
     }
 
     private static func suggestion(_ exercise: TrainingExercise, session: TrainingSession,
