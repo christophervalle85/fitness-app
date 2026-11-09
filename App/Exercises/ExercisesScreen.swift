@@ -1,6 +1,10 @@
 import ImageIO
 import SwiftUI
 
+extension EnvironmentValues {
+    @Entry var exerciseTabTopInset: CGFloat?
+}
+
 struct ExercisesScreen: View {
     let planner: PlanningStore
     let training: TrainingStore
@@ -294,12 +298,23 @@ private struct CatalogDetail: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.layoutDirection) private var layoutDirection
+    @Environment(\.exerciseTabTopInset) private var tabTopInset
     @State private var issue: String?
     @State private var heldCreator: Int?
     @State private var releasedHold: (index: Int, date: Date)?
     @State private var openCreator: Int?
 
     var body: some View {
+        if let tabTopInset {
+            detailPage
+                .safeAreaPadding(.top, tabTopInset)
+                .ignoresSafeArea(.container, edges: .top)
+        } else {
+            detailPage
+        }
+    }
+
+    private var detailPage: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 12) {

@@ -70,6 +70,9 @@ final class DiscoverUITests: XCTestCase {
         XCTAssertFalse(app.tabBars.buttons["Exercises"].isHittable)
         let nativeBar = app.navigationBars.firstMatch
         XCTAssertFalse(nativeBar.exists && nativeBar.isHittable)
+        let back = app.buttons["exerciseDetailBack"]
+        XCTAssertTrue(back.isHittable)
+        XCTAssertLessThan(back.frame.minY, 95)
         XCTAssertFalse(accessory.isHittable)
         let pose = app.images["catalogFrame1"]
         XCTAssertTrue(pose.waitForExistence(timeout: 5))
@@ -129,6 +132,8 @@ final class DiscoverUITests: XCTestCase {
         XCTAssertTrue(popup.waitForNonExistence(timeout: 5))
         tap(app.buttons["exerciseDetailBack"])
         XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertEqual(field.value as? String, "machine chest press")
+        XCTAssertTrue(app.buttons["catalogRow-" + original].exists)
         XCTAssertTrue(app.tabBars.buttons["Exercises"].isHittable)
         tap(accessory)
         tap(app.buttons["reviewSession"])

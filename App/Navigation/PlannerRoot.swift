@@ -71,10 +71,14 @@ struct PlannerRoot: View {
                         }
                     }
                     Tab("Exercises", systemImage: "dumbbell", value: "Exercises") {
-                        NavigationStack {
-                            ExercisesScreen(planner: store, training: training)
-                                .onAppear { exercisesRootVisible = true }
-                                .onDisappear { exercisesRootVisible = false }
+                        GeometryReader { tab in
+                            NavigationStack {
+                                ExercisesScreen(planner: store, training: training)
+                                    .onAppear { exercisesRootVisible = true }
+                                    .onDisappear { exercisesRootVisible = false }
+                            }
+                            // Search can extend the navigation stack's inset on the first detail push.
+                            .environment(\.exerciseTabTopInset, tab.safeAreaInsets.top)
                         }
                     }
                     Tab("Progress", systemImage: "chart.xyaxis.line", value: "Progress") {

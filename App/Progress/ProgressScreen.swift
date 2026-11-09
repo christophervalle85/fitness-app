@@ -489,7 +489,7 @@ struct CatalogWorkoutTrend: View {
     let unit: String
 
     @ScaledMetric(relativeTo: .caption2) private var chartHeight: CGFloat = 104
-    @ScaledMetric(relativeTo: .caption2) private var monthLabelWidth: CGFloat = 28
+    @ScaledMetric(relativeTo: .caption2) private var monthLabelWidth: CGFloat = 25
     @State private var selectedID: UUID?
 
     private struct Point: Identifiable {
@@ -519,10 +519,12 @@ struct CatalogWorkoutTrend: View {
         let calendar = Calendar(identifier: .gregorian)
         let now = Date.now
         let today = calendar.startOfDay(for: now)
-        let start = calendar.dateInterval(of: .year, for: today)?.start ?? today
-        let end = calendar.date(byAdding: .day, value: 1, to: today) ?? now
+        let year = calendar.dateInterval(of: .year, for: today)
+        let start = year?.start ?? today
+        let endOfToday = calendar.date(byAdding: .day, value: 1, to: today) ?? now
+        let yearEnd = year?.end ?? endOfToday
         let visible = points.compactMap { point -> Point? in
-            guard point.date >= start, point.date < end,
+            guard point.date >= start, point.date < endOfToday,
                   let value = trendValue(point, basis: basis, unit: unit), value.isFinite else { return nil }
             return Point(workout: point, value: value)
         }
@@ -532,8 +534,8 @@ struct CatalogWorkoutTrend: View {
             Text(axisTitle).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             GeometryReader { geometry in
                 let plotWidth = max(0, geometry.size.width - Self.scaleGutter)
-                let dates = monthTicks(from: start, through: today, calendar: calendar, width: plotWidth)
-                chart(visible, scale: scale, domain: start...end, dates: dates, calendar: calendar)
+                let dates = monthTicks(from: start, calendar: calendar, width: plotWidth)
+                chart(visible, scale: scale, domain: start...yearEnd, dates: dates, calendar: calendar)
                     .accessibilityLabel("Workout trend")
                     .accessibilityIdentifier("exerciseWorkoutTrend")
             }
@@ -566,7 +568,7 @@ struct CatalogWorkoutTrend: View {
                 .symbolSize(point.id == selectedID ? 50 : 24)
                 .accessibilityHidden(true)
         }
-        .chartXScale(domain: domain, range: .plotDimension(padding: monthLabelWidth / 2))
+        .chartXScale(domain: domain, range: .plotDimension(padding: 4))
         .chartYScale(domain: baseline...scale[3], range: .plotDimension(padding: 4))
         .chartXAxis {
             AxisMarks(values: dates) { tick in
@@ -652,8 +654,12 @@ struct CatalogWorkoutTrend: View {
         return min(max(coordinate, halfTarget), size - halfTarget)
     }
 
-    private func monthTicks(from start: Date, through today: Date, calendar: Calendar, width: CGFloat) -> [Date] {
-        let months = (0..<12).compactMap { calendar.date(byAdding: .month, value: $0, to: start) }.filter { $0 <= today }
+    private func monthTicks(from start: Date, calendar: Calendar, width: CGFloat) -> [Date] {
+        let months = (0..<12).compactMap { offset -> Date? in
+            guard let firstDay = calendar.date(byAdding: .month, value: offset, to: start),
+                  let month = calendar.dateInterval(of: .month, for: firstDay) else { return nil }
+            return month.start.addingTimeInterval(month.duration / 2)
+        }
         let count = min(months.count, max(2, Int(width / monthLabelWidth)))
         guard count > 1 else { return months }
         return (0..<count).map { months[$0 * (months.count - 1) / (count - 1)] }
