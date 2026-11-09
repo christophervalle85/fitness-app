@@ -120,14 +120,12 @@ struct WorkoutSetRow: View {
 
     private var foldingRow: some View {
         let content = rowContents
-        let curve = UnitCurve.bezier(startControlPoint: UnitPoint(x: 0.20, y: 0.74),
-                                     endControlPoint: UnitPoint(x: 0.23, y: 1))
         return TimelineView(.animation) { timeline in
-            let elapsed = foldStartedAt.map { unitProgress(timeline.date.timeIntervalSince($0) / 0.18) } ?? 0
-            let fraction = elapsed >= 1 ? 0 : 1 - curve.value(at: elapsed)
+            let elapsed = foldStartedAt.map { unitProgress(timeline.date.timeIntervalSince($0) / 0.20) } ?? 0
+            let fraction = 1 - UnitCurve.easeInOut.value(at: elapsed)
             FoldHeight(fraction: fraction) { content }
                 .clipped()
-                .opacity(fraction)
+                .opacity(fraction * fraction)
                 .onChange(of: foldStartedAt == nil, initial: true) { _, shouldStart in
                     // Reserve the existing slot before the first shrinking frame.
                     if shouldStart { foldStartedAt = timeline.date }
