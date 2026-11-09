@@ -346,7 +346,7 @@ private struct CatalogDetail: View {
                 sourceCredits.padding(.horizontal, 20)
             }
             .padding(.top, 4)
-            .padding(.bottom, 22)
+            .padding(.bottom, 8)
         }
         .scrollIndicators(.hidden)
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -560,7 +560,7 @@ private struct CatalogDetail: View {
     @ViewBuilder private var sourceCredits: some View {
         let credits = creatorCredits
         if !credits.isEmpty || safeLink(entry.source) != nil {
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(spacing: 1) {
                 if credits.isEmpty, let source = safeLink(entry.source) {
                     Link("Exercise source", destination: source)
                 }
@@ -568,7 +568,9 @@ private struct CatalogDetail: View {
                     creatorCredit(credit, index: index)
                 }
             }
-            .font(.caption)
+            .frame(maxWidth: .infinity)
+            .font(.caption2)
+            .multilineTextAlignment(.center)
             .foregroundStyle(.secondary)
             .tint(PlannerStyle.moss)
             .accessibilityElement(children: .contain)
@@ -579,7 +581,8 @@ private struct CatalogDetail: View {
     private var creatorCredits: [CreatorCredit] {
         let media = mediaCreditGroups.compactMap(\.first).map { entry.media[$0] }
         if let reference = entry.textReference, media.count == 1, let art = media.first,
-           reference.authors.joined(separator: ", ") == art.author, reference.licenseURL == art.licenseURL {
+           reference.authors.joined(separator: ", ") == art.author,
+           sameLicense(reference.license, url: reference.licenseURL, as: art.license, url: art.licenseURL) {
             return [CreatorCredit(prefix: "Instructions and illustrations by", name: art.author,
                                   license: reference.license, licenseURL: reference.licenseURL,
                                   note: reference.modifications)]
@@ -600,7 +603,7 @@ private struct CatalogDetail: View {
     }
 
     private func creatorCredit(_ credit: CreatorCredit, index: Int) -> some View {
-        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 2))
             : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 4))
         return layout {
             Text(credit.prefix).fixedSize(horizontal: false, vertical: true)
@@ -615,7 +618,7 @@ private struct CatalogDetail: View {
             } label: {
                 Text(credit.name).underline()
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(minHeight: 24, alignment: .leading)
+                    .frame(minHeight: 24)
                     .contentShape(Rectangle())
             }
             .buttonStyle(CreatorPressStyle(onPress: { pressed in
@@ -627,19 +630,19 @@ private struct CatalogDetail: View {
                 }
             }, onHold: { showCreatorPreview(index) }))
             .foregroundStyle(PlannerStyle.moss)
-            .accessibilityHint("Opens source credits")
+            .accessibilityHint("Opens source details")
             .accessibilityIdentifier(index == 0 ? "exerciseSourceCreator" : "exerciseSourceCreator-\(index)")
             .anchorPreference(key: CreatorBounds.self, value: .bounds) { $0 }
             .popover(isPresented: Binding(get: { openCreator == index }, set: { presented in
                 if !presented, openCreator == index { openCreator = nil }
             }), attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
-                creditPopover
+                creditPopover(credit)
                     .presentationCompactAdaptation(.popover)
             }
             if !typeSize.isAccessibilitySize { Text("·").accessibilityHidden(true) }
             licenseCredit(credit.license, url: credit.licenseURL)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
         .overlayPreferenceValue(CreatorBounds.self) { anchor in
             GeometryReader { geometry in
                 Color.clear.overlay(alignment: .bottomLeading) {
@@ -653,6 +656,7 @@ private struct CatalogDetail: View {
                             Text(credit.license.components(separatedBy: " · ").first ?? credit.license)
                             if !credit.note.isEmpty { Text(credit.note).font(.caption2) }
                         }
+                        .multilineTextAlignment(.leading)
                         .padding(10)
                         .frame(width: width, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -674,53 +678,100 @@ private struct CatalogDetail: View {
         withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) { heldCreator = index }
     }
 
-    private var creditPopover: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("Credits").font(.headline).accessibilityAddTraits(.isHeader)
-                    Spacer()
-                    Button("Done") { openCreator = nil }
-                }
-                sourceDetails
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
+    private func creditPopover(_ selectedCredit: CreatorCredit) -> some View {
+        let sharedLicense = creatorCredits.allSatisfy {
+            sameLicense(selectedCredit.license, url: selectedCredit.licenseURL, as: $0.license, url: $0.licenseURL)
         }
-        .scrollIndicators(.hidden)
-        .frame(idealWidth: 280, maxWidth: 300, idealHeight: 240, maxHeight: 340)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(selectedCredit.name).font(.headline).foregroundStyle(.primary)
+                        .accessibilityAddTraits(.isHeader)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if sharedLicense {
+                        licenseCredit(selectedCredit.license, url: selectedCredit.licenseURL)
+                            .foregroundStyle(PlannerStyle.moss)
+                    }
+                }
+                Spacer(minLength: 0)
+                Button {
+                    openCreator = nil
+                } label: {
+                    Image(systemName: "xmark").font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close source details")
+                .accessibilityIdentifier("closeExerciseSourcePopup")
+            }
+            ScrollView {
+                sourceDetails(headingAuthor: selectedCredit.name, sharedLicense: sharedLicense)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .font(.footnote)
+        .multilineTextAlignment(.leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .frame(idealWidth: 280, maxWidth: 300, idealHeight: 268, maxHeight: 340)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("exerciseSourcePopup")
     }
 
-    private var sourceDetails: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private func sourceDetails(headingAuthor: String, sharedLicense: Bool) -> some View {
+        let instructionURL = entry.textReference.flatMap { safeLink($0.source) }
+        return VStack(alignment: .leading, spacing: 11) {
             if let reference = entry.textReference {
-                credit(title: "Instructions", author: reference.authors.joined(separator: ", "),
-                       license: reference.license, licenseURL: reference.licenseURL,
-                       changes: reference.modifications, source: reference.source)
+                creditSection("Instructions", author: reference.authors.joined(separator: ", "), headingAuthor: headingAuthor) {
+                    if !sharedLicense { licenseCredit(reference.license, url: reference.licenseURL) }
+                    if !reference.modifications.isEmpty { Text(reference.modifications) }
+                    if let instructionURL { sourceLink("Instruction source", destination: instructionURL) }
+                }
             }
             ForEach(mediaCreditGroups, id: \.self) { group in
                 if let index = group.first {
                     let media = entry.media[index]
-                    Text("Illustrations: \(media.author)")
-                    licenseCredit(media.license, url: media.licenseURL)
-                    if !media.modifications.isEmpty { Text(media.modifications) }
-                    if media.isEverkineticLineArt { Text("Displayed as tinted line art in Weekform.") }
-                    ForEach(group, id: \.self) { index in
-                        if let source = safeLink(entry.media[index].source) {
-                            Link("Illustration \(index + 1) source", destination: source)
+                    creditSection("Illustrations", author: media.author, headingAuthor: headingAuthor) {
+                        if !sharedLicense { licenseCredit(media.license, url: media.licenseURL) }
+                        if !media.modifications.isEmpty { Text(media.modifications) }
+                        if media.isEverkineticLineArt { Text("Displayed as tinted line art in Weekform.") }
+                        ForEach(group, id: \.self) { index in
+                            if let source = safeLink(entry.media[index].source), source != instructionURL,
+                               group.first(where: { safeLink(entry.media[$0].source) == source }) == index {
+                                sourceLink("Illustration \(index + 1) source", destination: source)
+                            }
                         }
                     }
                 }
             }
-            if let source = safeLink(entry.source) { Link("Exercise source", destination: source) }
-            if !catalog.alternatives(to: entry).isEmpty {
-                Text("Credits for similar exercise illustrations appear on each exercise page.")
+            if let source = safeLink(entry.source), source != instructionURL,
+               !entry.media.contains(where: { safeLink($0.source) == source }) {
+                sourceLink("Exercise source", destination: source)
             }
         }
-        .font(.footnote)
         .foregroundStyle(.secondary)
+    }
+
+    private func creditSection<Content: View>(_ title: String, author: String, headingAuthor: String,
+                                             @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                .accessibilityAddTraits(.isHeader)
+            if author != headingAuthor { Text(author) }
+            content()
+        }
+    }
+
+    private func sourceLink(_ title: String, destination: URL) -> some View {
+        Link(destination: destination) {
+            Text(title).underline()
+                .frame(minHeight: 24, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .foregroundStyle(PlannerStyle.moss)
     }
 
     private var mediaCreditGroups: [[Int]] {
@@ -740,20 +791,17 @@ private struct CatalogDetail: View {
         return groups
     }
 
+    private func sameLicense(_ name: String, url: String?, as otherName: String, url otherURL: String?) -> Bool {
+        let link = url.flatMap(safeLink)
+        guard link == otherURL.flatMap(safeLink) else { return false }
+        return link != nil || name == otherName
+    }
+
     @ViewBuilder private func licenseCredit(_ license: String, url: String?) -> some View {
         if let url = url.flatMap(safeLink) {
             Link(license.components(separatedBy: " · ").first ?? license, destination: url)
         } else {
             Text(license)
-        }
-    }
-
-    private func credit(title: String, author: String, license: String, licenseURL: String?, changes: String, source: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("\(title): \(author)")
-            licenseCredit(license, url: licenseURL)
-            if !changes.isEmpty { Text(changes) }
-            if let url = safeLink(source) { Link("\(title) source", destination: url) }
         }
     }
 

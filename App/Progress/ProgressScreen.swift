@@ -483,7 +483,7 @@ private func trendValue(_ point: ExerciseWorkoutPoint, basis: LoadBasis, unit: S
 }
 
 struct CatalogWorkoutTrend: View {
-    private static let scaleGutter: CGFloat = 26
+    private static let scaleGutter: CGFloat = 30
     let points: [ExerciseWorkoutPoint]
     let basis: LoadBasis
     let unit: String
@@ -536,6 +536,7 @@ struct CatalogWorkoutTrend: View {
         let selected = visible.first { $0.id == selectedID }
         VStack(alignment: .leading, spacing: 5) {
             Text(axisTitle).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                .padding(.bottom, 4)
             GeometryReader { geometry in
                 let plotWidth = max(0, geometry.size.width - Self.scaleGutter)
                 chart(visible, scale: scale, yearStart: start, ticks: monthTicks(width: plotWidth), calendar: calendar)
@@ -584,6 +585,7 @@ struct CatalogWorkoutTrend: View {
                     AxisValueLabel {
                         Text(value, format: .number.precision(.fractionLength(0...2)))
                             .font(.caption2).monospacedDigit().foregroundStyle(PlannerStyle.ink.opacity(0.65))
+                            .padding(.trailing, 4)
                     }
                 }
             }
