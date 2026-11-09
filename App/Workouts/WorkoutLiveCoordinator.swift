@@ -55,7 +55,8 @@ enum WorkoutLiveCoordinator {
         return true
     }
 
-    static func snapshot(_ session: TrainingSession, revision: Int, privacy: WorkoutLivePrivacy) -> WorkoutLiveActivity.ContentState {
+    static func snapshot(_ session: TrainingSession, revision: Int, privacy: WorkoutLivePrivacy,
+                         training: TrainingStore) -> WorkoutLiveActivity.ContentState {
         let exercise = session.exercises.first { $0.id == session.currentExerciseID } ?? session.exercises.first
         var state = WorkoutLiveActivity.ContentState(revision: revision, privacyEpoch: privacy.epoch, exerciseID: exercise?.id)
         if let rest = session.rest {
@@ -80,8 +81,9 @@ enum WorkoutLiveCoordinator {
         state.finalSet = pending.count == 1
         state.willRest = !state.finalSet && exercise.restSeconds != nil
         // The user-facing setting covers every actual, including unweighted reps and seconds.
-        if state.exerciseName != nil, privacy.showLoad, (try? row.actual.validate(for: exercise.basis)) != nil {
-            state.result = resultLabel(row.actual, basis: exercise.basis, convention: exercise.prescription.convention)
+        let actual = training.suggestedActual(for: row, in: exercise) ?? row.actual
+        if state.exerciseName != nil, privacy.showLoad, (try? actual.validate(for: exercise.basis)) != nil {
+            state.result = resultLabel(actual, basis: exercise.basis, convention: exercise.prescription.convention)
         }
         if state.restPausedAt != nil { state.primary = .resume }
         else { state.primary = state.result == nil ? .edit : .confirm }
@@ -106,15 +108,15 @@ enum WorkoutLiveCoordinator {
         case .bodyweight:
             text = "\(actual.reps!) reps · bodyweight"
         default:
-            let basisLabel: String = switch basis {
-            case .assisted: "assistance"
-            case .added: "added"
-            case .barbell: "total"
-            case .dumbbell: "each"
-            case .machine: "machine"
-            default: "external"
+            let weightQualifier: String = switch basis {
+            case .assisted: " assistance"
+            case .added: " added"
+            case .barbell: " total"
+            case .dumbbell: " each"
+            case .machine: " machine"
+            default: ""
             }
-            text = "\(actual.reps!) reps · \(weight(actual.load)) \(basisLabel)"
+            text = "\(actual.reps!) reps · \(weight(actual.load))\(weightQualifier)"
         }
         // A lengthy or custom machine convention needs the full in-app editor.
         if basis == .machine && !convention.isEmpty && !["machine setting", "machine"].contains(convention.lowercased()) { return nil }
@@ -179,7 +181,7 @@ enum WorkoutLiveCoordinator {
         guard let session, let focusToken, let latest = try? openCanonical(), latest.owner == owner,
               Self.generation(latest.paths) == generation, latest.training.focusToken == focusToken,
               let focused = latest.training.active, focused.id == session.id, !latest.training.isExpired(focused) else { return }
-        let state = snapshot(focused, revision: latest.training.liveRevision, privacy: .current)
+        let state = snapshot(focused, revision: latest.training.liveRevision, privacy: .current, training: latest.training)
         let content = ActivityContent(state: state, staleDate: latest.training.expirationDate(for: focused))
         if let existing {
             // Never overwrite an externally committed intent with this foreground
@@ -273,7 +275,7 @@ enum WorkoutLiveCoordinator {
         guard let session = training.active, !training.isExpired(session),
               training.liveRevision == revision, expected.revision == revision,
               expected.privacyEpoch == epoch, privacy.epoch == epoch,
-              snapshot(session, revision: revision, privacy: privacy) == expected else { throw TrainingError("Review the updated workout.") }
+              snapshot(session, revision: revision, privacy: privacy, training: training) == expected else { throw TrainingError("Review the updated workout.") }
         guard expected.primary == action || (action == .startSet && expected.canStartSet) else {
             throw TrainingError("Open Weekform to review the result.")
         }
@@ -283,7 +285,8 @@ enum WorkoutLiveCoordinator {
                   let row = exercise.sets.first(where: { $0.id == expected.setID }), expected.result != nil else {
                 throw TrainingError("Open the set to review its values.")
             }
-            try training.confirm(sessionID: session.id, setID: row.id, actual: row.actual, revision: row.revision, commandID: commandID)
+            let actual = training.suggestedActual(for: row, in: exercise) ?? row.actual
+            try training.confirm(sessionID: session.id, setID: row.id, actual: actual, revision: row.revision, commandID: commandID)
         case .startSet:
             try training.startSet(sessionID: session.id)
         case .resume:

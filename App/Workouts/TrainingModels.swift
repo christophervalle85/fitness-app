@@ -28,14 +28,16 @@ struct SetActual: Codable, Equatable {
     func validate(for basis: LoadBasis) throws {
         guard ["lb", "kg"].contains(unit),
               [load, rightLoad].compactMap({ $0 }).allSatisfy({ $0.isFinite && $0 >= 0 })
-        else { throw TrainingError("Enter a valid load in lb or kg.") }
+        else { throw TrainingError("Enter a valid weight in lb or kg.") }
         if basis == .timed {
             guard let seconds, seconds > 0 else { throw TrainingError("Enter the seconds you held this set.") }
         } else {
             guard let reps, reps > 0 else { throw TrainingError("Enter the reps you completed.") }
-            if basis != .bodyweight && load == nil { throw TrainingError("Enter the load you used.") }
+            if basis != .bodyweight && load == nil {
+                throw TrainingError(basis == .assisted ? "Enter the assistance used." : "Enter the weight you used.")
+            }
             if basis == .unilateral && ((rightReps ?? 0) <= 0 || rightLoad == nil) {
-                throw TrainingError("Enter the reps and load for both sides.")
+                throw TrainingError("Enter the reps and weight for both sides.")
             }
         }
         if basis != .unilateral && (rightLoad != nil || rightReps != nil) {
@@ -69,6 +71,16 @@ struct TrainingExercise: Codable, Identifiable, Equatable {
 }
 
 extension TrainingExercise {
+    func suggestedActual(for set: TrainingSet) -> SetActual? {
+        guard set.revision == 0, set.confirmedAt == nil else { return nil }
+        let last = sets.filter {
+            $0.confirmedAt != nil && ($0.warmup == true) == (set.warmup == true)
+        }.max { ($0.confirmedAt ?? .distantPast) < ($1.confirmedAt ?? .distantPast) }
+        guard let actual = last?.actual.converted(to: set.actual.unit),
+              (try? actual.validate(for: basis)) != nil else { return nil }
+        return actual
+    }
+
     func matchesPlannedItem(_ target: PlanExercise) -> Bool {
         guard basis == LoadBasis(target) else { return false }
         if let variant = prescription.variantID, let targetVariant = target.variantID {

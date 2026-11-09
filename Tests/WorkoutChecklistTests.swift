@@ -13,7 +13,7 @@ struct WorkoutChecklistTests {
         let rowSlot = UUID()
         let plan = TrainingOccurrence(name: "Upper", sourceDay: civil, scheduledDay: civil, day: day,
                                       plannedSets: [curl.id: slots, row.id: [rowSlot]])
-        let first = TrainingSet(plannedID: slots[0], ordinal: 1, actual: SetActual(reps: 10, load: 15), confirmedAt: date)
+        let first = TrainingSet(plannedID: slots[0], ordinal: 4, actual: SetActual(reps: 10, load: 15), confirmedAt: date)
         let extra = TrainingSet(ordinal: 4, optional: true, actual: SetActual(reps: 7, load: 10), confirmedAt: date)
         let logged = TrainingExercise(prescription: curl, basis: .external, sets: [first, extra])
         let replacement = PlanExercise(name: "Cable curl", sets: 1)
@@ -31,14 +31,22 @@ struct WorkoutChecklistTests {
         #expect(list.completed == 2)
         let original = try #require(list.groups.first { $0.id == live.id })
         #expect(original.rows.map(\.ordinal) == [1, 3])
-        guard case .earlier(let saved, _, _) = original.rows[0] else { Issue.record("Expected earlier confirmed result"); return }
-        #expect(saved == first)
+        guard case .earlier(let saved) = original.rows[0] else { Issue.record("Expected earlier confirmed result"); return }
+        #expect(saved.set == first)
+        #expect(saved.sessionID == before.id)
+        #expect(saved.exercise == logged)
+        #expect(saved.ordinal == 1)
+        #expect(saved.performedAt == date)
         guard case .live(let remaining, let index) = original.rows[1] else { Issue.record("Expected current row"); return }
         #expect(remaining.id == pending.id)
         #expect(index == 0)
         let replaced = try #require(list.groups.first { $0.prescription.name == replacement.name })
         #expect(replaced.liveExercise == nil)
         #expect(replaced.rows.map(\.id) == [swapCredit.id])
+        guard case .earlier(let savedSwap) = replaced.rows[0] else { Issue.record("Expected earlier replacement result"); return }
+        #expect(savedSwap.sessionID == before.id)
+        #expect(savedSwap.exercise == swapped)
+        #expect(savedSwap.ordinal == 2)
         let missing = try #require(list.groups.first { $0.prescription.id == row.id })
         guard case .remaining(let slot, let ordinal) = missing.rows[0] else { Issue.record("Expected remaining planned slot"); return }
         #expect(slot == rowSlot && ordinal == 1)

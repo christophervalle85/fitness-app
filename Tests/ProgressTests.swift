@@ -117,6 +117,31 @@ struct ProgressTests {
         #expect(result.cardioSeconds == 240)
     }
 
+    @Test func cardioCreditSaturatesWhilePlanKeepsAnOpenWorkoutInProgress() throws {
+        let path = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: path) }
+        let store = TrainingStore(directory: path, now: { monday })
+        try store.load(profileID: UUID())
+        try store.scheduleCardio(name: "Walk", date: monday, goalSeconds: Int.max)
+        let occurrence = try #require(store.occurrences.first)
+        let first = try store.startOccurrence(occurrence.id)
+        try store.recordCardio(sessionID: first, result: CardioResult(seconds: Int.max - 10))
+        try store.finish(sessionID: first, partial: true)
+        let second = try store.startOccurrence(occurrence.id)
+        try store.recordCardio(sessionID: second, result: CardioResult(seconds: 20))
+
+        #expect(store.progress(for: occurrence).completed == Int.max)
+        #expect(store.planState(for: occurrence) == .inProgress)
+        let during = ProgressMetrics(sessions: store.sessions, occurrences: store.occurrences, asOf: monday)
+        #expect(during.adherence.fulfilled == 1)
+        #expect(during.cardioSeconds == Int.max - 10)
+
+        try store.finish(sessionID: second, partial: false)
+        let after = ProgressMetrics(sessions: store.sessions, occurrences: store.occurrences, asOf: monday)
+        #expect(store.planState(for: occurrence) == .finished)
+        #expect(after.cardioSeconds == Int.max)
+    }
+
     @Test func activityUsesSevenCivilDaysAndKeepsOlderSessionsInHistory() throws {
         let calendar = Calendar.current
         let today = try #require(calendar.date(byAdding: .day, value: 8, to: monday))
@@ -280,13 +305,16 @@ struct ProgressTests {
         try store.startExtra(name: "Metric day")
         let nextID = try #require(store.active?.id)
         var metric = easier
+        metric.low = 6
         metric.loadUnit = "kg"
         try store.add(sessionID: nextID, prescription: metric, basis: .external)
-        let suggested = try #require(store.active?.exercises.first?.sets.first)
-        #expect(suggested.actual.reps == 6)
-        #expect(suggested.actual.unit == "kg")
-        #expect(suggested.actual.load == WeightUnits.convert(100, from: "lb", to: "kg"))
-        #expect(suggested.confirmedAt == nil)
+        let exercise = try #require(store.active?.exercises.first)
+        let row = try #require(exercise.sets.first)
+        let suggested = try #require(store.suggestedActual(for: row, in: exercise))
+        #expect(suggested.reps == 6)
+        #expect(suggested.unit == "kg")
+        #expect(suggested.load == WeightUnits.convert(100, from: "lb", to: "kg"))
+        #expect(row.confirmedAt == nil)
     }
 
     @Test func assistedTimedAndBodyweightRetainHistoryWithoutLoadProgression() {

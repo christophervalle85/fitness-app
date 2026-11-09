@@ -169,27 +169,26 @@ final class TrainingStore {
     func isOriginal(_ occurrence: TrainingOccurrence, on date: Date) -> Bool { occurrence.sourceDay == CivilTrainingDay(date) }
     func isPerformed(_ session: TrainingSession, on date: Date) -> Bool { session.performedDay == CivilTrainingDay(date) }
 
+    private func credit(for occurrence: TrainingOccurrence) -> WorkoutCredit {
+        WorkoutCredit(for: occurrence, linkedSessions: sessions.filter { $0.occurrenceID == occurrence.id })
+    }
+
     func progress(for occurrence: TrainingOccurrence) -> (completed: Int, total: Int) {
-        let linked = sessions.filter { $0.occurrenceID == occurrence.id }
-        if let goal = occurrence.cardioGoalSeconds {
-            let seconds = linked.compactMap { $0.cardio?.seconds }.reduce(0) { $0 + min($1, Int.max - $0) }
-            return (min(seconds, goal), goal)
-        }
-        let ids = Set(occurrence.plannedSets.values.joined())
-        return (ids.intersection(creditedIDs(in: linked)).count, ids.count)
+        let progress = credit(for: occurrence)
+        return (progress.completed, progress.total)
     }
 
     func remainingSetIDs(for occurrence: TrainingOccurrence) -> Set<UUID> {
-        let credited = creditedIDs(in: sessions.filter { $0.occurrenceID == occurrence.id })
-        return Set(occurrence.plannedSets.values.joined()).subtracting(credited)
+        let credited = WorkoutCredit.creditedSetIDs(in: sessions.filter { $0.occurrenceID == occurrence.id })
+        return WorkoutCredit.plannedSetIDs(for: occurrence).subtracting(credited)
     }
 
     func status(for occurrence: TrainingOccurrence) -> String {
         if occurrence.skipped { return "Skipped" }
-        let (completed, total) = progress(for: occurrence)
-        guard total > 0, completed == total else { return completed > 0 ? "Partial" : "Scheduled" }
+        let progress = credit(for: occurrence)
+        guard progress.isFulfilled else { return progress.completed > 0 ? "Partial" : "Scheduled" }
         let contributors = sessions.filter {
-            $0.occurrenceID == occurrence.id && ($0.cardio != nil || !creditedIDs(in: [$0]).isEmpty)
+            $0.occurrenceID == occurrence.id && ($0.cardio != nil || !WorkoutCredit.creditedSetIDs(in: [$0]).isEmpty)
         }
         return contributors.allSatisfy { $0.performedDay.date < occurrence.date } ? "Done early" : "Done"
     }
@@ -197,18 +196,14 @@ final class TrainingStore {
     func planState(for occurrence: TrainingOccurrence) -> PlanWorkoutState {
         if occurrence.skipped { return .skipped }
         if openSession(for: occurrence.id) != nil { return .inProgress }
-        let (completed, total) = progress(for: occurrence)
-        if total > 0 && completed == total { return .finished }
-        return completed > 0 ? .inProgress : .notStarted
+        let progress = credit(for: occurrence)
+        if progress.isFulfilled { return .finished }
+        return progress.completed > 0 ? .inProgress : .notStarted
     }
 
     func slotProgress(for occurrence: TrainingOccurrence) -> [UUID: [Bool]] {
-        let credits = creditedIDs(in: sessions.filter { $0.occurrenceID == occurrence.id })
+        let credits = WorkoutCredit.creditedSetIDs(in: sessions.filter { $0.occurrenceID == occurrence.id })
         return occurrence.plannedSets.mapValues { $0.map(credits.contains) }
-    }
-
-    private func creditedIDs(in sessions: [TrainingSession]) -> Set<UUID> {
-        Set(sessions.flatMap(\.exercises).flatMap(\.sets).filter { $0.confirmedAt != nil && $0.warmup != true }.compactMap(\.plannedID))
     }
 
     private func planned(_ plan: WeekPlan, _ date: Date) throws -> TrainingOccurrence {
@@ -289,7 +284,7 @@ final class TrainingStore {
             guard exercise.matchesPlannedItem(target) else {
                 throw TrainingError("Choose a matching exercise and result type.")
             }
-            guard set.plannedID == nil, !creditedIDs(in: sessions.filter { $0.occurrenceID == occurrence.id }).contains(plannedSetID) else {
+            guard set.plannedID == nil, !WorkoutCredit.creditedSetIDs(in: sessions.filter { $0.occurrenceID == occurrence.id }).contains(plannedSetID) else {
                 throw TrainingError("This result or planned set already has a credit.")
             }
             session.exercises[i].sets[j].plannedID = plannedSetID
@@ -324,7 +319,7 @@ final class TrainingStore {
         var session = TrainingSession(name: occurrence.name, startedAt: instant, performedDay: CivilTrainingDay(instant),
                                       occurrenceID: occurrence.id, isCardio: occurrence.cardioGoalSeconds != nil,
                                       workoutDetailsChanged: false)
-        let credited = creditedIDs(in: sessions.filter { $0.occurrenceID == occurrence.id })
+        let credited = WorkoutCredit.creditedSetIDs(in: sessions.filter { $0.occurrenceID == occurrence.id })
         for prescription in occurrence.day?.exercises ?? [] {
             let original = occurrence.plannedSets[prescription.id] ?? []
             let pending = original.filter { !credited.contains($0) }
@@ -456,13 +451,57 @@ final class TrainingStore {
         occurrences.removeAll { $0.id == id }
     }
 
+    func suggestedActual(for set: TrainingSet, in exercise: TrainingExercise) -> SetActual? {
+        guard set.revision == 0, set.confirmedAt == nil else { return nil }
+        if let carried = exercise.suggestedActual(for: set) { return carried }
+
+        let reps = exercise.prescription.low
+        guard set.warmup != true, exercise.basis != .timed, reps > 0 else { return nil }
+        let unit = set.actual.unit
+        if exercise.basis == .bodyweight { return SetActual(reps: reps, unit: unit) }
+
+        let starting = SetActual(load: exercise.prescription.startingLoad, unit: exercise.prescription.loadUnit)
+        let fallback = usableLoad(starting.converted(to: unit).load)
+        // More assistance makes an exercise easier, so a historical maximum is not a load target.
+        if exercise.basis == .assisted { return SetActual(reps: reps, load: fallback, unit: unit) }
+
+        let (load, rightLoad) = heaviestLoads(for: RecordIdentity(exercise), reps: reps, unit: unit)
+        if exercise.basis == .unilateral {
+            return SetActual(reps: reps, load: load ?? fallback, rightReps: reps, rightLoad: rightLoad ?? fallback, unit: unit)
+        }
+        return SetActual(reps: reps, load: load ?? fallback, unit: unit)
+    }
+
+    private func heaviestLoads(for identity: RecordIdentity, reps: Int, unit: String) -> (Double?, Double?) {
+        var left: Double?
+        var right: Double?
+        let rows = sessions.lazy.flatMap(\.exercises).filter { RecordIdentity($0) == identity }.flatMap(\.sets)
+        for row in rows where row.confirmedAt != nil && row.warmup != true {
+            let matchesLeft = row.actual.reps == reps
+            let matchesRight = identity.basis == .unilateral && row.actual.rightReps == reps
+            guard matchesLeft || matchesRight, (try? row.actual.validate(for: identity.basis)) != nil else { continue }
+
+            let converted = row.actual.converted(to: unit)
+            if matchesLeft, let load = usableLoad(converted.load) { left = max(left ?? load, load) }
+            if matchesRight, let load = usableLoad(converted.rightLoad) { right = max(right ?? load, load) }
+        }
+        return (left, right)
+    }
+
+    private func usableLoad(_ load: Double?) -> Double? {
+        guard let load, load.isFinite, load >= 0 else { return nil }
+        return load
+    }
+
     private func makeExercise(_ prescription: PlanExercise, basis: LoadBasis, slots: [UUID?], rest: Int?, ordinals: [Int]? = nil) -> TrainingExercise {
         let target = TrainingExercise(prescription: prescription, basis: basis, sets: [], restSeconds: rest)
         let identity = RecordIdentity(target)
-        let match = sessions.flatMap(\.exercises).filter { RecordIdentity($0) == identity }
-            .flatMap(\.sets).filter { $0.confirmedAt != nil && $0.warmup != true }
-        let latest = match.max { ($0.confirmedAt ?? .distantPast) < ($1.confirmedAt ?? .distantPast) }
-        let starting = SetActual(load: basis == .bodyweight ? nil : prescription.startingLoad, unit: prescription.loadUnit)
+        // Timed exercises keep their existing last-result defaults. Rep defaults are computed on read.
+        let latest: TrainingSet? = basis == .timed ? sessions.lazy.flatMap(\.exercises)
+            .filter { RecordIdentity($0) == identity }.flatMap(\.sets)
+            .filter { $0.confirmedAt != nil && $0.warmup != true }
+            .max { ($0.confirmedAt ?? .distantPast) < ($1.confirmedAt ?? .distantPast) } : nil
+        let starting = SetActual(load: basis == .timed ? prescription.startingLoad : nil, unit: prescription.loadUnit)
         let sets = slots.enumerated().map { index, slot in
             TrainingSet(plannedID: slot, ordinal: ordinals?[index] ?? index + 1,
                         actual: latest?.actual.converted(to: prescription.loadUnit) ?? starting, previousAt: latest?.confirmedAt)
@@ -503,14 +542,15 @@ final class TrainingStore {
         throw TrainingError("This set is no longer available.")
     }
 
-    func edit(sessionID: UUID, setID: UUID, actual: SetActual, revision: Int) throws {
+    func edit(sessionID: UUID, setID: UUID, actual: SetActual, revision: Int,
+              markUnchangedDraft: Bool = false) throws {
         try withSession(sessionID, allowFinished: true) { session in
             let (i, j) = try location(setID, session)
             let set = session.exercises[i].sets[j]
             guard set.revision == revision else { throw TrainingError("Review the latest set values.") }
             if set.confirmedAt != nil { try actual.validate(for: session.exercises[i].basis) }
             else if session.finishedAt != nil { throw TrainingError("This workout has finished.") }
-            guard actual != set.actual else { return }
+            guard actual != set.actual || (markUnchangedDraft && set.confirmedAt == nil) else { return }
             session.exercises[i].sets[j].actual = actual
             session.exercises[i].sets[j].previousAt = nil
             session.exercises[i].sets[j].revision = try increment(session.exercises[i].sets[j].revision)
@@ -577,7 +617,7 @@ final class TrainingStore {
             let set = exercise.sets[j]
             guard set.revision == revision, set.confirmedAt == nil else { throw TrainingError("Review the latest set values.") }
             try actual.validate(for: exercise.basis)
-            if let planned = set.plannedID, creditedIDs(in: sessions.filter { $0.occurrenceID == session.occurrenceID }).contains(planned) {
+            if let planned = set.plannedID, WorkoutCredit.creditedSetIDs(in: sessions.filter { $0.occurrenceID == session.occurrenceID }).contains(planned) {
                 throw TrainingError("This planned set has already been credited.")
             }
             let instant = now()
@@ -648,9 +688,10 @@ final class TrainingStore {
         try withSession(sessionID) { session in
             guard let i = session.exercises.firstIndex(where: { $0.id == exerciseID }) else { throw TrainingError("Choose an exercise.") }
             let exercise = session.exercises[i]
-            var set = TrainingSet(ordinal: try increment(exercise.sets.compactMap(\.ordinal).max() ?? 0),
+            let lastOrdinal = exercise.sets.enumerated().map { $0.element.ordinal ?? ($0.offset + 1) }.max() ?? 0
+            var set = TrainingSet(ordinal: try increment(lastOrdinal),
                                   warmup: warmup, optional: true, actual: SetActual(unit: exercise.prescription.loadUnit))
-            if !warmup {
+            if !warmup && exercise.basis == .timed {
                 let suggested = makeExercise(exercise.prescription, basis: exercise.basis, slots: [nil], rest: exercise.restSeconds)
                 if let first = suggested.sets.first {
                     set.actual = first.actual
@@ -661,20 +702,47 @@ final class TrainingStore {
         }
     }
 
-    func substitute(sessionID: UUID, exerciseID: UUID, prescription: PlanExercise, basis: LoadBasis) throws {
+    func removeAddedSet(sessionID: UUID, setID: UUID, revision: Int) throws {
+        try withSession(sessionID) { session in
+            let (i, j) = try location(setID, session)
+            let row = session.exercises[i].sets[j]
+            guard row.revision == revision else { throw TrainingError("Review the latest set before removing it.") }
+            guard row.optional == true, row.plannedID == nil, row.confirmedAt == nil else {
+                throw TrainingError("Only unlogged sets you added can be removed.")
+            }
+            session.exercises[i].sets.remove(at: j)
+            clearTimerReferences(to: [setID], in: &session)
+        }
+    }
+
+    private func clearTimerReferences(to removedSets: Set<UUID>, in session: inout TrainingSession) {
+        if let rest = session.rest, removedSets.contains(rest.sourceSetID) { session.rest = nil }
+        if let undo = session.timerUndo, removedSets.contains(undo.setID) {
+            session.timerUndo = nil
+        } else if let previous = session.timerUndo?.previous, removedSets.contains(previous.sourceSetID) {
+            session.timerUndo?.previous = nil
+        }
+    }
+
+    @discardableResult
+    func substitute(sessionID: UUID, exerciseID: UUID, prescription: PlanExercise, basis: LoadBasis) throws -> UUID {
         try validate(prescription)
         guard (basis == .timed) == prescription.timed else { throw TrainingError("Choose a target that matches the recording method.") }
+        let replacementID = UUID()
         try withSession(sessionID) { session in
             guard let i = session.exercises.firstIndex(where: { $0.id == exerciseID }) else { throw TrainingError("Choose the exercise to replace.") }
             let old = session.exercises[i]
-            let remaining = old.sets.filter { $0.confirmedAt == nil }
+            let wasCurrent = (session.currentExerciseID ?? session.exercises.first?.id) == old.id
+            let remaining = old.sets.enumerated().filter { $0.element.confirmedAt == nil }
             guard !remaining.isEmpty else { throw TrainingError("All sets for this exercise are confirmed.") }
-            var replacement = makeExercise(prescription, basis: basis, slots: remaining.map(\.plannedID), rest: old.restSeconds,
-                                           ordinals: remaining.enumerated().map { $0.element.ordinal ?? $0.offset + 1 })
-            for j in remaining.indices {
-                replacement.sets[j].warmup = remaining[j].warmup
-                replacement.sets[j].optional = remaining[j].optional
-                if remaining[j].warmup == true {
+            var replacement = makeExercise(prescription, basis: basis, slots: remaining.map { $0.element.plannedID },
+                                           rest: old.restSeconds, ordinals: remaining.map { $0.element.ordinal ?? ($0.offset + 1) })
+            replacement.id = replacementID
+            for (j, item) in remaining.enumerated() {
+                let row = item.element
+                replacement.sets[j].warmup = row.warmup
+                replacement.sets[j].optional = row.optional
+                if row.warmup == true {
                     replacement.sets[j].actual = SetActual(unit: prescription.loadUnit)
                     replacement.sets[j].previousAt = nil
                 }
@@ -682,12 +750,22 @@ final class TrainingStore {
             replacement.replacedPrescription = old.replacedPrescription ?? old.prescription
             replacement.prescription.sets = remaining.count
             session.exercises[i].sets.removeAll { $0.confirmedAt == nil }
-            if session.exercises[i].sets.isEmpty { session.exercises[i] = replacement }
+            let replacesOriginal = session.exercises[i].sets.isEmpty
+            if replacesOriginal { session.exercises[i] = replacement }
             else { session.exercises.insert(replacement, at: i + 1) }
-            session.currentExerciseID = replacement.id
-            session.rest = nil
-            session.timerUndo = nil
+            if wasCurrent {
+                session.currentExerciseID = replacementID
+                session.rest = nil
+                session.timerUndo = nil
+            } else {
+                clearTimerReferences(to: Set(remaining.map { $0.element.id }), in: &session)
+                if replacesOriginal, let undo = session.timerUndo, undo.previousExerciseID == old.id {
+                    session.timerUndo = TrainingTimerUndo(setID: undo.setID, previous: undo.previous,
+                                                          previousExerciseID: replacementID, measurementID: undo.measurementID)
+                }
+            }
         }
+        return replacementID
     }
 
     func setBasis(sessionID: UUID, exerciseID: UUID, basis: LoadBasis) throws {

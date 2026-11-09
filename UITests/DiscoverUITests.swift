@@ -83,13 +83,13 @@ final class DiscoverUITests: XCTestCase {
         tap(app.buttons["startPlanned"])
         let reps = app.textFields["actualReps0"]
         let load = app.textFields["actualLoad0"]
-        tap(reps)
-        reps.typeText("10")
+        XCTAssertTrue(reps.waitForExistence(timeout: 5))
+        XCTAssertEqual(reps.value as? String, "10")
         tap(load)
         load.typeText("25")
         if app.buttons["dismissSetKeyboard"].isHittable { tap(app.buttons["dismissSetKeyboard"]) }
         tap(app.buttons["confirmSet0"])
-        XCTAssertTrue(app.buttons["undoSet0"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["editSet0"].waitForExistence(timeout: 5))
         let swap = app.buttons["swapExercise"]
         for _ in 0..<8 where !swap.isHittable { app.swipeUp() }
         tap(swap)
@@ -100,14 +100,18 @@ final class DiscoverUITests: XCTestCase {
         tap(app.buttons["useCatalogExercise"])
         tap(app.buttons["customSave"])
 
-        let exerciseMenu = app.buttons["jumpExercise"]
-        for _ in 0..<5 where !exerciseMenu.isHittable { app.swipeDown() }
-        XCTAssertTrue(exerciseMenu.waitForExistence(timeout: 5))
-        XCTAssertTrue(exerciseMenu.label.contains(replacement))
+        XCTAssertTrue(app.buttons[replacement].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["jumpExercise"].exists)
         XCTAssertFalse(app.buttons["undoSet0"].exists)
-        tap(exerciseMenu)
-        tap(app.buttons["Squat"])
-        XCTAssertTrue(app.buttons["undoSet0"].waitForExistence(timeout: 5))
+        let squatGroup = app.buttons["Squat"]
+        for _ in 0..<5 where !squatGroup.isHittable { app.swipeDown() }
+        XCTAssertTrue(squatGroup.waitForExistence(timeout: 5))
+        if (squatGroup.value as? String)?.hasSuffix("collapsed") == true { tap(squatGroup) }
+        tap(app.buttons["editSet0"])
+        XCTAssertTrue(app.buttons["saveSet0"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["undoSet0"].exists)
+        XCTAssertFalse(app.buttons["Cancel"].exists)
+        tap(app.buttons["editSet0"])
         // End this run's Live Activity so SpringBoard can present the next workout.
         tap(app.buttons["reviewSession"])
         tap(app.buttons["finishPartial"])

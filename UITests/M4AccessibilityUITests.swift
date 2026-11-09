@@ -67,14 +67,14 @@ final class M4AccessibilityUITests: XCTestCase {
         tap(app.buttons["90 seconds"])
         let reps = app.textFields["actualReps0"]
         for _ in 0..<6 where !reps.isHittable { app.swipeDown() }
-        tap(reps)
-        reps.typeText("10")
+        XCTAssertTrue(reps.isHittable)
+        XCTAssertEqual(reps.value as? String, "10")
         let load = app.textFields["actualLoad0"]
         tap(load)
         load.typeText("25")
         if app.buttons["dismissSetKeyboard"].isHittable { tap(app.buttons["dismissSetKeyboard"]) }
         tap(app.buttons["confirmSet0"])
-        XCTAssertTrue(app.buttons["undoSet0"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["editSet0"].waitForExistence(timeout: 5))
 
         XCUIDevice.shared.press(.home)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
