@@ -835,7 +835,7 @@ private struct CatalogWorkoutHistory: View {
                 plot.accessibilityIdentifier("exerciseWorkoutTrend")
             } else {
                 VStack(spacing: 8) {
-                    ExerciseTrendPlot.empty
+                    ExerciseTrendPlot.empty(basis: LoadBasis(entry.prescription), unit: unit)
                     Text(latest == nil ? "No sets recorded yet." : "No comparable working sets yet.")
                         .font(.caption).foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

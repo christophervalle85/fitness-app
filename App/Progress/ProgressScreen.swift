@@ -435,18 +435,47 @@ struct ExerciseTrendPlot: View {
     let record: ExerciseRecords
     let unit: String
 
-    static var empty: some View {
-        Chart {}
-            .chartXScale(domain: 0.0...1.0)
-            .chartYScale(domain: 0.0...1.0)
-            .chartXAxis {
-                AxisMarks(values: [0.0]) { _ in AxisGridLine() }
+    static func empty(basis: LoadBasis, unit: String) -> some View {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let dates = [-28, -14, 0].compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
+        let axisTitle = switch basis {
+        case .timed: "Time (seconds)"
+        case .bodyweight: "Reps"
+        case .assisted: "Assistance (\(unit))"
+        default: "Weight (\(unit))"
+        }
+
+        return VStack(spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(axisTitle).fontWeight(.semibold)
+                Spacer(minLength: 8)
+                Text("Last 4 weeks")
             }
-            .chartYAxis {
-                AxisMarks(position: .leading, values: [0.0, 1.0 / 3, 2.0 / 3, 1.0]) { _ in AxisGridLine() }
-            }
-            .frame(height: height)
-            .accessibilityHidden(true)
+            chart(points: [], basis: basis, unit: unit, measure: axisTitle)
+                .chartXScale(domain: (dates.first ?? today)...today)
+                .chartYScale(domain: 0...3)
+                .chartXAxis {
+                    AxisMarks(values: dates) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        if let date = value.as(Date.self) {
+                            let anchor: UnitPoint = value.index == 0 ? .topLeading : value.index == dates.count - 1 ? .topTrailing : .top
+                            AxisValueLabel(anchor: anchor) {
+                                Text(date, format: .dateTime.month(.abbreviated).day())
+                            }
+                        }
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(position: .leading, values: [0, 1, 2, 3]) { _ in AxisGridLine() }
+                }
+                .frame(height: height)
+                .accessibilityHidden(true)
+            Text("Workout date")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 
     var measure: String {
@@ -457,17 +486,15 @@ struct ExerciseTrendPlot: View {
         default: "Heaviest working set · \(unit)"
         }
     }
-    private func value(_ point: ExerciseWorkoutPoint) -> Double? {
-        switch record.basis {
-        case .timed: point.result.seconds.map(Double.init)
-        case .bodyweight: point.result.reps.map(Double.init)
-        default: point.result.kg.map { WeightUnits.convert($0, from: "kg", to: unit) }
-        }
-    }
-    var body: some View {
-        let points = record.workoutPoints
+
+    private static func chart(points: [ExerciseWorkoutPoint], basis: LoadBasis, unit: String, measure: String) -> some View {
         Chart(points) { point in
-            if let y = value(point), y.isFinite {
+            let value = switch basis {
+            case .timed: point.result.seconds.map(Double.init)
+            case .bodyweight: point.result.reps.map(Double.init)
+            default: point.result.kg.map { WeightUnits.convert($0, from: "kg", to: unit) }
+            }
+            if let y = value, y.isFinite {
                 if points.count > 1 {
                     LineMark(x: .value("Workout", point.date), y: .value(measure, y))
                         .accessibilityHidden(true)
@@ -478,14 +505,19 @@ struct ExerciseTrendPlot: View {
             }
         }
         .foregroundStyle(PlannerStyle.moss)
-        .chartXAxis {
-            if points.count > 1 { AxisMarks(values: .automatic(desiredCount: 3)) }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 3))
-        }
-        .chartXScale(range: .plotDimension(padding: 5))
-        .frame(height: Self.height)
+    }
+
+    var body: some View {
+        let points = record.workoutPoints
+        Self.chart(points: points, basis: record.basis, unit: unit, measure: measure)
+            .chartXAxis {
+                if points.count > 1 { AxisMarks(values: .automatic(desiredCount: 3)) }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading, values: .automatic(desiredCount: 3))
+            }
+            .chartXScale(range: .plotDimension(padding: 5))
+            .frame(height: Self.height)
     }
 }
 

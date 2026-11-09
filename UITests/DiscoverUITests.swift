@@ -84,6 +84,9 @@ final class DiscoverUITests: XCTestCase {
         XCTAssertTrue((history.label + String(describing: history.value)).contains("N/A"))
         let lastLogged = app.descendants(matching: .any)["exerciseHistoryLastLogged"].firstMatch
         XCTAssertTrue((lastLogged.label + String(describing: lastLogged.value)).contains("N/A"))
+        XCTAssertTrue(app.staticTexts["Weight (lb)"].exists)
+        XCTAssertTrue(app.staticTexts["Last 4 weeks"].exists)
+        XCTAssertTrue(app.staticTexts["Workout date"].exists)
         screenshot("Exercise history without logged sets", in: app)
 
         let cards = app.scrollViews["similarExerciseCards"].firstMatch
