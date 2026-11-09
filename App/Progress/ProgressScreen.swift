@@ -483,18 +483,20 @@ private func trendValue(_ point: ExerciseWorkoutPoint, basis: LoadBasis, unit: S
 }
 
 struct CatalogWorkoutTrend: View {
-    private static let scaleGutter: CGFloat = 26
+    private static let scaleGutter: CGFloat = 30
     let points: [ExerciseWorkoutPoint]
     let basis: LoadBasis
     let unit: String
 
     @ScaledMetric(relativeTo: .caption2) private var chartHeight: CGFloat = 104
-    @ScaledMetric(relativeTo: .caption2) private var monthLabelWidth: CGFloat = 28
+    @ScaledMetric(relativeTo: .caption2) private var monthLabelWidth: CGFloat = 25
+    @ScaledMetric(relativeTo: .caption2) private var monthLabelHeight: CGFloat = 20
     @State private var selectedID: UUID?
 
     private struct Point: Identifiable {
         let workout: ExerciseWorkoutPoint
         let value: Double
+        let monthPosition: Double
         var id: UUID { workout.id }
         var date: Date { workout.date }
     }
@@ -520,20 +522,26 @@ struct CatalogWorkoutTrend: View {
         let now = Date.now
         let today = calendar.startOfDay(for: now)
         let start = calendar.dateInterval(of: .year, for: today)?.start ?? today
-        let end = calendar.date(byAdding: .day, value: 1, to: today) ?? now
+        let endOfToday = calendar.date(byAdding: .day, value: 1, to: today) ?? now
         let visible = points.compactMap { point -> Point? in
-            guard point.date >= start, point.date < end,
-                  let value = trendValue(point, basis: basis, unit: unit), value.isFinite else { return nil }
-            return Point(workout: point, value: value)
+            guard point.date >= start, point.date < endOfToday,
+                  let value = trendValue(point, basis: basis, unit: unit), value.isFinite,
+                  let month = calendar.dateInterval(of: .month, for: point.date) else { return nil }
+            // Every month gets the same width, with each workout placed within its own month.
+            let index = calendar.component(.month, from: point.date) - 1
+            let fraction = point.date.timeIntervalSince(month.start) / month.duration
+            return Point(workout: point, value: value, monthPosition: Double(index) + fraction)
         }
         let scale = scaleValues(for: visible)
         let selected = visible.first { $0.id == selectedID }
         VStack(alignment: .leading, spacing: 5) {
             Text(axisTitle).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                .padding(.bottom, 4)
             GeometryReader { geometry in
                 let plotWidth = max(0, geometry.size.width - Self.scaleGutter)
-                let dates = monthTicks(from: start, through: today, calendar: calendar, width: plotWidth)
-                chart(visible, scale: scale, domain: start...end, dates: dates, calendar: calendar)
+                chart(visible, scale: scale, yearStart: start, ticks: monthTicks(width: plotWidth), calendar: calendar)
+                    .frame(height: chartHeight - monthLabelHeight)
+                    .padding(.bottom, monthLabelHeight)
                     .accessibilityLabel("Workout trend")
                     .accessibilityIdentifier("exerciseWorkoutTrend")
             }
@@ -547,36 +555,28 @@ struct CatalogWorkoutTrend: View {
         }
     }
 
-    private func chart(_ points: [Point], scale: [Double], domain: ClosedRange<Date>,
-                       dates: [Date], calendar: Calendar) -> some View {
+    private func chart(_ points: [Point], scale: [Double], yearStart: Date,
+                       ticks: [Double], calendar: Calendar) -> some View {
         let baseline = scale[0]
         let monthFormat = Date.FormatStyle(calendar: calendar, timeZone: calendar.timeZone).month(.abbreviated)
         return Chart(points) { point in
             if points.count > 1 {
-                AreaMark(x: .value("Date", point.date), yStart: .value("Baseline", baseline), yEnd: .value(axisTitle, point.value))
+                AreaMark(x: .value("Month position", point.monthPosition), yStart: .value("Baseline", baseline), yEnd: .value(axisTitle, point.value))
                     .foregroundStyle(PlannerStyle.moss.opacity(0.12))
                     .accessibilityHidden(true)
-                LineMark(x: .value("Date", point.date), y: .value(axisTitle, point.value))
+                LineMark(x: .value("Month position", point.monthPosition), y: .value(axisTitle, point.value))
                     .foregroundStyle(PlannerStyle.moss)
                     .lineStyle(StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
                     .accessibilityHidden(true)
             }
-            PointMark(x: .value("Date", point.date), y: .value(axisTitle, point.value))
+            PointMark(x: .value("Month position", point.monthPosition), y: .value(axisTitle, point.value))
                 .foregroundStyle(point.id == selectedID ? PlannerStyle.ochre : PlannerStyle.moss)
                 .symbolSize(point.id == selectedID ? 50 : 24)
                 .accessibilityHidden(true)
         }
-        .chartXScale(domain: domain, range: .plotDimension(padding: monthLabelWidth / 2))
+        .chartXScale(domain: 0.0...12.0, range: .plotDimension(padding: 4))
         .chartYScale(domain: baseline...scale[3], range: .plotDimension(padding: 4))
-        .chartXAxis {
-            AxisMarks(values: dates) { tick in
-                if let date = tick.as(Date.self) {
-                    AxisValueLabel(anchor: .top) {
-                        Text(date, format: monthFormat).font(.caption2).foregroundStyle(PlannerStyle.ink.opacity(0.65))
-                    }
-                }
-            }
-        }
+        .chartXAxis(.hidden)
         .chartYAxis {
             AxisMarks(position: .leading, values: scale) { tick in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 1))
@@ -585,6 +585,7 @@ struct CatalogWorkoutTrend: View {
                     AxisValueLabel {
                         Text(value, format: .number.precision(.fractionLength(0...2)))
                             .font(.caption2).monospacedDigit().foregroundStyle(PlannerStyle.ink.opacity(0.65))
+                            .padding(.trailing, 4)
                     }
                 }
             }
@@ -593,8 +594,19 @@ struct CatalogWorkoutTrend: View {
             GeometryReader { geometry in
                 if let anchor = proxy.plotFrame {
                     let frame = geometry[anchor]
+                    ForEach(ticks, id: \.self) { position in
+                        if let x = proxy.position(forX: position),
+                           let month = calendar.date(byAdding: .month, value: Int(position), to: yearStart) {
+                            Text(month, format: monthFormat)
+                                .font(.caption2.monospaced()).foregroundStyle(PlannerStyle.ink.opacity(0.65))
+                                .fixedSize()
+                                .position(x: frame.minX + x, y: frame.maxY + monthLabelHeight / 2)
+                                .allowsHitTesting(false)
+                                .accessibilityHidden(true)
+                        }
+                    }
                     let centers = points.reduce(into: [UUID: CGPoint]()) { centers, point in
-                        if let x = proxy.position(forX: point.date), let y = proxy.position(forY: point.value) {
+                        if let x = proxy.position(forX: point.monthPosition), let y = proxy.position(forY: point.value) {
                             centers[point.id] = CGPoint(x: frame.minX + x, y: frame.minY + y)
                         }
                     }
@@ -652,11 +664,9 @@ struct CatalogWorkoutTrend: View {
         return min(max(coordinate, halfTarget), size - halfTarget)
     }
 
-    private func monthTicks(from start: Date, through today: Date, calendar: Calendar, width: CGFloat) -> [Date] {
-        let months = (0..<12).compactMap { calendar.date(byAdding: .month, value: $0, to: start) }.filter { $0 <= today }
-        let count = min(months.count, max(2, Int(width / monthLabelWidth)))
-        guard count > 1 else { return months }
-        return (0..<count).map { months[$0 * (months.count - 1) / (count - 1)] }
+    private func monthTicks(width: CGFloat) -> [Double] {
+        let count = min(12, max(2, Int(width / monthLabelWidth)))
+        return (0..<count).map { Double($0 * 11 / (count - 1)) + 0.5 }
     }
 
     private func scaleValues(for points: [Point]) -> [Double] {
