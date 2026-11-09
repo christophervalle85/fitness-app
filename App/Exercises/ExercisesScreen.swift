@@ -834,15 +834,12 @@ private struct CatalogWorkoutHistory: View {
                 Text(plot.measure).font(.caption).foregroundStyle(.secondary)
                 plot.accessibilityIdentifier("exerciseWorkoutTrend")
             } else {
-                VStack(spacing: 5) {
-                    Image(systemName: "chart.xyaxis.line").foregroundStyle(PlannerStyle.moss).accessibilityHidden(true)
+                VStack(spacing: 8) {
+                    ExerciseTrendPlot.empty
                     Text(latest == nil ? "No sets recorded yet." : "No comparable working sets yet.")
-                        .font(.subheadline.weight(.medium))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, minHeight: 84)
-                .padding(.horizontal, 8)
-                .background(PlannerStyle.paper, in: RoundedRectangle(cornerRadius: 10))
             }
             if latest != nil {
                 NavigationLink("View logged sets") {

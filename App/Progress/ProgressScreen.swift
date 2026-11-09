@@ -431,8 +431,24 @@ private struct RecordMeasurement: View {
 }
 
 struct ExerciseTrendPlot: View {
+    private static let height: CGFloat = 160
     let record: ExerciseRecords
     let unit: String
+
+    static var empty: some View {
+        Chart {}
+            .chartXScale(domain: 0.0...1.0)
+            .chartYScale(domain: 0.0...1.0)
+            .chartXAxis {
+                AxisMarks(values: [0.0]) { _ in AxisGridLine() }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading, values: [0.0, 1.0 / 3, 2.0 / 3, 1.0]) { _ in AxisGridLine() }
+            }
+            .frame(height: height)
+            .accessibilityHidden(true)
+    }
+
     var measure: String {
         switch record.basis {
         case .timed: "Longest working set · seconds"
@@ -469,7 +485,7 @@ struct ExerciseTrendPlot: View {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 3))
         }
         .chartXScale(range: .plotDimension(padding: 5))
-        .frame(height: 160)
+        .frame(height: Self.height)
     }
 }
 
