@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct WorkoutSetRow: View {
     let sessionID: UUID
@@ -23,12 +24,16 @@ struct WorkoutSetRow: View {
     @State private var issue: String?
     @State private var commandID = UUID()
     @State private var editorRevealed = true
+    @State private var removalDrag: RemovalDrag?
+    @State private var removalSettle: RemovalSettle?
     @FocusState private var focused: ActualField?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.layoutDirection) private var layoutDirection
-    @ScaledMetric(relativeTo: .subheadline) private var removeWidth = 79.0
+    @ScaledMetric(relativeTo: .subheadline) private var scaledRemoveWidth: CGFloat = 86
+    @ScaledMetric(relativeTo: .subheadline) private var scaledStatusWidth: CGFloat = 122
+    @ScaledMetric(relativeTo: .subheadline) private var statusPointSize: CGFloat = 15
 
     private enum ActualField { case reps, seconds, load, rightReps, rightLoad }
     private var latest: TrainingSet? {
@@ -109,7 +114,14 @@ struct WorkoutSetRow: View {
         }
         .onChange(of: row.revision) { _, _ in commandID = UUID() }
         .onChange(of: isRemovable) { _, removable in
-            if !removable, isRemovalRevealed { onRevealRemoval(false) }
+            if !removable {
+                removalDrag = nil
+                removalSettle = nil
+                if isRemovalRevealed { onRevealRemoval(false) }
+            }
+        }
+        .onChange(of: isRemovalRevealed) { _, revealed in
+            if !revealed, removalSettle?.destination == 1 { removalSettle = nil }
         }
         .toolbar {
             if focused != nil {
@@ -122,35 +134,90 @@ struct WorkoutSetRow: View {
     }
 
     private var swipeableHeading: some View {
-        ZStack(alignment: layoutDirection == .leftToRight ? .trailing : .leading) {
-            if isRemovalRevealed {
-                Button(role: .destructive, action: onRemove) {
-                    Text("Remove").font(.footnote.weight(.semibold))
-                        .frame(width: removeWidth)
-                        .frame(minHeight: 44)
-                        .foregroundStyle(colorScheme == .dark ? Color(red: 1, green: 0.83, blue: 0.81)
-                                                              : Color(red: 0.62, green: 0.16, blue: 0.16))
-                        .background(Color.red.opacity(colorScheme == .dark ? 0.24 : 0.11))
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove \(title)")
-                .accessibilityIdentifier("removeSet\(index)")
-            }
-            rowHeading
-                .frame(maxWidth: .infinity)
-                .background(PlannerStyle.surface)
-                .offset(x: isRemovalRevealed ? -removeWidth : 0)
+        rowHeading
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+            .gesture(RemovalPan(update: updateRemoval))
+    }
+
+    private func updateRemoval(_ state: UIGestureRecognizer.State, horizontal: CGFloat) {
+        switch state {
+        case .began:
+            let origin = removalSettle?.progress(at: .now) ?? (isRemovalRevealed ? 1 : 0)
+            removalSettle = nil
+            removalDrag = RemovalDrag(origin: origin, horizontal: horizontal)
+        case .changed:
+            if let drag = removalDrag { removalDrag = RemovalDrag(origin: drag.origin, horizontal: horizontal) }
+        case .ended, .cancelled, .failed:
+            guard let drag = removalDrag else { return }
+            let progress = state == .ended ? RemovalDrag(origin: drag.origin, horizontal: horizontal).progress : drag.progress
+            let revealed = state == .ended ? progress >= 0.5 : isRemovalRevealed
+            let destination: CGFloat = revealed ? 1 : 0
+            removalSettle = reduceMotion || progress == destination ? nil : RemovalSettle(origin: progress, destination: destination)
+            removalDrag = nil
+            if revealed != isRemovalRevealed { onRevealRemoval(revealed) }
+        default:
+            break
         }
-        .clipShape(RoundedRectangle(cornerRadius: 9))
-        .contentShape(Rectangle())
-        .simultaneousGesture(DragGesture(minimumDistance: 18).onEnded { drag in
-            let horizontal = drag.translation.width
-            guard abs(horizontal) >= 32, abs(horizontal) > abs(drag.translation.height) else { return }
-            if horizontal < 0 || isRemovalRevealed {
-                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) { onRevealRemoval(horizontal < 0) }
+    }
+
+    private var removalWidth: CGFloat { min(220, scaledRemoveWidth) }
+    private var statusHeight: CGFloat { max(44, ceil(statusPointSize * 1.5 + 8)) }
+    private var removalInk: Color {
+        colorScheme == .dark ? Color(red: 1, green: 0.84, blue: 0.82) : Color(red: 0.62, green: 0.16, blue: 0.16)
+    }
+    private var removalTint: Color {
+        colorScheme == .dark ? Color(red: 0.30, green: 0.18, blue: 0.17) : Color(red: 0.98, green: 0.89, blue: 0.88)
+    }
+
+    private var removalLabel: some View {
+        Text("Remove").font(.subheadline.bold()).foregroundStyle(removalInk)
+            .padding(.trailing, removalWidth * 13 / 86)
+            .frame(width: removalWidth, height: statusHeight, alignment: .trailing)
+            .background {
+                RoundedRectangle(cornerRadius: 9).fill(removalTint).padding(.vertical, 4)
             }
-        })
+            .contentShape(Rectangle())
+    }
+
+    private func letterpress(_ progress: CGFloat) -> some View {
+        RemovalLetterpress(progress: progress, previous: isCurrent ? "Current" : "Pending",
+                           previousColor: isCurrent ? PlannerStyle.moss : .secondary,
+                           previousBold: isCurrent, ink: removalInk, tint: removalTint,
+                           pointSize: statusPointSize, pillWidth: removalWidth, direction: layoutDirection)
+            .accessibilityHidden(true).allowsHitTesting(false)
+    }
+
+    private var removalStatus: some View {
+        ZStack(alignment: .trailing) {
+            if let settle = removalSettle {
+                TimelineView(.animation) { timeline in
+                    letterpress(settle.progress(at: timeline.date))
+                        .onChange(of: settle.hasEnded(at: timeline.date), initial: true) { _, ended in
+                            if ended, removalSettle == settle { removalSettle = nil }
+                        }
+                }
+            } else if let drag = removalDrag, !reduceMotion {
+                letterpress(drag.progress)
+            } else if isRemovalRevealed {
+                if removalDrag == nil {
+                    Button(role: .destructive, action: onRemove) { removalLabel }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Remove \(title)")
+                        .accessibilityIdentifier("removeSet\(index)")
+                } else {
+                    removalLabel.accessibilityHidden(true)
+                }
+            } else {
+                rowStatus
+            }
+        }
+        .frame(width: min(250, scaledStatusWidth), height: statusHeight, alignment: .trailing)
+        .clipped()
+    }
+
+    @ViewBuilder private var headingStatus: some View {
+        if isRemovable { removalStatus } else { rowStatus }
     }
 
     private var rowHeading: some View {
@@ -158,17 +225,19 @@ struct WorkoutSetRow: View {
             HStack(spacing: 8) {
                 setButton.fixedSize()
                 Spacer(minLength: 4)
-                rowStatus.fixedSize()
+                headingStatus.fixedSize()
             }
             VStack(alignment: .leading, spacing: 0) {
                 setButton
-                rowStatus.frame(maxWidth: .infinity, alignment: .trailing)
+                headingStatus.frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
     }
 
     private var setButton: some View {
         Button {
+            removalDrag = nil
+            removalSettle = nil
             if !isExpanded { editorRevealed = reduceMotion }
             if isLogged, !isExpanded {
                 correctionRevision = row.revision
@@ -384,6 +453,139 @@ struct WorkoutSetRow: View {
             issue = nil
             focused = nil
         } catch { issue = error.localizedDescription }
+    }
+}
+
+private struct RemovalPan: UIGestureRecognizerRepresentable {
+    let update: (UIGestureRecognizer.State, CGFloat) -> Void
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let pan = UIPanGestureRecognizer()
+        pan.maximumNumberOfTouches = 1
+        pan.delegate = context.coordinator
+        return pan
+    }
+
+    func handleUIGestureRecognizerAction(_ pan: UIPanGestureRecognizer, context: Context) {
+        update(pan.state, pan.translation(in: pan.view).x)
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = recognizer as? UIPanGestureRecognizer else { return false }
+            let motion = pan.translation(in: pan.view)
+            return abs(motion.x) > abs(motion.y)
+        }
+
+        func gestureRecognizer(_ recognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            other.view is UIScrollView
+        }
+    }
+}
+
+private struct RemovalDrag {
+    let origin: CGFloat
+    let horizontal: CGFloat
+
+    var progress: CGFloat { unitProgress(origin - horizontal / 118) }
+}
+
+private struct RemovalSettle: Equatable {
+    let token = UUID()
+    let origin: CGFloat
+    let destination: CGFloat
+    let start = Date.now
+
+    func hasEnded(at date: Date) -> Bool { date.timeIntervalSince(start) >= 0.22 }
+
+    func progress(at date: Date) -> CGFloat {
+        let remaining = 1 - unitProgress(date.timeIntervalSince(start) / 0.22)
+        return origin + (destination - origin) * (1 - remaining * remaining * remaining)
+    }
+}
+
+private func unitProgress(_ value: CGFloat) -> CGFloat { min(1, max(0, value)) }
+
+private func smoothProgress(_ value: CGFloat) -> CGFloat {
+    let progress = unitProgress(value)
+    return progress * progress * (3 - 2 * progress)
+}
+
+private struct RemovalLetterpress: View {
+    let progress: CGFloat
+    let previous: String
+    let previousColor: Color
+    let previousBold: Bool
+    let ink: Color
+    let tint: Color
+    let pointSize: CGFloat
+    let pillWidth: CGFloat
+    let direction: LayoutDirection
+
+    var body: some View {
+        Canvas { context, size in
+            let softness = smoothProgress(progress)
+            drawPill(in: context, size: size, softness: softness)
+
+            let next = "Remove"
+            let nextCharacters = Array(next)
+            let oldPositions = positions(previous, size: size, bold: previousBold, inset: 0)
+            let newPositions = positions(next, size: size, bold: true, inset: pillWidth * 13 / 86)
+            for (index, character) in previous.enumerated() {
+                let replacement = index < nextCharacters.count ? nextCharacters[index] : nil
+                let destinationX = index < newPositions.count ? newPositions[index] : newPositions.last! + pointSize / 2
+                let x = oldPositions[index] + (destinationX - oldPositions[index]) * softness
+                let local = smoothProgress((progress - 0.055 * CGFloat(previous.count - 1 - index)) / 0.64)
+                let blur = sin(.pi * local) * 1.05
+                if replacement == character {
+                    draw(character, in: context, x: x, y: size.height / 2,
+                         color: previousColor.mix(with: ink, by: softness, in: .device),
+                         bold: previousBold || progress > 0.64, opacity: 1, blur: 0)
+                } else {
+                    draw(character, in: context, x: x, y: size.height / 2 - pointSize * local,
+                         color: previousColor, bold: previousBold, opacity: 1 - local, blur: blur)
+                    if let replacement {
+                        draw(replacement, in: context, x: x, y: size.height / 2 + pointSize * (1 - local),
+                             color: ink, bold: true, opacity: local, blur: blur)
+                    }
+                }
+            }
+        }
+    }
+
+    private func positions(_ word: String, size: CGSize, bold: Bool, inset: CGFloat) -> [CGFloat] {
+        let font = UIFont.systemFont(ofSize: pointSize, weight: bold ? .bold : .regular)
+        func width(_ value: String) -> CGFloat { (value as NSString).size(withAttributes: [.font: font]).width }
+        let leading = direction == .leftToRight ? size.width - inset - width(word) : inset
+        return (0..<word.count).map { leading + width(String(word.prefix($0))) }
+    }
+
+    private func drawPill(in context: GraphicsContext, size: CGSize, softness: CGFloat) {
+        let width = pillWidth * (0.24 + 0.76 * softness)
+        let x = direction == .leftToRight ? size.width - width : 0
+        let rect = CGRect(x: x, y: 4, width: width, height: size.height - 8)
+        let pill = RoundedRectangle(cornerRadius: 9).path(in: rect)
+        context.fill(pill, with: .color(tint.opacity(smoothProgress((progress - 0.12) / 0.64))))
+
+        let glint = sin(.pi * unitProgress((progress - 0.22) / 0.68)) * 0.35
+        guard glint > 0 else { return }
+        let glintX = rect.midX + 20 - 44 * softness
+        let gradient = Gradient(colors: [.clear, .white.opacity(glint), .clear])
+        context.fill(pill, with: .linearGradient(gradient, startPoint: CGPoint(x: glintX - 20, y: rect.maxY),
+                                                 endPoint: CGPoint(x: glintX + 20, y: rect.minY)))
+    }
+
+    private func draw(_ character: Character, in context: GraphicsContext, x: CGFloat, y: CGFloat,
+                      color: Color, bold: Bool, opacity: CGFloat, blur: CGFloat) {
+        guard opacity > 0 else { return }
+        var glyph = context
+        glyph.opacity = opacity
+        if blur > 0 { glyph.addFilter(.blur(radius: blur)) }
+        glyph.draw(Text(String(character)).font(.system(size: pointSize, weight: bold ? .bold : .regular))
+            .foregroundColor(color), at: CGPoint(x: x, y: y), anchor: .leading)
     }
 }
 

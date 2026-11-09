@@ -181,21 +181,41 @@ final class TrainUITests: XCTestCase {
         XCTAssertTrue((progress.value as? String)?.contains("0 of 7") == true)
         capture("Exercise footer with Set 4", in: app)
 
-        func swipeRow(_ title: XCUIElement) {
+        func swipeRow(_ title: XCUIElement, from startX: CGFloat = 0.8, to endX: CGFloat = 0.2,
+                      slow: Bool = false) {
             let origin = app.coordinate(withNormalizedOffset: .zero)
             let y = title.frame.midY - app.frame.minY
-            let start = origin.withOffset(CGVector(dx: app.frame.width * 0.8, dy: y))
-            let end = origin.withOffset(CGVector(dx: app.frame.width * 0.2, dy: y))
-            start.press(forDuration: 0.05, thenDragTo: end)
+            let start = origin.withOffset(CGVector(dx: app.frame.width * startX, dy: y))
+            let end = origin.withOffset(CGVector(dx: app.frame.width * endX, dy: y))
+            if slow {
+                start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.1)
+            } else {
+                start.press(forDuration: 0.05, thenDragTo: end)
+            }
         }
 
         swipeRow(app.buttons["openSet2"])
         XCTAssertFalse(app.buttons["removeSet2"].exists)
-        swipeRow(addedSet)
         let remove = app.buttons["removeSet3"]
+        let rowOrigin = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
+            dx: app.frame.width * 0.8, dy: addedSet.frame.midY - app.frame.minY
+        ))
+        rowOrigin.press(forDuration: 0.05, thenDragTo: rowOrigin.withOffset(CGVector(dx: 0, dy: -88)))
+        XCTAssertFalse(remove.exists)
+        let originalFrame = addedSet.frame
+        swipeRow(addedSet, to: 0.7)
+        XCTAssertFalse(remove.exists)
+        swipeRow(addedSet, slow: true)
         XCTAssertTrue(remove.waitForExistence(timeout: 5))
-        XCTAssertTrue(addedSet.exists)
+        XCTAssertEqual(addedSet.frame.minX, originalFrame.minX, accuracy: 2)
+        XCTAssertEqual(addedSet.frame.minY, originalFrame.minY, accuracy: 2)
+        XCTAssertTrue(addedSet.isHittable)
+        XCTAssertTrue((progress.value as? String)?.contains("0 of 7") == true)
         capture("Swipe reveals Remove", in: app)
+        swipeRow(addedSet, from: 0.3, to: 0.8)
+        XCTAssertTrue(remove.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(addedSet.frame.minX, originalFrame.minX, accuracy: 2)
+        swipeRow(addedSet)
         tap(remove)
         XCTAssertTrue(addedSet.waitForNonExistence(timeout: 5))
         XCTAssertTrue((progress.value as? String)?.contains("0 of 6") == true)
