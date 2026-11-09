@@ -83,8 +83,8 @@ final class DiscoverUITests: XCTestCase {
         tap(app.buttons["startPlanned"])
         let reps = app.textFields["actualReps0"]
         let load = app.textFields["actualLoad0"]
-        tap(reps)
-        reps.typeText("10")
+        XCTAssertTrue(reps.waitForExistence(timeout: 5))
+        XCTAssertEqual(reps.value as? String, "10")
         tap(load)
         load.typeText("25")
         if app.buttons["dismissSetKeyboard"].isHittable { tap(app.buttons["dismissSetKeyboard"]) }

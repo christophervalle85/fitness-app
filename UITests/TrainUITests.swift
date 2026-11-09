@@ -44,14 +44,19 @@ final class TrainUITests: XCTestCase {
         XCTAssertEqual(app.buttons["reviewSession"].label, "Finish")
         let workoutProgress = app.descendants(matching: .any)["workoutSetProgress"]
         XCTAssertTrue(workoutProgress.label.contains("Workout progress") || app.staticTexts["Workout progress"].exists)
+        let firstReps = app.textFields["actualReps0"]
+        let firstLoad = app.textFields["actualLoad0"]
+        XCTAssertEqual(firstReps.value as? String, "10")
+        XCTAssertFalse((firstLoad.value as? String)?.first?.isNumber == true)
         capture("Full-screen planned workout", in: app)
         tap(confirm)
-        XCTAssertTrue(app.descendants(matching: .any)["setIssue0"].waitForExistence(timeout: 5))
+        let issue = app.descendants(matching: .any)["setIssue0"]
+        XCTAssertTrue(issue.waitForExistence(timeout: 5))
+        XCTAssertTrue(issue.label.contains("weight"))
         XCTAssertFalse(app.buttons["undoSet0"].exists)
-        enter("10", in: app.textFields["actualReps0"])
-        enter("25", in: app.textFields["actualLoad0"])
+        enter("25", in: firstLoad)
         if app.buttons["dismissSetKeyboard"].isHittable { tap(app.buttons["dismissSetKeyboard"]) }
-        let firstReps = app.textFields["actualReps0"]
+        XCTAssertEqual(firstLoad.value as? String, "25")
         tap(app.buttons["incrementActualReps0"])
         XCTAssertEqual(firstReps.value as? String, "11")
         XCTAssertFalse(app.buttons["undoSet0"].exists)
@@ -123,22 +128,34 @@ final class TrainUITests: XCTestCase {
         let total = app.descendants(matching: .any)["workoutSetProgress"]
         XCTAssertTrue(total.waitForExistence(timeout: 5))
         XCTAssertTrue((total.label + String(describing: total.value)).contains("1 of 6"))
-        let prior = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "priorSet-"))
+        let prior = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "priorSet-"))
+        let priorDate = app.staticTexts["priorSetDate"]
         XCTAssertEqual(prior.count, 1)
-        XCTAssertTrue(prior.element.label.contains("11 reps"))
-        XCTAssertTrue(prior.element.label.contains("30 lb"))
+        XCTAssertEqual(prior.element.label, "Set 1")
+        XCTAssertTrue(app.staticTexts["11 reps × 30 lb"].exists)
+        XCTAssertFalse(priorDate.exists)
         let next = app.descendants(matching: .any).matching(identifier: "currentSetLabel").firstMatch
         XCTAssertEqual(next.label, "Current set, Set 2")
         capture("Resumed workout with earlier set", in: app)
 
-        for (field, value) in [(app.textFields["actualReps0"], "11"), (app.textFields["actualLoad0"], "30")] {
-            tap(field)
-            if (field.value as? String)?.first?.isNumber == true {
-                field.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).doubleTap()
-            }
-            field.typeText(value)
-            XCTAssertEqual(field.value as? String, value)
-        }
+        tap(prior.element)
+        XCTAssertTrue(priorDate.waitForExistence(timeout: 5))
+        XCTAssertEqual(firstReps.value as? String, "11")
+        XCTAssertEqual(firstLoad.value as? String, "30")
+        tap(app.buttons["incrementActualLoad0"])
+        capture("Earlier set correction", in: app)
+        tap(app.buttons["saveSet0"])
+        XCTAssertTrue(app.staticTexts["11 reps × 35 lb"].waitForExistence(timeout: 5))
+        XCTAssertTrue(priorDate.waitForNonExistence(timeout: 5))
+        XCTAssertTrue((total.label + String(describing: total.value)).contains("1 of 6"))
+        XCTAssertEqual(next.label, "Current set, Set 2")
+        tap(app.buttons["openSet0"])
+        XCTAssertEqual(firstReps.value as? String, "10")
+        XCTAssertFalse((firstLoad.value as? String)?.first?.isNumber == true)
+        tap(app.buttons["incrementActualReps0"])
+        XCTAssertEqual(firstReps.value as? String, "11")
+        enter("30", in: firstLoad)
+        XCTAssertEqual(firstLoad.value as? String, "30")
         if app.buttons["dismissSetKeyboard"].isHittable { tap(app.buttons["dismissSetKeyboard"]) }
         tap(app.buttons["confirmSet0"])
         tap(app.buttons["reviewSession"])
@@ -155,6 +172,7 @@ final class TrainUITests: XCTestCase {
         XCTAssertEqual(segments.count, 2)
         tap(segments.element(boundBy: 0))
         XCTAssertTrue(app.navigationBars["Lower body"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Set 1, 11 reps × 35 lb"].waitForExistence(timeout: 5))
 
         tap(app.tabBars.buttons["Progress"])
         let adherence = app.descendants(matching: .any)["adherence"]

@@ -13,6 +13,7 @@ struct WorkoutSetRow: View {
     let isRemovalRevealed: Bool
     let isFolding: Bool
     let target: String
+    var earlier: WorkoutChecklist.EarlierSet? = nil
     let onToggle: () -> Void
     let onCloseCorrection: () -> Void
     let onRevealRemoval: (Bool) -> Void
@@ -21,6 +22,7 @@ struct WorkoutSetRow: View {
     let onEditorHeightChange: (CGFloat) -> Void
 
     @State private var correctionRevision: Int?
+    @State private var correctionPerformedAt: Date?
     @State private var correction: SetActual?
     @State private var unsaved: SetActual?
     @State private var issue: String?
@@ -40,14 +42,21 @@ struct WorkoutSetRow: View {
 
     private enum ActualField { case reps, seconds, load, rightReps, rightLoad }
     private var latest: TrainingSet? {
-        store.openSessions.first { $0.id == sessionID }?.exercises.first { $0.id == exercise.id }?.sets.first { $0.id == row.id }
+        let sessions = earlier == nil ? store.openSessions : store.sessions
+        return sessions.first { $0.id == sessionID }?.exercises.first { $0.id == exercise.id }?.sets.first { $0.id == row.id }
     }
-    private var suggestion: SetActual? {
-        (isFolding ? row : latest).flatMap { exercise.suggestedActual(for: $0) }
-    }
+    private var suggestionRow: TrainingSet? { isFolding ? row : latest }
+    private var suggestion: SetActual? { suggestionRow.flatMap { store.suggestedActual(for: $0, in: exercise) } }
 
     private var isLogged: Bool { row.confirmedAt != nil }
-    private var title: String { setTitle(row, index: index) }
+    private var title: String {
+        if let earlier { return "Set \(earlier.ordinal)" }
+        return setTitle(row, index: index)
+    }
+    private var titleIdentifier: String {
+        if earlier != nil { return "priorSet-\((row.plannedID ?? row.id).uuidString)" }
+        return isLogged ? "editSet\(index)" : "openSet\(index)"
+    }
     private var isEditorMounted: Bool { isExpanded || closingCorrection != nil }
     private var editorIsCorrection: Bool { closingCorrection ?? isLogged }
     private var isRemovable: Bool { !isLogged && row.optional == true && row.plannedID == nil }
@@ -94,6 +103,7 @@ struct WorkoutSetRow: View {
             if !mounted {
                 correction = nil
                 correctionRevision = nil
+                correctionPerformedAt = nil
                 if unsaved == nil { issue = nil }
             }
         }
@@ -278,6 +288,7 @@ struct WorkoutSetRow: View {
             if !isExpanded { editorRevealed = reduceMotion }
             if isLogged, !isExpanded {
                 correctionRevision = row.revision
+                correctionPerformedAt = earlier?.performedAt
                 correction = row.actual
                 issue = nil
             }
@@ -289,7 +300,7 @@ struct WorkoutSetRow: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier(isLogged ? "editSet\(index)" : "openSet\(index)")
+        .accessibilityIdentifier(titleIdentifier)
         .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
         .accessibilityHint(isExpanded ? "Closes the set editor" : "Opens the set editor")
         .accessibilityActions {
@@ -312,7 +323,11 @@ struct WorkoutSetRow: View {
 
     private var editor: some View {
         VStack(alignment: .leading, spacing: 7) {
-            if !editorIsCorrection {
+            if let date = correctionPerformedAt ?? earlier?.performedAt {
+                Text("Logged earlier · \(date.formatted(date: .abbreviated, time: .shortened))")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("priorSetDate")
+            } else if !editorIsCorrection {
                 Text("Target \(target)").font(.caption).foregroundStyle(.secondary)
             }
             issueMessage
@@ -321,14 +336,11 @@ struct WorkoutSetRow: View {
                 inputs
             }
             if !editorIsCorrection, unsaved == nil {
-                if suggestion != nil {
+                if suggestionRow.flatMap({ exercise.suggestedActual(for: $0) }) != nil {
                     Text("Suggested from the last matching set")
                         .font(.caption).foregroundStyle(.secondary)
-                } else if let date = row.previousAt {
+                } else if suggestion == nil, let date = row.previousAt {
                     Text("Previous result · \(date.formatted(date: .abbreviated, time: .omitted))")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else if row.revision == 0 {
-                    Text("Enter what you completed")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -414,7 +426,7 @@ struct WorkoutSetRow: View {
                                                decrement: @escaping () -> Void, increment: @escaping () -> Void,
                                                @ViewBuilder field: () -> Field) -> some View {
         let suffix = id.prefix(1).uppercased() + String(id.dropFirst()) + String(index)
-        let ordinal = row.ordinal ?? (index + 1)
+        let ordinal = earlier?.ordinal ?? row.ordinal ?? (index + 1)
         return VStack(spacing: 3) {
             Text(label).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -480,7 +492,16 @@ struct WorkoutSetRow: View {
         guard isLogged == (latest.confirmedAt != nil) else { return }
         do {
             if isLogged {
-                try store.edit(sessionID: sessionID, setID: row.id, actual: actual, revision: correctionRevision ?? row.revision)
+                if earlier != nil {
+                    guard let revision = correctionRevision, let performedAt = correctionPerformedAt else {
+                        issue = "Reopen this set before saving."
+                        return
+                    }
+                    try store.correct(sessionID: sessionID, setID: row.id, actual: actual, performedAt: performedAt,
+                                      revision: revision)
+                } else {
+                    try store.edit(sessionID: sessionID, setID: row.id, actual: actual, revision: correctionRevision ?? row.revision)
+                }
                 onCloseCorrection()
             } else {
                 try store.confirm(sessionID: sessionID, setID: row.id, actual: actual, revision: latest.revision, commandID: commandID)

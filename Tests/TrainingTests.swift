@@ -28,6 +28,95 @@ struct TrainingTests {
         try store.confirm(sessionID: session.id, setID: set.id, actual: actual, revision: set.revision, commandID: commandID)
     }
 
+    @Test func workingSetDefaultsUseHeaviestExactRepResultAcrossUnits() throws {
+        try withDirectory { path in
+            var instant = thursday
+            let store = TrainingStore(directory: path, now: { instant })
+            try store.load(profileID: UUID())
+            let prescription = PlanExercise(name: "Row", sets: 3, low: 8, high: 12, startingLoad: 25)
+            let history = try store.startExtra(name: "History")
+            try store.add(sessionID: history, prescription: prescription, basis: .external)
+            let source = try #require(store.active?.exercises.first)
+            let recorded = [SetActual(reps: 8, load: 100), SetActual(reps: 8, load: 40, unit: "kg"),
+                            SetActual(reps: 6, load: 250)]
+            for (row, actual) in zip(source.sets, recorded) {
+                instant = instant.addingTimeInterval(1)
+                try store.confirm(sessionID: history, setID: row.id, actual: actual, revision: row.revision, commandID: UUID())
+            }
+            try store.addSet(sessionID: history, exerciseID: source.id, warmup: true)
+            let warmup = try #require(store.active?.exercises.first?.sets.last)
+            try store.confirm(sessionID: history, setID: warmup.id, actual: SetActual(reps: 8, load: 400),
+                              revision: warmup.revision, commandID: UUID())
+            try store.finish(sessionID: history, partial: false)
+            let workout = try store.startExtra(name: "Next")
+            try store.add(sessionID: workout, prescription: prescription, basis: .external)
+            let exercise = try #require(store.active?.exercises.first)
+            let row = try #require(exercise.sets.first)
+
+            #expect(row.actual == SetActual())
+            #expect(store.suggestedActual(for: row, in: exercise) == SetActual(reps: 8, load: 100))
+
+            var legacy = row
+            legacy.actual = SetActual(reps: 6, load: 250)
+            #expect(store.suggestedActual(for: legacy, in: exercise) == SetActual(reps: 8, load: 100))
+
+            try store.edit(sessionID: workout, setID: row.id, actual: SetActual(), revision: row.revision, markUnchangedDraft: true)
+            let edited = try #require(store.active?.exercises.first)
+            let cleared = try #require(edited.sets.first)
+            #expect(cleared.actual == SetActual() && cleared.revision == 1)
+            #expect(store.suggestedActual(for: cleared, in: edited) == nil)
+        }
+    }
+
+    @Test func unilateralDefaultsMatchRepCountForEachSide() throws {
+        try withDirectory { path in
+            let store = TrainingStore(directory: path, now: { thursday })
+            try store.load(profileID: UUID())
+            let prescription = PlanExercise(name: "Split squat", sets: 2, low: 8)
+            let history = try store.startExtra(name: "History")
+            try store.add(sessionID: history, prescription: prescription, basis: .unilateral)
+            let source = try #require(store.active?.exercises.first)
+            let results = [SetActual(reps: 8, load: 30, rightReps: 9, rightLoad: 100),
+                           SetActual(reps: 9, load: 90, rightReps: 8, rightLoad: 35)]
+            for (row, actual) in zip(source.sets, results) {
+                try store.confirm(sessionID: history, setID: row.id, actual: actual, revision: row.revision, commandID: UUID())
+            }
+            try store.finish(sessionID: history, partial: false)
+
+            let workout = try store.startExtra(name: "Next")
+            try store.add(sessionID: workout, prescription: prescription, basis: .unilateral)
+            let exercise = try #require(store.active?.exercises.first)
+            let row = try #require(exercise.sets.first)
+            #expect(store.suggestedActual(for: row, in: exercise) ==
+                    SetActual(reps: 8, load: 30, rightReps: 8, rightLoad: 35))
+        }
+    }
+
+    @Test func missingWorkingSetHistoryUsesOnlyAnApplicableStartingLoad() throws {
+        try withDirectory { path in
+            let store = TrainingStore(directory: path, now: { thursday })
+            try store.load(profileID: UUID())
+            let session = try store.startExtra(name: "Defaults")
+            let cases: [(PlanExercise, LoadBasis, SetActual?)] = [
+                (PlanExercise(name: "Press", low: 7, startingLoad: 20), .external, SetActual(reps: 7, load: 20)),
+                (PlanExercise(name: "Pull", low: 6), .external, SetActual(reps: 6)),
+                (PlanExercise(name: "Push-up", low: 9, startingLoad: 20), .bodyweight, SetActual(reps: 9)),
+                (PlanExercise(name: "Split squat", low: 8, startingLoad: 20), .unilateral,
+                 SetActual(reps: 8, load: 20, rightReps: 8, rightLoad: 20)),
+                (PlanExercise(name: "Hold", timed: true), .timed, nil)
+            ]
+            for (prescription, basis, expected) in cases {
+                try store.add(sessionID: session, prescription: prescription, basis: basis)
+                let exercise = try #require(store.active?.exercises.last)
+                let row = try #require(exercise.sets.first)
+                #expect(store.suggestedActual(for: row, in: exercise) == expected)
+                var warmup = row
+                warmup.warmup = true
+                #expect(store.suggestedActual(for: warmup, in: exercise) == nil)
+            }
+        }
+    }
+
     @Test func clearingSuggestedActualsRemembersTheDraftWithoutLoggingASet() throws {
         try withDirectory { path in
             let owner = UUID()
@@ -495,7 +584,8 @@ struct TrainingTests {
             let extraID = try #require(store.active?.id)
             try store.add(sessionID: extraID, prescription: p, basis: .machine)
             let extra = try #require(store.active)
-            #expect(extra.exercises[0].sets[0].actual.load == 50)
+            #expect(extra.exercises[0].sets[0].actual.load == nil)
+            #expect(store.suggestedActual(for: extra.exercises[0].sets[0], in: extra.exercises[0])?.load == 50)
             try store.addSet(sessionID: extraID, exerciseID: extra.exercises[0].id, warmup: true)
             try confirm(store, row: 1, actual: SetActual(reps: 5, load: 10))
             let warmupID = try #require(store.active?.exercises[0].sets[1].id)

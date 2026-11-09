@@ -451,13 +451,57 @@ final class TrainingStore {
         occurrences.removeAll { $0.id == id }
     }
 
+    func suggestedActual(for set: TrainingSet, in exercise: TrainingExercise) -> SetActual? {
+        guard set.revision == 0, set.confirmedAt == nil else { return nil }
+        if let carried = exercise.suggestedActual(for: set) { return carried }
+
+        let reps = exercise.prescription.low
+        guard set.warmup != true, exercise.basis != .timed, reps > 0 else { return nil }
+        let unit = set.actual.unit
+        if exercise.basis == .bodyweight { return SetActual(reps: reps, unit: unit) }
+
+        let starting = SetActual(load: exercise.prescription.startingLoad, unit: exercise.prescription.loadUnit)
+        let fallback = usableLoad(starting.converted(to: unit).load)
+        // More assistance makes an exercise easier, so a historical maximum is not a load target.
+        if exercise.basis == .assisted { return SetActual(reps: reps, load: fallback, unit: unit) }
+
+        let (load, rightLoad) = heaviestLoads(for: RecordIdentity(exercise), reps: reps, unit: unit)
+        if exercise.basis == .unilateral {
+            return SetActual(reps: reps, load: load ?? fallback, rightReps: reps, rightLoad: rightLoad ?? fallback, unit: unit)
+        }
+        return SetActual(reps: reps, load: load ?? fallback, unit: unit)
+    }
+
+    private func heaviestLoads(for identity: RecordIdentity, reps: Int, unit: String) -> (Double?, Double?) {
+        var left: Double?
+        var right: Double?
+        let rows = sessions.lazy.flatMap(\.exercises).filter { RecordIdentity($0) == identity }.flatMap(\.sets)
+        for row in rows where row.confirmedAt != nil && row.warmup != true {
+            let matchesLeft = row.actual.reps == reps
+            let matchesRight = identity.basis == .unilateral && row.actual.rightReps == reps
+            guard matchesLeft || matchesRight, (try? row.actual.validate(for: identity.basis)) != nil else { continue }
+
+            let converted = row.actual.converted(to: unit)
+            if matchesLeft, let load = usableLoad(converted.load) { left = max(left ?? load, load) }
+            if matchesRight, let load = usableLoad(converted.rightLoad) { right = max(right ?? load, load) }
+        }
+        return (left, right)
+    }
+
+    private func usableLoad(_ load: Double?) -> Double? {
+        guard let load, load.isFinite, load >= 0 else { return nil }
+        return load
+    }
+
     private func makeExercise(_ prescription: PlanExercise, basis: LoadBasis, slots: [UUID?], rest: Int?, ordinals: [Int]? = nil) -> TrainingExercise {
         let target = TrainingExercise(prescription: prescription, basis: basis, sets: [], restSeconds: rest)
         let identity = RecordIdentity(target)
-        let match = sessions.flatMap(\.exercises).filter { RecordIdentity($0) == identity }
-            .flatMap(\.sets).filter { $0.confirmedAt != nil && $0.warmup != true }
-        let latest = match.max { ($0.confirmedAt ?? .distantPast) < ($1.confirmedAt ?? .distantPast) }
-        let starting = SetActual(load: basis == .bodyweight ? nil : prescription.startingLoad, unit: prescription.loadUnit)
+        // Timed exercises keep their existing last-result defaults. Rep defaults are computed on read.
+        let latest: TrainingSet? = basis == .timed ? sessions.lazy.flatMap(\.exercises)
+            .filter { RecordIdentity($0) == identity }.flatMap(\.sets)
+            .filter { $0.confirmedAt != nil && $0.warmup != true }
+            .max { ($0.confirmedAt ?? .distantPast) < ($1.confirmedAt ?? .distantPast) } : nil
+        let starting = SetActual(load: basis == .timed ? prescription.startingLoad : nil, unit: prescription.loadUnit)
         let sets = slots.enumerated().map { index, slot in
             TrainingSet(plannedID: slot, ordinal: ordinals?[index] ?? index + 1,
                         actual: latest?.actual.converted(to: prescription.loadUnit) ?? starting, previousAt: latest?.confirmedAt)
@@ -647,7 +691,7 @@ final class TrainingStore {
             let lastOrdinal = exercise.sets.enumerated().map { $0.element.ordinal ?? ($0.offset + 1) }.max() ?? 0
             var set = TrainingSet(ordinal: try increment(lastOrdinal),
                                   warmup: warmup, optional: true, actual: SetActual(unit: exercise.prescription.loadUnit))
-            if !warmup {
+            if !warmup && exercise.basis == .timed {
                 let suggested = makeExercise(exercise.prescription, basis: exercise.basis, slots: [nil], rest: exercise.restSeconds)
                 if let first = suggested.sets.first {
                     set.actual = first.actual

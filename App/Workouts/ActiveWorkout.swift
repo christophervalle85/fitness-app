@@ -64,7 +64,7 @@ struct ActiveWorkout: View {
                         }
                     }
                     .onChange(of: openEditorID) { _, id in
-                        if case .correction(let correctionID) = setEditor, id != correctionID {
+                        if case .correction(_, let correctionID) = setEditor, id != correctionID {
                             setEditor = .closed
                         }
                     }
@@ -165,8 +165,8 @@ struct ActiveWorkout: View {
         switch setEditor {
         case .current: currentRowID
         case .closed: nil
-        case .correction(let id):
-            session?.exercises.contains { exercise in
+        case .correction(let sourceSessionID, let id):
+            store.sessions.first { $0.id == sourceSessionID }?.exercises.contains { exercise in
                 exercise.sets.contains { $0.id == id && $0.confirmedAt != nil }
             } == true ? id : nil
         }
@@ -367,20 +367,23 @@ struct ActiveWorkout: View {
                               session: TrainingSession, isCurrentExercise: Bool, editorID: UUID?,
                               beforeOpening: @escaping (UUID) -> Void) -> some View {
         switch item {
-        case .earlier(let set, let ordinal, let date):
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Set \(ordinal)").font(.subheadline.weight(.semibold))
-                    Spacer(minLength: 8)
-                    Text(actualDescription(set.actual, basis: group.basis)).font(.subheadline)
-                        .multilineTextAlignment(.trailing)
+        case .earlier(let source):
+            let row = source.set
+            WorkoutSetRow(sessionID: source.sessionID, exercise: source.exercise, row: row,
+                          index: source.ordinal - 1, store: store, isCurrent: false, isExpanded: row.id == editorID,
+                          closingCorrection: closingEditor?.rowID == row.id ? closingEditor?.isCorrection : nil,
+                          isRemovalRevealed: false, isFolding: false, target: targetDescription(source.exercise.prescription),
+                          earlier: source, onToggle: {
+                revealedRemoval = nil
+                if row.id == editorID {
+                    closeEditor(row)
+                } else {
+                    openCorrection(row.id, sessionID: source.sessionID, beforeOpening: beforeOpening)
                 }
-                Text("Logged earlier · \(date.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            .padding(.vertical, 5)
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("priorSet-\((set.plannedID ?? set.id).uuidString)")
+            }, onCloseCorrection: { closeEditor(row) }, onRevealRemoval: { _ in }, onRemove: {},
+               onFoldComplete: {}, onEditorHeightChange: { height in
+                checklistLayout.editor = (row.id, height)
+            })
         case .remaining(_, let ordinal):
             Label("Set \(ordinal) · Remaining in plan", systemImage: "circle.dashed")
                 .font(.subheadline).foregroundStyle(.secondary).padding(.vertical, 5)
@@ -397,9 +400,7 @@ struct ActiveWorkout: View {
                     if row.id == editorID {
                         closeEditor(row)
                     } else if row.confirmedAt != nil {
-                        beforeOpening(row.id)
-                        closingEditor = nil
-                        setEditor = .correction(row.id)
+                        openCorrection(row.id, sessionID: session.id, beforeOpening: beforeOpening)
                     } else {
                         selectExercise(live, session: session, rowID: row.id, beforeOpening: beforeOpening)
                     }
@@ -414,6 +415,12 @@ struct ActiveWorkout: View {
                 })
             }
         }
+    }
+
+    private func openCorrection(_ rowID: UUID, sessionID: UUID, beforeOpening: (UUID) -> Void) {
+        beforeOpening(rowID)
+        closingEditor = nil
+        setEditor = .correction(sessionID: sessionID, rowID: rowID)
     }
 
     private func removeAddedSet(_ row: TrainingSet, item: WorkoutChecklist.Row, group: WorkoutChecklist.Group,
@@ -647,7 +654,7 @@ private final class ChecklistLayout {
 
 private enum SetEditor: Equatable {
     case current, closed
-    case correction(UUID)
+    case correction(sessionID: UUID, rowID: UUID)
 }
 
 private struct ClosingSetEditor: Equatable {

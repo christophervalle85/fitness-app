@@ -29,7 +29,8 @@ struct WorkoutLiveTests {
     }
 
     private func snapshot(_ store: TrainingStore, privacy: WorkoutLivePrivacy? = nil) throws -> WorkoutLiveActivity.ContentState {
-        WorkoutLiveCoordinator.snapshot(try #require(store.active), revision: store.liveRevision, privacy: privacy ?? visible)
+        WorkoutLiveCoordinator.snapshot(try #require(store.active), revision: store.liveRevision,
+                                        privacy: privacy ?? visible, training: store)
     }
 
     private func tap(_ action: WorkoutLiveAction, _ state: WorkoutLiveActivity.ContentState,
@@ -84,6 +85,25 @@ struct WorkoutLiveTests {
             try tap(.confirm, displayed, on: store)
             #expect(store.active?.exercises[0].sets[1].actual == actual)
             #expect(store.active?.exercises[0].sets[1].confirmedAt != nil)
+        }
+    }
+
+    @Test func liveActivityDisplaysAndConfirmsExactRepHistoryDefault() throws {
+        try setup(seedActuals: false) { store, _, _ in
+            let session = try #require(store.active)
+            let exercise = try #require(session.exercises.first)
+            let exact = SetActual(reps: 10, load: 42.5)
+            for (row, actual) in zip(exercise.sets, [exact, SetActual(reps: 12, load: 60)]) {
+                try store.confirm(sessionID: session.id, setID: row.id, actual: actual, revision: row.revision, commandID: UUID())
+            }
+            try store.finish(sessionID: session.id, partial: false)
+            let next = try store.startExtra(name: "Next workout")
+            try store.add(sessionID: next, prescription: exercise.prescription, basis: exercise.basis)
+            let displayed = try snapshot(store)
+            #expect(displayed.result == "10 reps · 42.5 lb machine")
+            try tap(.confirm, displayed, on: store)
+            #expect(store.active?.exercises.first?.sets.first?.actual == exact)
+            #expect(store.active?.exercises.first?.sets.first?.confirmedAt != nil)
         }
     }
 

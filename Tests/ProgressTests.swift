@@ -305,13 +305,16 @@ struct ProgressTests {
         try store.startExtra(name: "Metric day")
         let nextID = try #require(store.active?.id)
         var metric = easier
+        metric.low = 6
         metric.loadUnit = "kg"
         try store.add(sessionID: nextID, prescription: metric, basis: .external)
-        let suggested = try #require(store.active?.exercises.first?.sets.first)
-        #expect(suggested.actual.reps == 6)
-        #expect(suggested.actual.unit == "kg")
-        #expect(suggested.actual.load == WeightUnits.convert(100, from: "lb", to: "kg"))
-        #expect(suggested.confirmedAt == nil)
+        let exercise = try #require(store.active?.exercises.first)
+        let row = try #require(exercise.sets.first)
+        let suggested = try #require(store.suggestedActual(for: row, in: exercise))
+        #expect(suggested.reps == 6)
+        #expect(suggested.unit == "kg")
+        #expect(suggested.load == WeightUnits.convert(100, from: "lb", to: "kg"))
+        #expect(row.confirmedAt == nil)
     }
 
     @Test func assistedTimedAndBodyweightRetainHistoryWithoutLoadProgression() {

@@ -187,8 +187,8 @@ final class PlanUITests: XCTestCase {
         tap(app.buttons["startPlanned"])
         XCTAssertTrue(app.navigationBars["Lower body"].waitForExistence(timeout: 5))
         let reps = app.textFields["actualReps0"]
-        tap(reps)
-        reps.typeText("10")
+        XCTAssertTrue(reps.waitForExistence(timeout: 5))
+        XCTAssertEqual(reps.value as? String, "10")
         let load = app.textFields["actualLoad0"]
         tap(load)
         load.typeText("25")

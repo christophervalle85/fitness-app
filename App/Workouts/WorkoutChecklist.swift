@@ -1,16 +1,24 @@
 import Foundation
 
-/// The checklist is a read model. A set credited by an earlier workout is
-/// displayed with its original result and cannot issue a command in this session.
+/// A credited set keeps the source needed to edit it in the workout that logged it.
 struct WorkoutChecklist {
+    struct EarlierSet {
+        let set: TrainingSet
+        let sessionID: UUID
+        let exercise: TrainingExercise
+        let ordinal: Int
+        let performedAt: Date
+    }
+
     enum Row: Identifiable {
         case live(TrainingSet, index: Int)
-        case earlier(TrainingSet, ordinal: Int, date: Date)
+        case earlier(EarlierSet)
         case remaining(slot: UUID, ordinal: Int)
 
         var id: UUID {
             switch self {
-            case .live(let set, _), .earlier(let set, _, _): set.id
+            case .live(let set, _): set.id
+            case .earlier(let source): source.set.id
             case .remaining(let slot, _): slot
             }
         }
@@ -18,7 +26,8 @@ struct WorkoutChecklist {
         var ordinal: Int {
             switch self {
             case .live(let set, let index): set.ordinal ?? index + 1
-            case .earlier(_, let ordinal, _), .remaining(_, let ordinal): ordinal
+            case .earlier(let source): source.ordinal
+            case .remaining(_, let ordinal): ordinal
             }
         }
 
@@ -67,7 +76,8 @@ struct WorkoutChecklist {
                     for set in exercise.sets {
                         guard let slot = set.plannedID, let source = slots[slot], set.warmup != true,
                               let date = set.confirmedAt, represented.insert(slot).inserted else { continue }
-                        let row = Row.earlier(set, ordinal: source.ordinal, date: date)
+                        let row = Row.earlier(EarlierSet(set: set, sessionID: earlier.id, exercise: exercise,
+                                                         ordinal: source.ordinal, performedAt: date))
                         if let i = sections.firstIndex(where: {
                             $0.planIndex == source.index && $0.basis == exercise.basis &&
                             ($0.prescription.variantID ?? $0.prescription.id) == (exercise.prescription.variantID ?? exercise.prescription.id) &&
