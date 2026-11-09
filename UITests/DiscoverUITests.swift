@@ -43,7 +43,12 @@ final class DiscoverUITests: XCTestCase {
 
     func testBundledSearchAndComparableAlternative() {
         let app = launchWithRoutine()
+        tap(app.buttons["weekday0"])
+        tap(app.buttons["startPlanned"])
+        tap(app.buttons["Close"])
         tap(app.tabBars.buttons["Exercises"])
+        let accessory = app.buttons["resumeAccessory"]
+        XCTAssertTrue(accessory.waitForExistence(timeout: 5))
         let field = app.searchFields["Search"].firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         XCTAssertTrue(field.isHittable)
@@ -53,28 +58,82 @@ final class DiscoverUITests: XCTestCase {
             XCTAssertFalse(app.buttons[id].exists)
         }
         screenshot("Blank Exercises with native search", in: app)
-        search("bench press", in: app)
-        let original = "Barbell bench press"
-        let alternative = "Dumbbell bench press"
+        search("machine chest press", in: app)
+        field.typeText("\n")
+        let original = "Machine chest press"
+        let alternative = "Pec deck fly"
         XCTAssertFalse(app.buttons["catalogRow-Barbell row"].exists)
         tap(app.buttons["catalogRow-" + original])
         XCTAssertTrue(app.staticTexts[original].waitForExistence(timeout: 5))
         XCTAssertFalse(field.isHittable)
         XCTAssertTrue(app.buttons["favoriteExercise"].exists)
-        screenshot("Exercise detail gallery", in: app)
-        tap(app.buttons["catalogFrame1"])
-        XCTAssertTrue(app.navigationBars["Frame 1 of 2"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.images[original + " demonstration, image 1"].exists)
-        screenshot("Expanded first demonstration frame", in: app)
-        tap(app.navigationBars.buttons.element(boundBy: 0))
-        XCTAssertTrue(app.buttons["favoriteExercise"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.tabBars.buttons["Exercises"].isHittable)
+        let nativeBar = app.navigationBars.firstMatch
+        XCTAssertFalse(nativeBar.exists && nativeBar.isHittable)
+        XCTAssertFalse(accessory.isHittable)
+        let pose = app.images["catalogFrame1"]
+        XCTAssertTrue(pose.waitForExistence(timeout: 5))
+        XCTAssertEqual(pose.label, original + " demonstration, image 1")
+        XCTAssertFalse(app.buttons["catalogFrame1"].exists)
+        XCTAssertTrue(app.staticTexts["Instructions"].exists)
+        screenshot("Exercise movement guide", in: app)
 
+        let history = app.descendants(matching: .any)["exerciseHistoryMax"].firstMatch
+        for _ in 0..<5 where !history.isHittable { app.swipeUp() }
+        XCTAssertTrue(history.waitForExistence(timeout: 5))
+        XCTAssertTrue((history.label + String(describing: history.value)).contains("N/A"))
+        let lastLogged = app.descendants(matching: .any)["exerciseHistoryLastLogged"].firstMatch
+        XCTAssertTrue((lastLogged.label + String(describing: lastLogged.value)).contains("N/A"))
+        XCTAssertTrue(app.staticTexts["Weight (lb)"].exists)
+        XCTAssertFalse(app.staticTexts["Last 4 weeks"].exists)
+        XCTAssertFalse(app.staticTexts["Workout date"].exists)
+        XCTAssertFalse(app.staticTexts["No sets recorded yet."].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["exerciseTrendPoint"].firstMatch.exists)
+        screenshot("Exercise history without logged sets", in: app)
+
+        let cards = app.scrollViews["similarExerciseCards"].firstMatch
+        for _ in 0..<8 where !cards.isHittable { app.swipeUp() }
+        XCTAssertTrue(cards.waitForExistence(timeout: 5))
+        let firstCard = app.buttons["catalogAlternative-Barbell bench press"]
+        XCTAssertTrue(firstCard.waitForExistence(timeout: 5))
+        let firstCardHeight = firstCard.frame.height
+        XCTAssertGreaterThan(firstCardHeight, 0)
         let candidate = app.buttons["catalogAlternative-" + alternative]
-        for _ in 0..<12 where !candidate.isHittable { app.swipeUp() }
+        for _ in 0..<8 {
+            if candidate.exists, !candidate.frame.isEmpty,
+               cards.frame.contains(CGPoint(x: candidate.frame.midX, y: candidate.frame.midY)) { break }
+            cards.swipeLeft()
+        }
+        XCTAssertEqual(candidate.frame.height, firstCardHeight, accuracy: 1)
+        screenshot("Even similar exercise cards", in: app)
         tap(candidate)
         XCTAssertTrue(app.staticTexts[alternative].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["favoriteExercise"].exists)
+        XCTAssertFalse(accessory.isHittable)
         screenshot("Selected comparable alternative", in: app)
+        tap(app.buttons["exerciseDetailBack"])
+        XCTAssertFalse(accessory.isHittable)
+        let credits = app.descendants(matching: .any)["exerciseSourceCredits"].firstMatch
+        for _ in 0..<4 where !credits.exists || !credits.isHittable { app.swipeUp() }
+        XCTAssertTrue(credits.exists)
+        screenshot("Compact illustration credits", in: app)
+        let creator = app.buttons["exerciseSourceCreator"]
+        XCTAssertTrue(creator.waitForExistence(timeout: 5))
+        XCTAssertEqual(creator.label, "Everkinetic")
+        let popup = app.descendants(matching: .any)["exerciseSourcePopup"].firstMatch
+        creator.press(forDuration: 1)
+        XCTAssertFalse(popup.exists)
+        tap(creator)
+        XCTAssertTrue(popup.waitForExistence(timeout: 5))
+        screenshot("Anchored creator credits", in: app)
+        tap(app.buttons["Done"])
+        XCTAssertTrue(popup.waitForNonExistence(timeout: 5))
+        tap(app.buttons["exerciseDetailBack"])
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["Exercises"].isHittable)
+        tap(accessory)
+        tap(app.buttons["reviewSession"])
+        tap(app.buttons["Discard empty workout"])
+        tap(app.buttons["Discard workout"].firstMatch)
     }
 
     func testSwapRemainingSetsUsingBundledCatalog() {
@@ -159,7 +218,7 @@ final class DiscoverUITests: XCTestCase {
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'catalogRow-'")).count, 1)
         tap(row)
         XCTAssertEqual(favorite.label, "Remove favorite")
-        XCTAssertTrue(app.staticTexts["No sets recorded yet."].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["exerciseHistoryMax"].firstMatch.exists)
         screenshot("Saved custom exercise", in: app)
 
         app.terminate()
@@ -169,6 +228,31 @@ final class DiscoverUITests: XCTestCase {
         XCTAssertTrue(secondProfile.staticTexts["No matching exercises"].waitForExistence(timeout: 5))
         XCTAssertFalse(secondProfile.buttons["catalogRow-" + name].exists)
         XCTAssertFalse(secondProfile.buttons["newCustomExercise"].exists)
+    }
+
+    func testExerciseSearchPreservesSingleKeyboardTaps() {
+        let app = launchWithRoutine()
+        tap(app.tabBars.buttons["Exercises"])
+        let search = app.searchFields["Search"].firstMatch
+        tap(search)
+
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+        for (key, expected) in [("c", "c"), ("h", "ch"), ("e", "che"), ("s", "ches"), ("t", "chest")] {
+            let button = keyboard.keys.matching(NSPredicate(format: "label ==[c] %@", key)).firstMatch
+            XCTAssertTrue(button.waitForExistence(timeout: 5), "Keyboard keys: \(keyboard.keys.allElementsBoundByIndex.map(\.label))")
+            button.tap()
+            XCTAssertEqual(search.value as? String, expected)
+        }
+        XCTAssertTrue(app.buttons["catalogRow-Barbell bench press"].waitForExistence(timeout: 5))
+        tap(search.buttons["Clear text"].firstMatch)
+        for (key, expected) in [("r", "r"), ("o", "ro"), ("w", "row")] {
+            let button = keyboard.keys.matching(NSPredicate(format: "label ==[c] %@", key)).firstMatch
+            XCTAssertTrue(button.waitForExistence(timeout: 5), "Keyboard keys: \(keyboard.keys.allElementsBoundByIndex.map(\.label))")
+            button.tap()
+            XCTAssertEqual(search.value as? String, expected)
+        }
+        XCTAssertTrue(app.buttons["catalogRow-Barbell row"].waitForExistence(timeout: 5))
     }
 
     func testMuscleSearchWithAnOpenWorkout() {

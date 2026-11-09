@@ -328,7 +328,7 @@ private func progressResult(_ point: ProgressSet, unit: String) -> String {
         .compactMap { $0 }.joined(separator: " · ")
 }
 
-private func weightText(_ kg: Double, _ unit: String) -> String {
+func weightText(_ kg: Double, _ unit: String) -> String {
     "\(weightNumber(kg, unit)) \(unit)"
 }
 
@@ -336,7 +336,7 @@ private func weightNumber(_ kg: Double, _ unit: String) -> String {
     WeightUnits.convert(kg, from: "kg", to: unit).formatted(.number.precision(.fractionLength(0...3)))
 }
 
-private func recordContext(_ record: ExerciseRecords) -> String {
+func recordContext(_ record: ExerciseRecords) -> String {
     let name: String = switch record.basis {
     case .external: "Weight"
     case .barbell: "Total barbell weight"
@@ -430,9 +430,11 @@ private struct RecordMeasurement: View {
     }
 }
 
-private struct ExerciseTrendPlot: View {
+struct ExerciseTrendPlot: View {
+    private static let height: CGFloat = 160
     let record: ExerciseRecords
     let unit: String
+
     var measure: String {
         switch record.basis {
         case .timed: "Longest working set · seconds"
@@ -441,17 +443,11 @@ private struct ExerciseTrendPlot: View {
         default: "Heaviest working set · \(unit)"
         }
     }
-    private func value(_ point: ExerciseWorkoutPoint) -> Double? {
-        switch record.basis {
-        case .timed: point.result.seconds.map(Double.init)
-        case .bodyweight: point.result.reps.map(Double.init)
-        default: point.result.kg.map { WeightUnits.convert($0, from: "kg", to: unit) }
-        }
-    }
-    var body: some View {
-        let points = record.workoutPoints
+
+    private static func chart(points: [ExerciseWorkoutPoint], basis: LoadBasis, unit: String, measure: String) -> some View {
         Chart(points) { point in
-            if let y = value(point), y.isFinite {
+            let value = trendValue(point, basis: basis, unit: unit)
+            if let y = value, y.isFinite {
                 if points.count > 1 {
                     LineMark(x: .value("Workout", point.date), y: .value(measure, y))
                         .accessibilityHidden(true)
@@ -462,18 +458,233 @@ private struct ExerciseTrendPlot: View {
             }
         }
         .foregroundStyle(PlannerStyle.moss)
-        .chartXAxis {
-            if points.count > 1 { AxisMarks(values: .automatic(desiredCount: 3)) }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 3))
-        }
-        .chartXScale(range: .plotDimension(padding: 5))
-        .frame(height: 160)
+    }
+
+    var body: some View {
+        let points = record.workoutPoints
+        Self.chart(points: points, basis: record.basis, unit: unit, measure: measure)
+            .chartXAxis {
+                if points.count > 1 { AxisMarks(values: .automatic(desiredCount: 3)) }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading, values: .automatic(desiredCount: 3))
+            }
+            .chartXScale(range: .plotDimension(padding: 5))
+            .frame(height: Self.height)
     }
 }
 
-private struct RecordDetail: View {
+private func trendValue(_ point: ExerciseWorkoutPoint, basis: LoadBasis, unit: String) -> Double? {
+    switch basis {
+    case .timed: point.result.seconds.map(Double.init)
+    case .bodyweight: point.result.reps.map(Double.init)
+    default: point.result.kg.map { WeightUnits.convert($0, from: "kg", to: unit) }
+    }
+}
+
+struct CatalogWorkoutTrend: View {
+    private static let scaleGutter: CGFloat = 26
+    let points: [ExerciseWorkoutPoint]
+    let basis: LoadBasis
+    let unit: String
+
+    @ScaledMetric(relativeTo: .caption2) private var chartHeight: CGFloat = 104
+    @ScaledMetric(relativeTo: .caption2) private var monthLabelWidth: CGFloat = 28
+    @State private var selectedID: UUID?
+
+    private struct Point: Identifiable {
+        let workout: ExerciseWorkoutPoint
+        let value: Double
+        var id: UUID { workout.id }
+        var date: Date { workout.date }
+    }
+
+    private struct PointCenters: PreferenceKey {
+        static var defaultValue: [UUID: CGPoint] { [:] }
+        static func reduce(value: inout [UUID: CGPoint], nextValue: () -> [UUID: CGPoint]) {
+            value.merge(nextValue(), uniquingKeysWith: { _, latest in latest })
+        }
+    }
+
+    private var axisTitle: String {
+        switch basis {
+        case .timed: "Time (seconds)"
+        case .bodyweight: "Reps"
+        case .assisted: "Assistance (\(unit))"
+        default: "Weight (\(unit))"
+        }
+    }
+
+    var body: some View {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date.now
+        let today = calendar.startOfDay(for: now)
+        let start = calendar.dateInterval(of: .year, for: today)?.start ?? today
+        let end = calendar.date(byAdding: .day, value: 1, to: today) ?? now
+        let visible = points.compactMap { point -> Point? in
+            guard point.date >= start, point.date < end,
+                  let value = trendValue(point, basis: basis, unit: unit), value.isFinite else { return nil }
+            return Point(workout: point, value: value)
+        }
+        let scale = scaleValues(for: visible)
+        let selected = visible.first { $0.id == selectedID }
+        VStack(alignment: .leading, spacing: 5) {
+            Text(axisTitle).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            GeometryReader { geometry in
+                let plotWidth = max(0, geometry.size.width - Self.scaleGutter)
+                let dates = monthTicks(from: start, through: today, calendar: calendar, width: plotWidth)
+                chart(visible, scale: scale, domain: start...end, dates: dates, calendar: calendar)
+                    .accessibilityLabel("Workout trend")
+                    .accessibilityIdentifier("exerciseWorkoutTrend")
+            }
+            .frame(height: chartHeight)
+            if let selected {
+                Text("\(selected.date.formatted(date: .abbreviated, time: .omitted)) · \(progressResult(selected.workout.result, unit: unit))")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(PlannerStyle.ochre)
+                    .accessibilityIdentifier("exerciseTrendSelection")
+            }
+        }
+    }
+
+    private func chart(_ points: [Point], scale: [Double], domain: ClosedRange<Date>,
+                       dates: [Date], calendar: Calendar) -> some View {
+        let baseline = scale[0]
+        let monthFormat = Date.FormatStyle(calendar: calendar, timeZone: calendar.timeZone).month(.abbreviated)
+        return Chart(points) { point in
+            if points.count > 1 {
+                AreaMark(x: .value("Date", point.date), yStart: .value("Baseline", baseline), yEnd: .value(axisTitle, point.value))
+                    .foregroundStyle(PlannerStyle.moss.opacity(0.12))
+                    .accessibilityHidden(true)
+                LineMark(x: .value("Date", point.date), y: .value(axisTitle, point.value))
+                    .foregroundStyle(PlannerStyle.moss)
+                    .lineStyle(StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
+                    .accessibilityHidden(true)
+            }
+            PointMark(x: .value("Date", point.date), y: .value(axisTitle, point.value))
+                .foregroundStyle(point.id == selectedID ? PlannerStyle.ochre : PlannerStyle.moss)
+                .symbolSize(point.id == selectedID ? 50 : 24)
+                .accessibilityHidden(true)
+        }
+        .chartXScale(domain: domain, range: .plotDimension(padding: monthLabelWidth / 2))
+        .chartYScale(domain: baseline...scale[3], range: .plotDimension(padding: 4))
+        .chartXAxis {
+            AxisMarks(values: dates) { tick in
+                if let date = tick.as(Date.self) {
+                    AxisValueLabel(anchor: .top) {
+                        Text(date, format: monthFormat).font(.caption2).foregroundStyle(PlannerStyle.ink.opacity(0.65))
+                    }
+                }
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading, values: scale) { tick in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 1))
+                    .foregroundStyle(PlannerStyle.rule)
+                if let value = tick.as(Double.self) {
+                    AxisValueLabel {
+                        Text(value, format: .number.precision(.fractionLength(0...2)))
+                            .font(.caption2).monospacedDigit().foregroundStyle(PlannerStyle.ink.opacity(0.65))
+                    }
+                }
+            }
+        }
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                if let anchor = proxy.plotFrame {
+                    let frame = geometry[anchor]
+                    let centers = points.reduce(into: [UUID: CGPoint]()) { centers, point in
+                        if let x = proxy.position(forX: point.date), let y = proxy.position(forY: point.value) {
+                            centers[point.id] = CGPoint(x: frame.minX + x, y: frame.minY + y)
+                        }
+                    }
+                    Color.clear.preference(key: PointCenters.self, value: centers)
+                        .allowsHitTesting(false).accessibilityHidden(true)
+                }
+            }
+        }
+        .overlayPreferenceValue(PointCenters.self) { centers in
+            if !centers.isEmpty { selectionOverlay(points, centers: centers) }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func selectionOverlay(_ points: [Point], centers: [UUID: CGPoint]) -> some View {
+        GeometryReader { geometry in
+            ZStack {
+                ForEach(points) { point in
+                    if let center = centers[point.id] {
+                        pointButton(point)
+                            .position(x: clampedCenter(center.x, within: geometry.size.width),
+                                      y: clampedCenter(center.y, within: geometry.size.height))
+                    }
+                }
+                // Keep focusable buttons separate from Charts' virtual accessibility marks.
+                // Physical taps choose the nearest dot even when targets overlap.
+                Color.clear.contentShape(Rectangle())
+                    .simultaneousGesture(SpatialTapGesture().onEnded { tap in
+                        let nearest = points.compactMap { point -> (id: UUID, distance: CGFloat)? in
+                            guard let center = centers[point.id] else { return nil }
+                            return (point.id, hypot(center.x - tap.location.x, center.y - tap.location.y))
+                        }.min { $0.distance < $1.distance }
+                        selectedID = nearest.flatMap { $0.distance <= 32 ? $0.id : nil }
+                    })
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    private func pointButton(_ point: Point) -> some View {
+        Button {
+            selectedID = point.id
+        } label: {
+            Color.clear.frame(width: 44, height: 44).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(point.date.formatted(date: .abbreviated, time: .omitted))
+        .accessibilityValue(progressResult(point.workout.result, unit: unit))
+        .accessibilityAddTraits(point.id == selectedID ? .isSelected : [])
+        .accessibilityIdentifier("exerciseTrendPoint")
+    }
+
+    private func clampedCenter(_ coordinate: CGFloat, within size: CGFloat) -> CGFloat {
+        let halfTarget = min(22, size / 2)
+        return min(max(coordinate, halfTarget), size - halfTarget)
+    }
+
+    private func monthTicks(from start: Date, through today: Date, calendar: Calendar, width: CGFloat) -> [Date] {
+        let months = (0..<12).compactMap { calendar.date(byAdding: .month, value: $0, to: start) }.filter { $0 <= today }
+        let count = min(months.count, max(2, Int(width / monthLabelWidth)))
+        guard count > 1 else { return months }
+        return (0..<count).map { months[$0 * (months.count - 1) / (count - 1)] }
+    }
+
+    private func scaleValues(for points: [Point]) -> [Double] {
+        let values = points.map(\.value)
+        guard let low = values.min(), let high = values.max() else {
+            let step: Double = switch basis {
+            case .timed: 20
+            case .bodyweight: 5
+            default: unit == "kg" ? 25 : 50
+            }
+            return (0...3).map { Double($0) * step }
+        }
+        let roughStep = max((high - low) / 3, high * 0.08, 1)
+        let magnitude = pow(10, floor(log10(roughStep)))
+        for multiple in [1.0, 2, 2.5, 5, 10, 20] {
+            let step = multiple * magnitude
+            guard step.isFinite, step >= roughStep else { continue }
+            let first = max(0, floor(low / step) * step)
+            let last = first + 3 * step
+            if last.isFinite, last >= high {
+                return (0...3).map { first + Double($0) * step }
+            }
+        }
+        return (0...3).map { (Double($0) / 3) * high }
+    }
+}
+
+struct RecordDetail: View {
     let record: ExerciseRecords
     let unit: String
     var body: some View {

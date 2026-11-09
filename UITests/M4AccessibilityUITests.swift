@@ -160,9 +160,9 @@ final class M4AccessibilityUITests: XCTestCase {
         if detail {
             tap(row)
             XCTAssertTrue(app.buttons["favoriteExercise"].waitForExistence(timeout: 5))
-            let frame = app.buttons["catalogFrame1"]
+            let frame = app.images["catalogFrame1"]
             XCTAssertTrue(frame.waitForExistence(timeout: 5))
-            XCTAssertEqual(frame.label, "Enlarge Barbell bench press demonstration, frame 1")
+            XCTAssertEqual(frame.label, "Barbell bench press demonstration, image 1")
         } else if searchCurl {
             XCTAssertTrue(row.isHittable)
             XCTAssertLessThan(row.frame.maxY, app.tabBars.firstMatch.frame.minY)

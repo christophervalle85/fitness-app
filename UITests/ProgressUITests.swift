@@ -48,7 +48,7 @@ final class ProgressUITests: XCTestCase {
         XCTAssertTrue(reps.waitForExistence(timeout: 5))
         XCTAssertEqual(reps.value as? String, "10")
         tap(load)
-        load.typeText("25")
+        load.typeText("175")
         if app.buttons["dismissSetKeyboard"].isHittable { tap(app.buttons["dismissSetKeyboard"]) }
         let loggedDate = Date.now.formatted(.dateTime.month(.abbreviated).day().year())
         tap(app.buttons["confirmSet0"])
@@ -97,6 +97,21 @@ final class ProgressUITests: XCTestCase {
             assertProgressTitleVisible(in: app)
         }
 
+        tap(app.tabBars.buttons["Exercises"])
+        let exerciseSearch = app.searchFields["Search"].firstMatch
+        tap(exerciseSearch)
+        exerciseSearch.typeText(exercise)
+        exerciseSearch.typeText("\n")
+        tap(app.buttons["catalogRow-" + exercise])
+        let point = app.buttons["exerciseTrendPoint"].firstMatch
+        revealOverviewControl(point)
+        tap(point)
+        let selection = app.staticTexts["exerciseTrendSelection"]
+        XCTAssertTrue(selection.waitForExistence(timeout: 5))
+        XCTAssertTrue(selection.label.contains("175 lb · 10 reps"))
+        capture("Selected exercise history point", in: app)
+        tap(app.buttons["exerciseDetailBack"])
+
         openProgress()
         capture("Progress overview", in: app)
         XCTAssertFalse(app.segmentedControls["weightUnit"].exists)
@@ -135,21 +150,21 @@ final class ProgressUITests: XCTestCase {
         revealOverviewControl(routineRecord)
         XCTAssertTrue(app.staticTexts["progressExerciseMuscle-Chest"].exists)
         XCTAssertFalse(app.staticTexts["Monday"].exists)
-        XCTAssertTrue(routineRecord.label.contains("25"))
+        XCTAssertTrue(routineRecord.label.contains("175"))
         XCTAssertTrue(routineRecord.label.contains(loggedDate))
         capture("Exercise record rows by muscle", in: app)
         tap(routineRecord)
         XCTAssertTrue(app.navigationBars[exercise].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["exerciseWorkoutTrend"].firstMatch.waitForExistence(timeout: 5))
         capture("Exercise trend from the routine", in: app)
-        XCTAssertTrue(app.staticTexts["25 lb · 10 reps"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["175 lb · 10 reps"].firstMatch.waitForExistence(timeout: 5))
         backToProgress()
 
         setUnit("kg")
         revealOverviewControl(routineRecord)
-        XCTAssertTrue(routineRecord.label.contains("11.34"))
+        XCTAssertTrue(routineRecord.label.contains("79.379"))
         openRecord()
-        XCTAssertTrue(app.staticTexts["11.34 kg · 10 reps"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["79.379 kg · 10 reps"].firstMatch.waitForExistence(timeout: 5))
         backToProgress()
         setUnit("lb")
 
@@ -163,8 +178,8 @@ final class ProgressUITests: XCTestCase {
         tap(app.buttons["saveCorrection"])
         backToProgress()
         openRecord()
-        XCTAssertTrue(app.staticTexts["25 lb · 8 reps"].firstMatch.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["25 lb · 10 reps"].firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["175 lb · 8 reps"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["175 lb · 10 reps"].firstMatch.exists)
         backToProgress()
 
         openLoggedSet()
