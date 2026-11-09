@@ -15,6 +15,7 @@ struct PlannerRoot: View {
     @State private var weekBoundary: Date?
     @State private var agendaDate = Date.now
     @State private var planRootVisible = true
+    @State private var exercisesRootVisible = true
     @State private var finishPulse = 0
     @State private var pendingCelebration = false
     @State private var editing = WeekPlan()
@@ -70,7 +71,11 @@ struct PlannerRoot: View {
                         }
                     }
                     Tab("Exercises", systemImage: "dumbbell", value: "Exercises") {
-                        NavigationStack { ExercisesScreen(planner: store, training: training) }
+                        NavigationStack {
+                            ExercisesScreen(planner: store, training: training)
+                                .onAppear { exercisesRootVisible = true }
+                                .onDisappear { exercisesRootVisible = false }
+                        }
                     }
                     Tab("Progress", systemImage: "chart.xyaxis.line", value: "Progress") {
                         NavigationStack {
@@ -272,6 +277,7 @@ struct PlannerRoot: View {
 
     private var showsWorkoutAccessory: Bool {
         guard let session = training.active else { return false }
+        if tab == "Exercises" { return exercisesRootVisible }
         guard tab == "Plan", planRootVisible, !training.isPastWeek(agendaDate) else { return true }
         guard let id = session.occurrenceID else { return false }
         guard let occurrence = training.occurrences.first(where: { $0.id == id }) else { return true }

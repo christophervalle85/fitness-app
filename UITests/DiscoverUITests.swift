@@ -43,7 +43,12 @@ final class DiscoverUITests: XCTestCase {
 
     func testBundledSearchAndComparableAlternative() {
         let app = launchWithRoutine()
+        tap(app.buttons["weekday0"])
+        tap(app.buttons["startPlanned"])
+        tap(app.buttons["Close"])
         tap(app.tabBars.buttons["Exercises"])
+        let accessory = app.buttons["resumeAccessory"]
+        XCTAssertTrue(accessory.waitForExistence(timeout: 5))
         let field = app.searchFields["Search"].firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         XCTAssertTrue(field.isHittable)
@@ -54,27 +59,55 @@ final class DiscoverUITests: XCTestCase {
         }
         screenshot("Blank Exercises with native search", in: app)
         search("bench press", in: app)
+        field.typeText("\n")
         let original = "Barbell bench press"
-        let alternative = "Dumbbell bench press"
+        let alternative = "Pec deck fly"
         XCTAssertFalse(app.buttons["catalogRow-Barbell row"].exists)
         tap(app.buttons["catalogRow-" + original])
         XCTAssertTrue(app.staticTexts[original].waitForExistence(timeout: 5))
         XCTAssertFalse(field.isHittable)
         XCTAssertTrue(app.buttons["favoriteExercise"].exists)
-        screenshot("Exercise detail gallery", in: app)
-        tap(app.buttons["catalogFrame1"])
-        XCTAssertTrue(app.navigationBars["Frame 1 of 2"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.images[original + " demonstration, image 1"].exists)
-        screenshot("Expanded first demonstration frame", in: app)
-        tap(app.navigationBars.buttons.element(boundBy: 0))
-        XCTAssertTrue(app.buttons["favoriteExercise"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.tabBars.buttons["Exercises"].isHittable)
+        let nativeBar = app.navigationBars.firstMatch
+        XCTAssertFalse(nativeBar.exists && nativeBar.isHittable)
+        XCTAssertFalse(accessory.isHittable)
+        let pose = app.images["catalogFrame1"]
+        XCTAssertTrue(pose.waitForExistence(timeout: 5))
+        XCTAssertEqual(pose.label, original + " demonstration, image 1")
+        XCTAssertFalse(app.buttons["catalogFrame1"].exists)
+        XCTAssertTrue(app.staticTexts["Instructions"].exists)
+        screenshot("Exercise movement guide", in: app)
 
+        let history = app.descendants(matching: .any)["exerciseHistoryMax"].firstMatch
+        for _ in 0..<5 where !history.isHittable { app.swipeUp() }
+        XCTAssertTrue(history.waitForExistence(timeout: 5))
+        XCTAssertTrue((history.label + String(describing: history.value)).contains("N/A"))
+        let lastLogged = app.descendants(matching: .any)["exerciseHistoryLastLogged"].firstMatch
+        XCTAssertTrue((lastLogged.label + String(describing: lastLogged.value)).contains("N/A"))
+        screenshot("Exercise history without logged sets", in: app)
+
+        let cards = app.scrollViews["similarExerciseCards"].firstMatch
+        for _ in 0..<8 where !cards.isHittable { app.swipeUp() }
+        XCTAssertTrue(cards.waitForExistence(timeout: 5))
         let candidate = app.buttons["catalogAlternative-" + alternative]
-        for _ in 0..<12 where !candidate.isHittable { app.swipeUp() }
+        for _ in 0..<8 {
+            if candidate.exists, !candidate.frame.isEmpty,
+               cards.frame.contains(CGPoint(x: candidate.frame.midX, y: candidate.frame.midY)) { break }
+            cards.swipeLeft()
+        }
         tap(candidate)
         XCTAssertTrue(app.staticTexts[alternative].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["favoriteExercise"].exists)
+        XCTAssertFalse(accessory.isHittable)
         screenshot("Selected comparable alternative", in: app)
+        tap(app.buttons["exerciseDetailBack"])
+        XCTAssertFalse(accessory.isHittable)
+        tap(app.buttons["exerciseDetailBack"])
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["Exercises"].isHittable)
+        tap(accessory)
+        tap(app.buttons["reviewSession"])
+        tap(app.buttons["Discard empty workout"])
+        tap(app.buttons["Discard workout"].firstMatch)
     }
 
     func testSwapRemainingSetsUsingBundledCatalog() {

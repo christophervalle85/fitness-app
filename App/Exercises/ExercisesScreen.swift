@@ -263,166 +263,445 @@ private struct CatalogDetail: View {
     let planner: PlanningStore
     let training: TrainingStore?
     let select: ((PlanExercise) -> Void)?
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
-    @State private var selectedFrame: Int?
-    @State private var equipment = ""
     @State private var issue: String?
+
     var body: some View {
-        List {
-            VStack(alignment: .leading, spacing: 7) {
-                if !entry.movement.isEmpty { Text(entry.movement).font(.subheadline.weight(.semibold)).foregroundStyle(PlannerStyle.moss) }
-                Text(entry.name).font(.system(.title, design: .rounded, weight: .bold))
-                    .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
-                if !entry.primary.isEmpty { Text(entry.primary.joined(separator: " · ")).font(.headline).foregroundStyle(PlannerStyle.ink) }
-            }.padding(.vertical, 4).listRowBackground(PlannerStyle.paper)
-            if let select {
-                Button("Use this exercise") {
-                    select(planner.customExercises.first { ($0.variantID ?? $0.id) == entry.id } ?? entry.prescription)
-                }.accessibilityIdentifier("useCatalogExercise")
-            }
-            if !entry.media.isEmpty {
-                Section("Demonstration") {
-                    LazyVGrid(columns: [GridItem(typeSize.isAccessibilitySize ? .flexible() : .adaptive(minimum: 125), spacing: 8)], spacing: 8) {
-                        ForEach(entry.media.indices, id: \.self) { i in
-                            Button {
-                                selectedFrame = i
-                            } label: {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    HStack(alignment: .firstTextBaseline, spacing: 5) {
-                                        Image(systemName: "arrow.up.left.and.arrow.down.right").accessibilityHidden(true)
-                                        Text("Frame \(i + 1)").fixedSize(horizontal: false, vertical: true)
-                                    }
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(PlannerStyle.ink)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.vertical, 4)
-                                    catalogFrame(i, height: 110)
-                                }
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Enlarge \(entry.name) demonstration, frame \(i + 1)")
-                            .accessibilityIdentifier("catalogFrame\(i + 1)")
-                        }
-                    }.padding(.vertical, 3)
-                }
-            }
-            if !entry.instructions.isEmpty {
-                Section("Form cues") {
-                    ForEach(entry.instructions.indices, id: \.self) { i in
-                        HStack(alignment: .firstTextBaseline, spacing: 12) {
-                            Text(String(format: "%02d", i + 1)).font(.caption.monospacedDigit().bold()).foregroundStyle(PlannerStyle.moss)
-                            Text(entry.instructions[i]).fixedSize(horizontal: false, vertical: true)
-                        }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 12) {
+                    heading
+                    if let issue {
+                        Label(issue, systemImage: "exclamationmark.circle").font(.footnote)
                     }
-                }
-            }
-            Section("Training details") {
-                if !entry.equipment.isEmpty { LabeledContent("Equipment", value: entry.equipment.joined(separator: ", ")) }
-                if !entry.secondary.isEmpty { LabeledContent("Also works", value: entry.secondary.joined(separator: ", ")) }
-                if !entry.convention.isEmpty { LabeledContent("Recording method", value: entry.convention) }
-            }
-            if let url = entry.tutorialURL.flatMap(safeLink), let creator = entry.tutorialCreator, !creator.isEmpty {
-                Link("Tutorial by \(creator)", destination: url)
-            }
-            if let training {
-                Section("Your history") {
-                    let results = training.sessions.sorted { $0.startedAt > $1.startedAt }.flatMap { session in
-                        session.exercises.filter { ($0.prescription.variantID ?? $0.prescription.id) == entry.id }
-                            .flatMap { exercise in exercise.sets.compactMap { set -> (UUID, Date, String)? in
-                                guard let date = set.confirmedAt else { return nil }
-                                return (set.id, date, actualDescription(set.actual.converted(to: planner.weightUnit), basis: exercise.basis))
-                            } }
-                    }.sorted { $0.1 > $1.1 }
-                    if results.isEmpty { Text("No sets recorded yet.").foregroundStyle(.secondary) }
-                    ForEach(results, id: \.0) { item in LabeledContent(item.1.formatted(date: .abbreviated, time: .shortened), value: item.2) }
-                }
-            }
-            if !entry.primary.isEmpty {
-                Section("Alternatives") {
-                    Picker("Equipment", selection: $equipment) {
-                        Text("Any").tag("")
-                        ForEach(Set(catalog.entries.flatMap(\.equipment)).sorted(), id: \.self) { Text($0).tag($0) }
-                    }
-                    let alternatives = catalog.alternatives(to: entry, filter: CatalogFilter(equipment: equipment))
-                    if alternatives.isEmpty { Text("No matching alternatives.").foregroundStyle(.secondary) }
-                    ForEach(alternatives, id: \.entry.id) { candidate in
-                        NavigationLink {
-                            CatalogDetail(entry: candidate.entry, catalog: catalog, planner: planner, training: training, select: select)
+                    if !entry.media.isEmpty { demonstration }
+                    muscleTags
+                    if let select {
+                        Button {
+                            select(planner.customExercises.first { ($0.variantID ?? $0.id) == entry.id } ?? entry.prescription)
                         } label: {
-                            VStack(alignment: .leading) {
-                                Text(candidate.entry.name)
-                                Text(candidate.reason).font(.subheadline).foregroundStyle(.secondary)
-                            }
-                        }.accessibilityIdentifier("catalogAlternative-" + candidate.entry.name)
+                            Text("Use this exercise").frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .accessibilityIdentifier("useCatalogExercise")
+                    }
+                }
+                .padding(.horizontal, 20)
+
+                instructions.padding(.horizontal, 20)
+                if let training {
+                    CatalogWorkoutHistory(entry: entry, training: training, unit: planner.weightUnit)
+                        .padding(.horizontal, 20)
+                }
+                similarExercises
+                sourceCredits.padding(.horizontal, 20)
+            }
+            .padding(.top, 4)
+            .padding(.bottom, 22)
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            detailActions
+                .padding(.horizontal, 20)
+                .background(PlannerStyle.paper)
+        }
+        .background(PlannerStyle.paper)
+        .navigationBarBackButtonHidden(true)
+        .toolbarVisibility(.hidden, for: .navigationBar, .tabBar)
+    }
+
+    private var detailActions: some View {
+        let favorite = planner.favoriteExerciseIDs.contains(entry.id)
+        return HStack {
+            Button {
+                dismiss()
+            } label: {
+                Label("Back", systemImage: "chevron.backward")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityIdentifier("exerciseDetailBack")
+            Spacer()
+            Button {
+                do {
+                    try planner.setExerciseFavorite(entry.id, favorite: !favorite)
+                    issue = nil
+                } catch {
+                    issue = error.localizedDescription
+                }
+            } label: {
+                Image(systemName: favorite ? "star.fill" : "star")
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(favorite ? "Remove favorite" : "Add favorite")
+            .accessibilityIdentifier("favoriteExercise")
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(PlannerStyle.moss)
+    }
+
+    private var heading: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(entry.name).font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            if !entry.equipment.isEmpty {
+                Text(entry.equipment.joined(separator: ", ")).font(.subheadline).foregroundStyle(.secondary)
+            }
+            if !entry.convention.isEmpty {
+                Text(entry.convention).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var demonstration: some View {
+        // Only source labels that identify the motion order justify an arrow.
+        let sequence = entry.media.count > 1
+            && entry.media[0].source.hasSuffix("-relaxation.png")
+            && entry.media[1].source.hasSuffix("-tension.png")
+            && entry.media.prefix(2).allSatisfy { $0.localURL != nil }
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 10)) : AnyLayout(HStackLayout(spacing: 8))
+        return VStack(spacing: 8) {
+            if entry.media.count == 1 {
+                catalogFrame(0, height: 210)
+            } else {
+                layout {
+                    catalogFrame(0, height: typeSize.isAccessibilitySize ? 200 : 155)
+                    if sequence {
+                        Image(systemName: typeSize.isAccessibilitySize ? "arrow.down" : "arrow.forward")
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(PlannerStyle.moss)
+                            .accessibilityHidden(true)
+                    }
+                    catalogFrame(1, height: typeSize.isAccessibilitySize ? 200 : 155)
+                }
+                if entry.media.count > 2 {
+                    LazyVGrid(columns: [GridItem(typeSize.isAccessibilitySize ? .flexible() : .adaptive(minimum: 140), spacing: 8)], spacing: 8) {
+                        ForEach(2..<entry.media.count, id: \.self) { index in
+                            catalogFrame(index, height: 155)
+                        }
                     }
                 }
             }
-            if !entry.source.isEmpty || entry.textReference != nil || !entry.media.isEmpty {
-                Section {
-                    DisclosureGroup("Sources and licenses") {
-                        if let text = entry.textReference {
-                            credit(title: "Instructions", author: text.authors.joined(separator: ", "),
-                                   license: text.license, licenseURL: text.licenseURL,
-                                   changes: text.modifications, source: text.source)
-                        }
-                        ForEach(entry.media.indices, id: \.self) { index in
-                            let media = entry.media[index]
-                            credit(title: "Illustration \(index + 1)", author: media.author,
-                                   license: media.license.components(separatedBy: " · ").first ?? media.license,
-                                   licenseURL: media.licenseURL, changes: media.modifications, source: media.source)
-                        }
-                        if let source = safeLink(entry.source) { Link("Exercise source", destination: source) }
-                    }
-                }
-            }
-            if let issue { Text(issue) }
-        }.scrollContentBackground(.hidden).background(PlannerStyle.paper)
-        .navigationTitle("Exercise").navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(item: $selectedFrame) { index in
-            ScrollView { catalogFrame(index, height: 400).padding() }
-                .navigationTitle("Frame \(index + 1) of \(entry.media.count)")
-                .navigationBarTitleDisplayMode(.inline)
         }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                let favorite = planner.favoriteExerciseIDs.contains(entry.id)
-                Button(favorite ? "Remove favorite" : "Add favorite", systemImage: favorite ? "star.fill" : "star") {
-                    do { try planner.setExerciseFavorite(entry.id, favorite: !favorite); issue = nil } catch { issue = error.localizedDescription }
-                }.accessibilityIdentifier("favoriteExercise")
-            }
-        }
+        .padding(10)
+        .background(PlannerStyle.moss.opacity(0.10), in: RoundedRectangle(cornerRadius: 20))
     }
 
     @ViewBuilder private func catalogFrame(_ index: Int, height: CGFloat) -> some View {
         if let url = entry.media[index].localURL, let image = UIImage(contentsOfFile: url.path) {
-            Image(uiImage: image).resizable().scaledToFit().padding(6)
+            Image(uiImage: image).resizable().scaledToFit().padding(4)
                 .frame(maxWidth: .infinity).frame(height: height)
                 .background(.white, in: RoundedRectangle(cornerRadius: 10))
                 .accessibilityLabel("\(entry.name) demonstration, image \(index + 1)")
+                .accessibilityIdentifier("catalogFrame\(index + 1)")
         } else {
             Label("Image unavailable offline", systemImage: "photo").font(.footnote)
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
+    }
+
+    @ViewBuilder private var muscleTags: some View {
+        if !entry.primary.isEmpty || !entry.secondary.isEmpty {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 6) { muscleTagContents }
+                    .fixedSize(horizontal: true, vertical: false)
+                VStack(alignment: .leading, spacing: 6) { muscleTagContents }
+            }
+        }
+    }
+
+    @ViewBuilder private var muscleTagContents: some View {
+        if !entry.primary.isEmpty { muscleTag("Primary", muscles: entry.primary, emphasized: true) }
+        if !entry.secondary.isEmpty { muscleTag("Secondary", muscles: entry.secondary, emphasized: false) }
+    }
+
+    private func muscleTag(_ role: String, muscles: [String], emphasized: Bool) -> some View {
+        let names = muscles.joined(separator: ", ")
+        return Text("\(Text(role).foregroundStyle(.secondary)) \(Text(names).fontWeight(.semibold))")
+            .font(.caption)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(emphasized ? PlannerStyle.moss.opacity(0.12) : PlannerStyle.surface, in: RoundedRectangle(cornerRadius: 10))
+            .accessibilityLabel("\(role): \(names)")
+    }
+
+    @ViewBuilder private var instructions: some View {
+        if !entry.instructions.isEmpty || entry.tutorialURL != nil {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Instructions").font(.headline).accessibilityAddTraits(.isHeader)
+                ForEach(entry.instructions.indices, id: \.self) { index in
+                    HStack(alignment: .firstTextBaseline, spacing: 9) {
+                        Text(String(format: "%02d", index + 1)).font(.caption.monospacedDigit().bold())
+                            .foregroundStyle(PlannerStyle.moss)
+                            .padding(.horizontal, 6).padding(.vertical, 4)
+                            .background(PlannerStyle.moss.opacity(0.10), in: Capsule())
+                        Text(entry.instructions[index]).font(.subheadline).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                if let url = entry.tutorialURL.flatMap(safeLink), let creator = entry.tutorialCreator, !creator.isEmpty {
+                    Link("Tutorial by \(creator)", destination: url).font(.subheadline)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var similarExercises: some View {
+        if !entry.primary.isEmpty {
+            let alternatives = catalog.alternatives(to: entry)
+            VStack(alignment: .leading, spacing: 9) {
+                Text("Similar exercises").font(.headline).accessibilityAddTraits(.isHeader).padding(.horizontal, 20)
+                if alternatives.isEmpty {
+                    Text("No matching alternatives.").font(.subheadline).foregroundStyle(.secondary).padding(.horizontal, 20)
+                } else {
+                    ScrollView(.horizontal) {
+                        LazyHStack(alignment: .top, spacing: 10) {
+                            ForEach(alternatives, id: \.entry.id) { candidate in
+                                NavigationLink {
+                                    CatalogDetail(entry: candidate.entry, catalog: catalog, planner: planner, training: training, select: select)
+                                } label: {
+                                    similarCard(candidate.entry, reason: candidate.reason)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("catalogAlternative-" + candidate.entry.name)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    .accessibilityIdentifier("similarExerciseCards")
+                }
+            }
+        }
+    }
+
+    private func similarCard(_ candidate: CatalogEntry, reason: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            CatalogThumbnail(media: candidate.media.first)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(PlannerStyle.moss.opacity(0.10))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(candidate.name).font(.subheadline.weight(.semibold))
+                Text(candidate.equipment.isEmpty ? reason : candidate.equipment.joined(separator: ", "))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(9)
+        }
+        .frame(width: typeSize.isAccessibilitySize ? 240 : 150)
+        .background(PlannerStyle.surface, in: RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(PlannerStyle.rule.opacity(0.42)).allowsHitTesting(false) }
+        .contentShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    @ViewBuilder private var sourceCredits: some View {
+        if !entry.source.isEmpty || entry.textReference != nil || !entry.media.isEmpty {
+            VStack(alignment: .leading, spacing: 5) {
+                if let reference = entry.textReference {
+                    credit(title: "Instructions", author: reference.authors.joined(separator: ", "),
+                           license: reference.license, licenseURL: reference.licenseURL,
+                           changes: reference.modifications, source: reference.source)
+                }
+                ForEach(mediaCreditGroups, id: \.self) { group in
+                    if let index = group.first {
+                        let media = entry.media[index]
+                        Text("Illustrations: \(media.author)")
+                        licenseCredit(media.license, url: media.licenseURL)
+                        if !media.modifications.isEmpty { Text(media.modifications) }
+                        ForEach(group, id: \.self) { index in
+                            if let source = safeLink(entry.media[index].source) {
+                                Link("Illustration \(index + 1) source", destination: source)
+                            }
+                        }
+                    }
+                }
+                if let source = safeLink(entry.source) { Link("Exercise source", destination: source) }
+                if !catalog.alternatives(to: entry).isEmpty {
+                    Text("Credits for similar exercise illustrations appear on each exercise page.")
+                }
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var mediaCreditGroups: [[Int]] {
+        var groups: [[Int]] = []
+        for index in entry.media.indices {
+            let media = entry.media[index]
+            if let group = groups.firstIndex(where: { group in
+                let existing = entry.media[group[0]]
+                return existing.author == media.author && existing.license == media.license
+                    && existing.licenseURL == media.licenseURL && existing.modifications == media.modifications
+            }) {
+                groups[group].append(index)
+            } else {
+                groups.append([index])
+            }
+        }
+        return groups
+    }
+
+    @ViewBuilder private func licenseCredit(_ license: String, url: String?) -> some View {
+        if let url = url.flatMap(safeLink) {
+            Link(license.components(separatedBy: " · ").first ?? license, destination: url)
+        } else {
+            Text(license)
         }
     }
 
     private func credit(title: String, author: String, license: String, licenseURL: String?, changes: String, source: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.subheadline.weight(.semibold))
-            Text(author)
-            if !changes.isEmpty { Text(changes).foregroundStyle(.secondary) }
-            if let url = licenseURL.flatMap(safeLink) {
-                Link(license, destination: url)
-            } else { Text(license) }
-            if let url = safeLink(source) { Link("View source", destination: url) }
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(title): \(author)")
+            licenseCredit(license, url: licenseURL)
+            if !changes.isEmpty { Text(changes) }
+            if let url = safeLink(source) { Link("\(title) source", destination: url) }
         }
-        .font(.footnote)
-        .buttonStyle(.borderless)
-        .padding(.vertical, 3)
     }
 
     private func safeLink(_ text: String) -> URL? {
         guard let url = URL(string: text), url.scheme?.lowercased() == "https", url.host != nil else { return nil }
         return url
+    }
+}
+
+private struct CatalogWorkoutHistory: View {
+    let entry: CatalogEntry
+    let training: TrainingStore
+    let unit: String
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var selectedSeries: RecordIdentity?
+
+    var body: some View {
+        let records = ProgressMetrics.exerciseRecords(variantID: entry.id, sessions: training.sessions).sorted {
+            ($0.trend.last?.date ?? .distantPast) > ($1.trend.last?.date ?? .distantPast)
+        }
+        let record = records.first { $0.id == selectedSeries } ?? records.first
+        let latest = training.sessions.lazy.flatMap(\.exercises)
+            .filter { ($0.prescription.variantID ?? $0.prescription.id) == entry.id }
+            .flatMap(\.sets).compactMap(\.confirmedAt).max()
+        let metric = metric(for: record)
+        let metricLayout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 6)) : AnyLayout(HStackLayout(alignment: .top, spacing: 6))
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Workout history").font(.headline).accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("exerciseHistory")
+            if records.count > 1 {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 6) {
+                        ForEach(Array(records.enumerated()), id: \.element.id) { index, series in
+                            let current = series.id == record?.id
+                            Button {
+                                selectedSeries = series.id
+                            } label: {
+                                Text(seriesName(series, at: index, among: records))
+                                    .font(.caption.weight(.semibold))
+                                    .padding(.horizontal, 9).frame(minHeight: 44)
+                                    .background(current ? PlannerStyle.moss.opacity(0.14) : PlannerStyle.paper, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(current ? .isSelected : [])
+                        }
+                    }
+                }
+                .accessibilityLabel("Workout history series")
+            } else if let record {
+                Text(recordContext(record)).font(.caption).foregroundStyle(.secondary)
+            }
+            metricLayout {
+                historyMetric(metric.title, value: metric.value, id: "exerciseHistoryMax")
+                let seriesDate = record?.trend.last?.date ?? latest
+                historyMetric("Last logged", value: seriesDate?.formatted(.dateTime.month(.abbreviated).day().year()),
+                              id: "exerciseHistoryLastLogged")
+            }
+            if let record {
+                let plot = ExerciseTrendPlot(record: record, unit: unit)
+                Text(plot.measure).font(.caption).foregroundStyle(.secondary)
+                plot.accessibilityIdentifier("exerciseWorkoutTrend")
+            } else {
+                VStack(spacing: 5) {
+                    Image(systemName: "chart.xyaxis.line").foregroundStyle(PlannerStyle.moss).accessibilityHidden(true)
+                    Text(latest == nil ? "No sets recorded yet." : "No comparable working sets yet.")
+                        .font(.subheadline.weight(.medium))
+                }
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, minHeight: 84)
+                .padding(.horizontal, 8)
+                .background(PlannerStyle.paper, in: RoundedRectangle(cornerRadius: 10))
+            }
+            if latest != nil {
+                NavigationLink("View logged sets") {
+                    CatalogLoggedSets(entry: entry, training: training, unit: unit)
+                }
+                .font(.subheadline)
+            }
+        }
+        .padding(13)
+        .background(PlannerStyle.surface, in: RoundedRectangle(cornerRadius: 20))
+        .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(PlannerStyle.rule.opacity(0.42)).allowsHitTesting(false) }
+    }
+
+    private func metric(for record: ExerciseRecords?) -> (title: String, value: String?) {
+        let result = record?.overviewResult
+        switch record?.basis ?? LoadBasis(entry.prescription) {
+        case .bodyweight: return ("Most reps", result?.reps?.formatted())
+        case .timed: return ("Longest set", result?.seconds.map { "\($0.formatted()) sec" })
+        case .assisted: return ("Latest assistance", result?.kg.map { weightText($0, unit) })
+        default: return ("Max weight", result?.kg.map { weightText($0, unit) })
+        }
+    }
+
+    private func seriesName(_ record: ExerciseRecords, at index: Int, among records: [ExerciseRecords]) -> String {
+        let context = recordContext(record)
+        let peers = records.filter { recordContext($0) == context }
+        guard peers.count > 1 else { return context }
+        let number = peers.firstIndex { $0.id == record.id }.map { $0 + 1 } ?? index + 1
+        return "\(context) · Series \(number)"
+    }
+
+    private func historyMetric(_ title: String, value: String?, id: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(value ?? "N/A").font(.headline).monospacedDigit()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(8)
+        .background(PlannerStyle.paper, in: RoundedRectangle(cornerRadius: 9))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(value ?? "N/A")
+        .accessibilityIdentifier(id)
+    }
+}
+
+private struct CatalogLoggedSets: View {
+    let entry: CatalogEntry
+    let training: TrainingStore
+    let unit: String
+
+    var body: some View {
+        let results = training.sessions.lazy.flatMap(\.exercises)
+            .filter { ($0.prescription.variantID ?? $0.prescription.id) == entry.id }
+            .flatMap { exercise in
+                exercise.sets.compactMap { set -> (id: UUID, date: Date, value: String)? in
+                    guard let date = set.confirmedAt else { return nil }
+                    return (set.id, date, actualDescription(set.actual.converted(to: unit), basis: exercise.basis))
+                }
+            }.sorted { $0.date > $1.date }
+        List(results, id: \.id) { result in
+            LabeledContent(result.date.formatted(date: .abbreviated, time: .shortened), value: result.value)
+        }
+        .navigationTitle("Logged sets")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarVisibility(.visible, for: .navigationBar)
+        .toolbarVisibility(.hidden, for: .tabBar)
+        .scrollContentBackground(.hidden)
+        .background(PlannerStyle.paper)
     }
 }
 
