@@ -829,18 +829,8 @@ private struct CatalogWorkoutHistory: View {
                 historyMetric("Last logged", value: seriesDate?.formatted(.dateTime.month(.abbreviated).day().year()),
                               id: "exerciseHistoryLastLogged")
             }
-            if let record {
-                let plot = ExerciseTrendPlot(record: record, unit: unit)
-                Text(plot.measure).font(.caption).foregroundStyle(.secondary)
-                plot.accessibilityIdentifier("exerciseWorkoutTrend")
-            } else {
-                VStack(spacing: 8) {
-                    ExerciseTrendPlot.empty(basis: LoadBasis(entry.prescription), unit: unit)
-                    Text(latest == nil ? "No sets recorded yet." : "No comparable working sets yet.")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-            }
+            CatalogWorkoutTrend(points: record?.workoutPoints ?? [], basis: record?.basis ?? LoadBasis(entry.prescription), unit: unit)
+                .id(record?.id)
             if latest != nil {
                 NavigationLink("View logged sets") {
                     CatalogLoggedSets(entry: entry, training: training, unit: unit)

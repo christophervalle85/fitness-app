@@ -85,8 +85,10 @@ final class DiscoverUITests: XCTestCase {
         let lastLogged = app.descendants(matching: .any)["exerciseHistoryLastLogged"].firstMatch
         XCTAssertTrue((lastLogged.label + String(describing: lastLogged.value)).contains("N/A"))
         XCTAssertTrue(app.staticTexts["Weight (lb)"].exists)
-        XCTAssertTrue(app.staticTexts["Last 4 weeks"].exists)
-        XCTAssertTrue(app.staticTexts["Workout date"].exists)
+        XCTAssertFalse(app.staticTexts["Last 4 weeks"].exists)
+        XCTAssertFalse(app.staticTexts["Workout date"].exists)
+        XCTAssertFalse(app.staticTexts["No sets recorded yet."].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["exerciseTrendPoint"].firstMatch.exists)
         screenshot("Exercise history without logged sets", in: app)
 
         let cards = app.scrollViews["similarExerciseCards"].firstMatch
@@ -216,7 +218,7 @@ final class DiscoverUITests: XCTestCase {
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'catalogRow-'")).count, 1)
         tap(row)
         XCTAssertEqual(favorite.label, "Remove favorite")
-        XCTAssertTrue(app.staticTexts["No sets recorded yet."].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["exerciseHistoryMax"].firstMatch.exists)
         screenshot("Saved custom exercise", in: app)
 
         app.terminate()
