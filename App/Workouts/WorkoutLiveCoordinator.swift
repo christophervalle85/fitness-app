@@ -80,8 +80,9 @@ enum WorkoutLiveCoordinator {
         state.finalSet = pending.count == 1
         state.willRest = !state.finalSet && exercise.restSeconds != nil
         // The user-facing setting covers every actual, including unweighted reps and seconds.
-        if state.exerciseName != nil, privacy.showLoad, (try? row.actual.validate(for: exercise.basis)) != nil {
-            state.result = resultLabel(row.actual, basis: exercise.basis, convention: exercise.prescription.convention)
+        let actual = exercise.suggestedActual(for: row) ?? row.actual
+        if state.exerciseName != nil, privacy.showLoad, (try? actual.validate(for: exercise.basis)) != nil {
+            state.result = resultLabel(actual, basis: exercise.basis, convention: exercise.prescription.convention)
         }
         if state.restPausedAt != nil { state.primary = .resume }
         else { state.primary = state.result == nil ? .edit : .confirm }
@@ -283,7 +284,8 @@ enum WorkoutLiveCoordinator {
                   let row = exercise.sets.first(where: { $0.id == expected.setID }), expected.result != nil else {
                 throw TrainingError("Open the set to review its values.")
             }
-            try training.confirm(sessionID: session.id, setID: row.id, actual: row.actual, revision: row.revision, commandID: commandID)
+            let actual = exercise.suggestedActual(for: row) ?? row.actual
+            try training.confirm(sessionID: session.id, setID: row.id, actual: actual, revision: row.revision, commandID: commandID)
         case .startSet:
             try training.startSet(sessionID: session.id)
         case .resume:

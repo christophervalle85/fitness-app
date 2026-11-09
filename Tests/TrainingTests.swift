@@ -28,6 +28,27 @@ struct TrainingTests {
         try store.confirm(sessionID: session.id, setID: set.id, actual: actual, revision: set.revision, commandID: commandID)
     }
 
+    @Test func clearingSuggestedActualsRemembersTheDraftWithoutLoggingASet() throws {
+        try withDirectory { path in
+            let owner = UUID()
+            let store = TrainingStore(directory: path, now: { thursday })
+            try store.load(profileID: owner)
+            let id = try store.startPlanned(plan: plan(), date: friday)
+            try confirm(store)
+            let pending = try #require(store.active?.exercises.first?.sets[1])
+
+            try store.edit(sessionID: id, setID: pending.id, actual: pending.actual,
+                           revision: pending.revision, markUnchangedDraft: true)
+
+            let reopened = TrainingStore(directory: path, now: { thursday })
+            try reopened.load(profileID: owner)
+            let saved = try #require(reopened.active?.exercises.first?.sets[1])
+            #expect(saved.actual == pending.actual)
+            #expect(saved.revision == pending.revision + 1)
+            #expect(saved.confirmedAt == nil)
+        }
+    }
+
     @Test func openingAnotherWorkoutKeepsTheFirstWorkoutAndItsTimer() throws {
         try withDirectory { path in
             let owner = UUID()

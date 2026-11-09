@@ -74,7 +74,7 @@ final class M4AccessibilityUITests: XCTestCase {
         load.typeText("25")
         if app.buttons["dismissSetKeyboard"].isHittable { tap(app.buttons["dismissSetKeyboard"]) }
         tap(app.buttons["confirmSet0"])
-        XCTAssertTrue(app.buttons["undoSet0"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["editSet0"].waitForExistence(timeout: 5))
 
         XCUIDevice.shared.press(.home)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")

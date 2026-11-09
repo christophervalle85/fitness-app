@@ -7,6 +7,7 @@ struct WorkoutLiveTests {
     private let visible = WorkoutLivePrivacy(showExercise: true, showLoad: true, epoch: "visible")
 
     private func setup(now: @escaping () -> Date = { Date() }, beforeSave: @escaping () throws -> Void = {},
+                       seedActuals: Bool = true,
                        _ test: (TrainingStore, URL, UUID) throws -> Void) throws {
         let root = URL.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -18,7 +19,11 @@ struct WorkoutLiveTests {
         try store.add(sessionID: id, prescription: PlanExercise(name: "Cable row", sets: 2, convention: "Machine setting", notes: "Private exercise note"), basis: .machine)
         let first = try #require(store.active?.exercises.first)
         try store.configureRest(sessionID: id, exerciseID: first.id, seconds: 90)
-        for row in first.sets { try store.edit(sessionID: id, setID: row.id, actual: SetActual(reps: 12, load: 42.5), revision: row.revision) }
+        if seedActuals {
+            for row in first.sets {
+                try store.edit(sessionID: id, setID: row.id, actual: SetActual(reps: 12, load: 42.5), revision: row.revision)
+            }
+        }
         try store.note(sessionID: id, text: "Private workout note")
         try test(store, root, owner)
     }
@@ -59,6 +64,26 @@ struct WorkoutLiveTests {
             #expect(reopened.active?.rest == nil)
             #expect(try snapshot(reopened).primary == .review)
             #expect(reopened.active != nil)
+        }
+    }
+
+    @Test func liveActivityConfirmsExactlyTheSuggestedSetItShows() throws {
+        try setup(seedActuals: false) { store, _, _ in
+            let session = try #require(store.active)
+            let first = session.exercises[0].sets[0]
+            let actual = SetActual(reps: 10, load: 25)
+            try store.confirm(sessionID: session.id, setID: first.id, actual: actual,
+                              revision: first.revision, commandID: UUID())
+
+            let pending = try #require(store.active?.exercises[0].sets[1])
+            #expect(pending.actual.reps == nil && pending.confirmedAt == nil)
+            let displayed = try snapshot(store)
+            #expect(displayed.result == "10 reps · 25 lb machine")
+            let hidden = WorkoutLivePrivacy(showExercise: true, showLoad: false, epoch: "hidden")
+            #expect(try snapshot(store, privacy: hidden).result == nil)
+            try tap(.confirm, displayed, on: store)
+            #expect(store.active?.exercises[0].sets[1].actual == actual)
+            #expect(store.active?.exercises[0].sets[1].confirmedAt != nil)
         }
     }
 

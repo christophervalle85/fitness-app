@@ -498,14 +498,15 @@ final class TrainingStore {
         throw TrainingError("This set is no longer available.")
     }
 
-    func edit(sessionID: UUID, setID: UUID, actual: SetActual, revision: Int) throws {
+    func edit(sessionID: UUID, setID: UUID, actual: SetActual, revision: Int,
+              markUnchangedDraft: Bool = false) throws {
         try withSession(sessionID, allowFinished: true) { session in
             let (i, j) = try location(setID, session)
             let set = session.exercises[i].sets[j]
             guard set.revision == revision else { throw TrainingError("Review the latest set values.") }
             if set.confirmedAt != nil { try actual.validate(for: session.exercises[i].basis) }
             else if session.finishedAt != nil { throw TrainingError("This workout has finished.") }
-            guard actual != set.actual else { return }
+            guard actual != set.actual || (markUnchangedDraft && set.confirmedAt == nil) else { return }
             session.exercises[i].sets[j].actual = actual
             session.exercises[i].sets[j].previousAt = nil
             session.exercises[i].sets[j].revision = try increment(session.exercises[i].sets[j].revision)
