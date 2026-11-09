@@ -20,6 +20,7 @@ struct ActiveWorkout: View {
     @State private var setEditor = SetEditor.current
     @State private var closingEditor: ClosingSetEditor?
     @State private var revealedRemoval: UUID?
+    @State private var foldingSets: [UUID: FoldingSet] = [:]
     @State private var expandedGroups: [UUID: Bool] = [:]
     @State private var checklistPosition = ScrollPosition()
     @State private var checklistLayout = ChecklistLayout()
@@ -329,7 +330,7 @@ struct ActiveWorkout: View {
             .contextMenu { exerciseOptions(group) }
             .accessibilityActions { exerciseOptions(group) }
             if isExpanded {
-                ForEach(group.rows) { item in
+                ForEach(displayedRows(in: group)) { item in
                     checklistRow(item, group: group, session: session, isCurrentExercise: isCurrent,
                                  editorID: editorID, beforeOpening: beforeOpening)
                         .id(item.id)
@@ -348,6 +349,17 @@ struct ActiveWorkout: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("exerciseCard-\(group.id.uuidString)")
+    }
+
+    private func displayedRows(in group: WorkoutChecklist.Group) -> [WorkoutChecklist.Row] {
+        let outgoing = foldingSets.values.filter { $0.groupID == group.id }.sorted { $0.position < $1.position }
+        var rows = group.rows
+        for fold in outgoing {
+            let next = rows.firstIndex { $0.id == fold.nextID }
+            let previous = rows.firstIndex { $0.id == fold.previousID }.map { $0 + 1 }
+            rows.insert(fold.item, at: next ?? previous ?? min(fold.position, rows.count))
+        }
+        return rows
     }
 
     @ViewBuilder
@@ -374,10 +386,12 @@ struct ActiveWorkout: View {
                 .font(.subheadline).foregroundStyle(.secondary).padding(.vertical, 5)
         case .live(let row, let index):
             if let live = group.liveExercise {
+                let fold = foldingSets[row.id]
                 WorkoutSetRow(sessionID: session.id, exercise: live, row: row, index: index, store: store,
-                              isCurrent: isCurrentExercise && row.id == currentRowID, isExpanded: row.id == editorID,
-                              closingCorrection: closingEditor?.rowID == row.id ? closingEditor?.isCorrection : nil,
-                              isRemovalRevealed: revealedRemoval == row.id,
+                              isCurrent: fold?.wasCurrent ?? (isCurrentExercise && row.id == currentRowID),
+                              isExpanded: fold?.wasExpanded ?? (row.id == editorID),
+                              closingCorrection: fold?.closingCorrection ?? (closingEditor?.rowID == row.id ? closingEditor?.isCorrection : nil),
+                              isRemovalRevealed: fold?.showedRemove ?? (revealedRemoval == row.id), isFolding: fold != nil,
                               target: targetDescription(group.prescription), onToggle: {
                     revealedRemoval = nil
                     if row.id == editorID {
@@ -392,7 +406,9 @@ struct ActiveWorkout: View {
                 }, onCloseCorrection: { closeEditor(row) }, onRevealRemoval: { revealed in
                     revealedRemoval = revealed ? row.id : nil
                 }, onRemove: {
-                    removeAddedSet(row, session: session)
+                    removeAddedSet(row, item: item, group: group, session: session)
+                }, onFoldComplete: {
+                    if let fold, foldingSets[row.id]?.token == fold.token { foldingSets[row.id] = nil }
                 }, onEditorHeightChange: { height in
                     checklistLayout.editor = (row.id, height)
                 })
@@ -400,14 +416,26 @@ struct ActiveWorkout: View {
         }
     }
 
-    private func removeAddedSet(_ row: TrainingSet, session: TrainingSession) {
+    private func removeAddedSet(_ row: TrainingSet, item: WorkoutChecklist.Row, group: WorkoutChecklist.Group,
+                                session: TrainingSession) {
         run {
             let wasOpen = openEditorID == row.id
+            let rows = displayedRows(in: group)
+            let fold = rows.firstIndex(where: { $0.id == row.id }).map { position in
+                FoldingSet(groupID: group.id, item: item, position: position,
+                           previousID: position > 0 ? rows[position - 1].id : nil,
+                           nextID: rows.dropFirst(position + 1).first?.id,
+                           wasCurrent: group.liveExercise?.id == exercise?.id && row.id == currentRowID,
+                           wasExpanded: wasOpen,
+                           closingCorrection: closingEditor?.rowID == row.id ? closingEditor?.isCorrection : nil,
+                           showedRemove: revealedRemoval == row.id)
+            }
             try store.removeAddedSet(sessionID: session.id, setID: row.id, revision: row.revision)
             if revealedRemoval == row.id { revealedRemoval = nil }
             if chosenRow == row.id { chosenRow = nil }
             if closingEditor?.rowID == row.id { closingEditor = nil }
             if wasOpen { setEditor = .closed }
+            if let fold, !reduceMotion { foldingSets[row.id] = fold }
         }
     }
 
@@ -626,6 +654,20 @@ private struct ClosingSetEditor: Equatable {
     let token = UUID()
     let rowID: UUID
     let isCorrection: Bool
+}
+
+// Kept in the card only while its already-deleted row folds out of layout.
+private struct FoldingSet {
+    let token = UUID()
+    let groupID: UUID
+    let item: WorkoutChecklist.Row
+    let position: Int
+    let previousID: UUID?
+    let nextID: UUID?
+    let wasCurrent: Bool
+    let wasExpanded: Bool
+    let closingCorrection: Bool?
+    let showedRemove: Bool
 }
 
 private enum WorkoutPanel: Identifiable {

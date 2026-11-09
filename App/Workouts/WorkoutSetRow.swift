@@ -11,11 +11,13 @@ struct WorkoutSetRow: View {
     let isExpanded: Bool
     let closingCorrection: Bool?
     let isRemovalRevealed: Bool
+    let isFolding: Bool
     let target: String
     let onToggle: () -> Void
     let onCloseCorrection: () -> Void
     let onRevealRemoval: (Bool) -> Void
     let onRemove: () -> Void
+    let onFoldComplete: () -> Void
     let onEditorHeightChange: (CGFloat) -> Void
 
     @State private var correctionRevision: Int?
@@ -26,6 +28,7 @@ struct WorkoutSetRow: View {
     @State private var editorRevealed = true
     @State private var removalDrag: RemovalDrag?
     @State private var removalSettle: RemovalSettle?
+    @State private var foldStartedAt: Date?
     @FocusState private var focused: ActualField?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -40,7 +43,7 @@ struct WorkoutSetRow: View {
         store.openSessions.first { $0.id == sessionID }?.exercises.first { $0.id == exercise.id }?.sets.first { $0.id == row.id }
     }
     private var suggestion: SetActual? {
-        latest.flatMap { exercise.suggestedActual(for: $0) }
+        (isFolding ? row : latest).flatMap { exercise.suggestedActual(for: $0) }
     }
 
     private var isLogged: Bool { row.confirmedAt != nil }
@@ -56,6 +59,7 @@ struct WorkoutSetRow: View {
 
     private var values: Binding<SetActual> {
         Binding(get: { displayedActual }, set: { actual in
+            guard !isFolding else { return }
             if editorIsCorrection {
                 correction = actual
                 return
@@ -74,30 +78,11 @@ struct WorkoutSetRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if isRemovable { swipeableHeading } else { rowHeading }
-            if isEditorMounted {
-                SetEditorHeight(fraction: isExpanded ? 1 : 0) {
-                    editor
-                        .padding(.top, 4)
-                        .mask {
-                            Rectangle().scaleEffect(x: 1, y: editorRevealed ? 1 : 0, anchor: .top)
-                        }
-                        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
-                            if isExpanded { onEditorHeightChange(height) }
-                        }
-                }
-                .clipped()
-                .allowsHitTesting(isExpanded)
-                .accessibilityHidden(!isExpanded)
-                .task(id: isExpanded) {
-                    guard isExpanded, !editorRevealed else { return }
-                    // Commit the new layout before revealing only the panel.
-                    await Task.yield()
-                    guard !Task.isCancelled else { return }
-                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) { editorRevealed = true }
-                }
-            }
+        Group {
+            if isFolding { foldingRow } else { rowContents }
+        }
+        .onChange(of: isFolding) { _, folding in
+            if folding { focused = nil }
         }
         .onChange(of: isExpanded) { _, expanded in
             if !expanded {
@@ -133,6 +118,57 @@ struct WorkoutSetRow: View {
         }
     }
 
+    private var foldingRow: some View {
+        let content = rowContents
+        let curve = UnitCurve.bezier(startControlPoint: UnitPoint(x: 0.20, y: 0.74),
+                                     endControlPoint: UnitPoint(x: 0.23, y: 1))
+        return TimelineView(.animation) { timeline in
+            let elapsed = foldStartedAt.map { unitProgress(timeline.date.timeIntervalSince($0) / 0.18) } ?? 0
+            let fraction = elapsed >= 1 ? 0 : 1 - curve.value(at: elapsed)
+            FoldHeight(fraction: fraction) { content }
+                .clipped()
+                .opacity(fraction)
+                .onChange(of: foldStartedAt == nil, initial: true) { _, shouldStart in
+                    // Reserve the existing slot before the first shrinking frame.
+                    if shouldStart { foldStartedAt = timeline.date }
+                }
+                .onChange(of: elapsed >= 1) { _, ended in
+                    if ended { onFoldComplete() }
+                }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+        .onDisappear(perform: onFoldComplete)
+    }
+
+    private var rowContents: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if isRemovable { swipeableHeading } else { rowHeading }
+            if isEditorMounted {
+                FoldHeight(fraction: isExpanded ? 1 : 0) {
+                    editor
+                        .padding(.top, 4)
+                        .mask {
+                            Rectangle().scaleEffect(x: 1, y: editorRevealed ? 1 : 0, anchor: .top)
+                        }
+                        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
+                            if isExpanded, !isFolding { onEditorHeightChange(height) }
+                        }
+                }
+                .clipped()
+                .allowsHitTesting(isExpanded)
+                .accessibilityHidden(!isExpanded)
+                .task(id: isExpanded) {
+                    guard isExpanded, !editorRevealed else { return }
+                    // Commit the new layout before revealing only the panel.
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) { editorRevealed = true }
+                }
+            }
+        }
+    }
+
     private var swipeableHeading: some View {
         rowHeading
             .frame(maxWidth: .infinity)
@@ -141,6 +177,7 @@ struct WorkoutSetRow: View {
     }
 
     private func updateRemoval(_ state: UIGestureRecognizer.State, horizontal: CGFloat) {
+        guard !isFolding else { return }
         switch state {
         case .began:
             let origin = removalSettle?.progress(at: .now) ?? (isRemovalRevealed ? 1 : 0)
@@ -190,7 +227,9 @@ struct WorkoutSetRow: View {
 
     private var removalStatus: some View {
         ZStack(alignment: .trailing) {
-            if let settle = removalSettle {
+            if isFolding {
+                if isRemovalRevealed { removalLabel } else { rowStatus }
+            } else if let settle = removalSettle {
                 TimelineView(.animation) { timeline in
                     letterpress(settle.progress(at: timeline.date))
                         .onChange(of: settle.hasEnded(at: timeline.date), initial: true) { _, ended in
@@ -589,7 +628,7 @@ private struct RemovalLetterpress: View {
     }
 }
 
-private struct SetEditorHeight: Layout {
+private struct FoldHeight: Layout {
     var fraction: CGFloat
 
     var animatableData: CGFloat {
@@ -598,8 +637,8 @@ private struct SetEditorHeight: Layout {
     }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        guard let editor = subviews.first else { return .zero }
-        let fullSize = editor.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        guard let content = subviews.first else { return .zero }
+        let fullSize = content.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
         return CGSize(width: fullSize.width, height: fullSize.height * min(1, max(0, fraction)))
     }
 
