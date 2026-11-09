@@ -179,40 +179,54 @@ struct ProgressMetrics {
         }
         adherence = (fulfilled, scheduled)
 
-        var points: [RecordIdentity: [ProgressSet]] = [:]
-        var titles: [RecordIdentity: String] = [:]
         var attempts: [RecordIdentity: (date: Date, suggestion: ProgressionSuggestion?)] = [:]
         let occurrenceByID = Dictionary(occurrences.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        for session in sessions {
-            guard !session.isCardio, !session.isArchivedDraft else { continue }
+        records = Self.collectExerciseRecords(sessions: sessions) { session, exercise, identity, working in
+            // The last performed prescription determines the current advice.
+            // An incomplete later attempt withdraws an older recommendation.
+            guard let attempted = working.compactMap(\.confirmedAt).max() ?? session.finishedAt else { return }
+            if let previous = attempts[identity], previous.date >= attempted { return }
             let occurrence = session.occurrenceID.flatMap { occurrenceByID[$0] }
+            attempts[identity] = (attempted, Self.suggestion(exercise, session: session, occurrence: occurrence))
+        }
+        routineGroups = Self.routineGroups(plan: activePlan, catalog: catalog, records: records)
+        suggestions = attempts.values.compactMap(\.suggestion).sorted { $0.date > $1.date }
+    }
+
+    static func exerciseRecords(variantID: UUID, sessions: [TrainingSession]) -> [ExerciseRecords] {
+        collectExerciseRecords(sessions: sessions, variantID: variantID)
+    }
+
+    private static func collectExerciseRecords(
+        sessions: [TrainingSession], variantID: UUID? = nil,
+        visitAttempt: ((TrainingSession, TrainingExercise, RecordIdentity, [TrainingSet]) -> Void)? = nil
+    ) -> [ExerciseRecords] {
+        var points: [RecordIdentity: [ProgressSet]] = [:]
+        var workoutDates: [UUID: Date] = [:]
+        for session in sessions where !session.isCardio && !session.isArchivedDraft {
             for exercise in session.exercises {
+                let identity = RecordIdentity(exercise)
+                if let variantID, identity.variant != variantID { continue }
                 let working = exercise.sets.filter { $0.warmup != true }
                 guard !working.isEmpty else { continue }
-                let sides: [String?] = exercise.basis == .unilateral ? ["Left", "Right"] : [nil]
+                let keys = exercise.basis == .unilateral ?
+                    [RecordIdentity(exercise, side: "Left"), RecordIdentity(exercise, side: "Right")] : [identity]
                 for row in working {
                     guard let date = row.confirmedAt, (try? row.actual.validate(for: exercise.basis)) != nil else { continue }
                     let actual = row.actual.converted(to: "kg")
-                    for side in sides {
-                        let key = RecordIdentity(exercise, side: side)
-                        let right = side == "Right"
+                    if workoutDates[session.id] == nil { workoutDates[session.id] = session.startedAt }
+                    for key in keys {
+                        let right = key.side == "Right"
                         let entry = ProgressSet(id: row.id, sessionID: session.id, date: date,
                                                 kg: right ? actual.rightLoad : actual.load,
                                                 reps: right ? actual.rightReps : actual.reps, seconds: actual.seconds)
                         points[key, default: []].append(entry)
-                        titles[key] = exercise.prescription.name
                     }
                 }
-                // The last performed prescription determines the current advice.
-                // An incomplete later attempt withdraws an older recommendation.
-                guard let attempted = working.compactMap(\.confirmedAt).max() ?? session.finishedAt else { continue }
-                let key = RecordIdentity(exercise)
-                if let previous = attempts[key], previous.date >= attempted { continue }
-                attempts[key] = (attempted, Self.suggestion(exercise, session: session, occurrence: occurrence))
+                visitAttempt?(session, exercise, identity, working)
             }
         }
-        let workoutDates = Dictionary(sessions.map { ($0.id, $0.startedAt) }, uniquingKeysWith: { first, _ in first })
-        records = points.map { ExerciseRecords(id: $0.key, name: titles[$0.key] ?? "", rows: $0.value, workoutDates: workoutDates) }.sorted {
+        return points.map { ExerciseRecords(id: $0.key, name: $0.key.name, rows: $0.value, workoutDates: workoutDates) }.sorted {
             if $0.name != $1.name { return $0.name.localizedStandardCompare($1.name) == .orderedAscending }
             if $0.id.variant != $1.id.variant { return $0.id.variant.uuidString < $1.id.variant.uuidString }
             if $0.id.convention != $1.id.convention { return $0.id.convention < $1.id.convention }
@@ -222,8 +236,6 @@ struct ProgressMetrics {
             }
             return ($0.side ?? "") < ($1.side ?? "")
         }
-        routineGroups = Self.routineGroups(plan: activePlan, catalog: catalog, records: records)
-        suggestions = attempts.values.compactMap(\.suggestion).sorted { $0.date > $1.date }
     }
 
     private static func routineGroups(plan: WeekPlan?, catalog: [CatalogEntry], records: [ExerciseRecords]) -> [RoutineProgressGroup] {

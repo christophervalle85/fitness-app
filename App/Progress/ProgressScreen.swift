@@ -328,7 +328,7 @@ private func progressResult(_ point: ProgressSet, unit: String) -> String {
         .compactMap { $0 }.joined(separator: " · ")
 }
 
-private func weightText(_ kg: Double, _ unit: String) -> String {
+func weightText(_ kg: Double, _ unit: String) -> String {
     "\(weightNumber(kg, unit)) \(unit)"
 }
 
@@ -336,7 +336,7 @@ private func weightNumber(_ kg: Double, _ unit: String) -> String {
     WeightUnits.convert(kg, from: "kg", to: unit).formatted(.number.precision(.fractionLength(0...3)))
 }
 
-private func recordContext(_ record: ExerciseRecords) -> String {
+func recordContext(_ record: ExerciseRecords) -> String {
     let name: String = switch record.basis {
     case .external: "Weight"
     case .barbell: "Total barbell weight"
@@ -430,7 +430,7 @@ private struct RecordMeasurement: View {
     }
 }
 
-private struct ExerciseTrendPlot: View {
+struct ExerciseTrendPlot: View {
     let record: ExerciseRecords
     let unit: String
     var measure: String {
@@ -473,7 +473,7 @@ private struct ExerciseTrendPlot: View {
     }
 }
 
-private struct RecordDetail: View {
+struct RecordDetail: View {
     let record: ExerciseRecords
     let unit: String
     var body: some View {

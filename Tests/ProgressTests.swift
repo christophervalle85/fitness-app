@@ -45,6 +45,44 @@ struct ProgressTests {
         #expect(metrics.records.first { $0.side == "Right" }?.heaviest?.reps == 8)
     }
 
+    @Test func exerciseDetailRecordsMatchProgressForOneVariantIncludingOpenWorkouts() throws {
+        let variant = UUID()
+        let prescription = PlanExercise(variantID: variant, name: "Row", convention: "Machine setting")
+        let confirmed = row(8, 40, on: monday.addingTimeInterval(30))
+        let warmup = row(8, 60, on: monday.addingTimeInterval(45), warmup: true)
+        let invalid = row(0, 100, on: monday.addingTimeInterval(60))
+        let exercise = TrainingExercise(prescription: prescription, basis: .machine, sets: [confirmed, warmup, invalid])
+        var open = session([exercise], on: monday)
+        open.finishedAt = nil
+
+        var otherMachine = exercise
+        otherMachine.id = UUID()
+        otherMachine.prescription.id = UUID()
+        let later = monday.addingTimeInterval(86_400)
+        otherMachine.sets = [row(10, 50, on: later)]
+        var otherVariant = otherMachine
+        otherVariant.id = UUID()
+        otherVariant.prescription.id = UUID()
+        otherVariant.prescription.variantID = UUID()
+        otherVariant.sets = [row(10, 70, on: monday)]
+        let workouts = [open, session([otherMachine, otherVariant], on: later)]
+
+        let detail = ProgressMetrics.exerciseRecords(variantID: variant, sessions: workouts)
+        let all = ProgressMetrics(sessions: workouts, occurrences: [])
+        #expect(detail.map(\.id) == all.records.filter { $0.id.variant == variant }.map(\.id))
+        #expect(Set(detail.compactMap(\.id.machineProfile)) == [prescription.id, otherMachine.prescription.id])
+        let openRecord = try #require(detail.first { $0.id.machineProfile == prescription.id })
+        #expect(openRecord.trend.map(\.id) == [confirmed.id])
+        #expect(openRecord.trend.last?.date == monday.addingTimeInterval(30))
+        #expect(openRecord.workoutPoints.map(\.date) == [monday])
+        #expect(openRecord.heaviest?.kg == 40)
+        let otherRecord = try #require(detail.first { $0.id.machineProfile == otherMachine.prescription.id })
+        #expect(otherRecord.trend.last?.date == later)
+        #expect(otherRecord.workoutPoints.map(\.date) == [later])
+        #expect(otherRecord.heaviest?.kg == 50)
+        #expect(ProgressMetrics.exerciseRecords(variantID: UUID(), sessions: workouts).isEmpty)
+    }
+
     @Test func independentRoutineCopySharesVariantRecordsButRenamedCustomExerciseDoesNot() {
         var plan = WeekPlan(name: "Original")
         plan.days[0] = PlanDay(name: "Upper", exercises: [PlanExercise(name: "Curl")])
