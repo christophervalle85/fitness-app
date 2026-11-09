@@ -14,9 +14,11 @@ In **Routines**, open a saved routine’s three-dot card menu for **Edit**, **Ma
 
 ## Train
 
-From **Plan**, use **Start** or **Resume** on a workout card. Its status shows your progress. Starting a workout scheduled for another date keeps its planned date and records when you actually trained. The card’s ellipsis menu offers **Reschedule**, **Skip** or **Remove** when eligible. To move a workout, choose **Reschedule**, select a date and tap **Move workout**. Moving or confirming a skip affects only that scheduled workout and preserves the routine and saved results. Confirming **Remove** for added scheduled cardio removes its plan entry while keeping saved sessions in history on their original dates. **Extra workout** and **Log cardio** directly start unscheduled sessions.
+From **Plan**, use **Start** to open a workout, **Resume** to return to an open session or **Continue** to pick up the remaining work after a partial session. Its status shows your progress. Starting a workout scheduled for another date keeps its planned date and records when you actually trained. The card’s ellipsis menu offers **Reschedule**, **Skip** or **Remove** when eligible. To move a workout, choose **Reschedule**, select a date and tap **Move workout**. Moving or confirming a skip affects only that scheduled workout and preserves the routine and saved results. Confirming **Remove** for added scheduled cardio removes its plan entry while keeping saved sessions in history on their original dates. **Extra workout** and **Log cardio** directly start unscheduled sessions.
 
-You can save several sessions in one day and keep one open at a time. On its scheduled date, resume a linked session from its workout card. On other dates or tabs, the **Resume** bar shows the current exercise, planned date (or **Unscheduled**) and actual start date. Selecting a different planned workout opens the current session’s review. Choose **Cancel switch** to keep the current workout, explicitly finish it, or discard it if it is empty. If the new workout fails to start after the first one closes, **Retry** retries only the new start.
+You can keep several workouts open at once. Starting or resuming a different workout opens it immediately and keeps the others available with their progress saved. Resume scheduled sessions from their workout cards and unscheduled sessions from **Open unscheduled workouts** in Plan. The **Resume** bar can also take you back to the last workout you opened.
+
+The training week closes when Monday begins in your local time. You can catch up on missed workouts within the week. At rollover, Weekform saves confirmed work in history and marks unfinished sessions partial. It keeps drafts with saved edits in history and clears untouched attempts. Past weeks are read-only in Plan. You can still correct saved results in workout history.
 
 The active workout fills the screen. Its checklist highlights the current set and shows how many sets you have completed for that exercise. Check the actual reps, seconds or load, then confirm the set. Use the exercise controls to add an exercise, change rest or swap the remaining sets. You can edit or undo a result. **Start set** ends the rest interval.
 
@@ -52,7 +54,7 @@ Open **Developer tools** from the Debug welcome screen, Plan or Routines. **Repl
 
 ## Use the workout Live Activity
 
-Starting a workout in Plan requests a Live Activity. The Lock Screen and expanded Dynamic Island can show actions for the current set when iOS allows them. The in-app workout remains available if the activity is dismissed or the device cannot show it.
+The workout you most recently started or resumed is the one shown in the Live Activity. The Lock Screen and expanded Dynamic Island can show actions for the current set when iOS allows them. The in-app workout remains available if the activity is dismissed or the device cannot show it.
 
 The compact Dynamic Island displays elapsed rest numerically. The expanded view adds the target, set number and available actions. In the iOS 26.2 and 27.2 simulators, the expanded activity on the Home Screen showed 0:07 elapsed against a 1:30 target for set 2, with **Edit result** and **Start set** visible.
 

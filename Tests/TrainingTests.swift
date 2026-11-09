@@ -28,9 +28,159 @@ struct TrainingTests {
         try store.confirm(sessionID: session.id, setID: set.id, actual: actual, revision: set.revision, commandID: commandID)
     }
 
+    @Test func openingAnotherWorkoutKeepsTheFirstWorkoutAndItsTimer() throws {
+        try withDirectory { path in
+            let owner = UUID()
+            let store = TrainingStore(directory: path, now: { thursday })
+            try store.load(profileID: owner)
+            let template = plan()
+            try store.startPlanned(plan: template, date: friday)
+            let first = try #require(store.active)
+            let firstFocus = try #require(store.focusToken)
+            try confirm(store)
+            let timer = try #require(store.active?.rest)
+            try store.startCardio(name: "Walk")
+            let second = try #require(store.active)
+            #expect(second.id != first.id)
+            #expect(store.focusToken != firstFocus)
+            try store.note(sessionID: second.id, text: "Easy effort")
+
+            try store.startPlanned(plan: template, date: friday)
+            #expect(store.active?.id == first.id)
+            #expect(store.active?.rest == timer)
+            let resumedFocus = try #require(store.focusToken)
+            #expect(resumedFocus != firstFocus)
+            let reopened = TrainingStore(directory: path, now: { thursday })
+            try reopened.load(profileID: owner)
+            #expect(reopened.active?.id == first.id)
+            #expect(reopened.focusToken == resumedFocus)
+            #expect(reopened.sessions.count == 2)
+            #expect(reopened.sessions.first { $0.id == second.id }?.notes == "Easy effort")
+        }
+    }
+
+    @Test func mondayClosesExpiredWorkAtomicallyAndKeepsOnlySavedContent() throws {
+        try withDirectory { path in
+            let owner = UUID()
+            let monday = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 9)))
+            var instant = monday.addingTimeInterval(-60)
+            var fail = false
+            let store = TrainingStore(directory: path, now: { instant }, beforeSave: {
+                if fail { throw CocoaError(.fileWriteOutOfSpace) }
+            })
+            try store.load(profileID: owner)
+            try store.startPlanned(plan: plan(), date: friday)
+            let strength = try #require(store.active)
+            try confirm(store)
+            let lastConfirmedAt = instant
+            let draft = try #require(store.active?.exercises[0].sets[1])
+            try store.edit(sessionID: strength.id, setID: draft.id, actual: SetActual(reps: 7, load: 35), revision: draft.revision)
+            try store.startCardio(name: "Draft cardio")
+            let cardio = try #require(store.active)
+            try store.updateCardio(sessionID: cardio.id, result: CardioResult(seconds: 90, notes: "Draft"))
+            let notes = try store.startExtra(name: "Notes only")
+            try store.note(sessionID: notes, text: "Saved plan for next time")
+            try store.startExtra(name: "Untouched")
+            #expect(store.nextWeekBoundary == monday)
+
+            instant = monday
+            fail = true
+            #expect(throws: CocoaError.self) { try store.reconcileExpiredSessions() }
+            #expect(store.sessions.count == 4 && store.sessions.allSatisfy { $0.finishedAt == nil })
+            fail = false
+            try store.reconcileExpiredSessions()
+            #expect(store.active == nil)
+            #expect(store.sessions.count == 3)
+            #expect(store.sessions.first { $0.id == notes }?.notes == "Saved plan for next time")
+            let saved = try #require(store.sessions.first { $0.id == strength.id })
+            #expect(saved.finishedAt == lastConfirmedAt)
+            #expect(saved.partial && saved.closedAtWeekBoundary == true && saved.rest == nil && saved.timerUndo == nil)
+            #expect(saved.exercises[0].sets[1].actual.reps == 7)
+            #expect(saved.exercises[0].sets[1].confirmedAt == nil)
+            let cardioSaved = try #require(store.sessions.first { $0.id == cardio.id })
+            #expect(cardioSaved.cardioDraft?.notes == "Draft")
+            #expect(cardioSaved.cardio == nil && cardioSaved.finishedAt == cardio.startedAt)
+            #expect(throws: TrainingError.self) { try store.recordCardio(sessionID: cardio.id, result: CardioResult(seconds: 90)) }
+
+            let occurrence = try #require(store.occurrences.first)
+            #expect(store.progress(for: occurrence).completed == 1)
+            #expect(throws: TrainingError.self) { try store.startOccurrence(occurrence.id) }
+            #expect(throws: TrainingError.self) { try store.move(occurrence.id, to: monday) }
+            #expect(throws: TrainingError.self) { try store.skip(occurrence.id) }
+            let row = saved.exercises[0].sets[0]
+            try store.correct(sessionID: saved.id, setID: row.id, actual: SetActual(reps: 9, load: 40),
+                              performedAt: lastConfirmedAt, revision: row.revision)
+            #expect(store.progress(for: occurrence).completed == 1)
+        }
+    }
+
+    @Test func assigningAConfirmedResultCannotAddCreditToAPastPlan() throws {
+        try withDirectory { path in
+            let monday = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 9)))
+            var instant = friday
+            let store = TrainingStore(directory: path, now: { instant })
+            try store.load(profileID: UUID())
+            let target = UUID()
+            try store.scheduleCardio(name: "Walk", date: friday, goalSeconds: 300, id: target)
+            let source = try store.startCardio(name: "Walk")
+            try store.recordCardio(sessionID: source, result: CardioResult(seconds: 120))
+            try store.finish(sessionID: source, partial: false)
+            let saved = store.sessions
+            instant = monday
+            #expect(throws: TrainingError.self) {
+                try store.assign(sessionID: source, occurrenceID: target, setID: nil, plannedSetID: nil)
+            }
+            #expect(store.sessions == saved)
+        }
+    }
+
+    @Test func staleCardioEditsRejectAtRolloverButFreshHistoryCorrectionWorks() throws {
+        try withDirectory { path in
+            let monday = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 9)))
+            var instant = monday.addingTimeInterval(-60)
+            let store = TrainingStore(directory: path, now: { instant })
+            try store.load(profileID: UUID())
+            let session = try store.startCardio(name: "Walk")
+            instant = instant.addingTimeInterval(30)
+            try store.recordCardio(sessionID: session, result: CardioResult(seconds: 60))
+            let recordedAt = instant
+            instant = monday
+            let correction = CardioResult(seconds: 75)
+            #expect(throws: TrainingError.self) {
+                try store.recordCardio(sessionID: session, result: correction, revision: 1, commandID: UUID())
+            }
+            let saved = try #require(store.sessions.first)
+            #expect(saved.finishedAt == recordedAt && saved.cardio?.seconds == 60)
+            try store.recordCardio(sessionID: session, result: correction, revision: 1, commandID: UUID())
+            #expect(store.sessions.first?.cardio?.seconds == 75)
+            #expect(store.sessions.first?.finishedAt == recordedAt)
+        }
+    }
+
+    @Test func confirmationCrossingMondayBeforeSaveDoesNotGrantLateCredit() throws {
+        try withDirectory { path in
+            let monday = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 9)))
+            var instant = monday.addingTimeInterval(-1)
+            var advanceOnSave = false
+            let store = TrainingStore(directory: path, now: { instant }, beforeSave: {
+                if advanceOnSave { instant = monday }
+            })
+            try store.load(profileID: UUID())
+            try store.startPlanned(plan: plan(), date: friday)
+            let occurrence = try #require(store.occurrences.first)
+            let original = store.active
+            advanceOnSave = true
+            #expect(throws: TrainingError.self) { try confirm(store) }
+            #expect(store.active == original)
+            #expect(store.progress(for: occurrence).completed == 0)
+            try store.reconcileExpiredSessions()
+            #expect(store.sessions.isEmpty)
+        }
+    }
+
     @Test func calendarTicksKeepOutOfOrderCreditsOnTheirPrescribedSlots() throws {
         try withDirectory { directory in
-            let store = TrainingStore(directory: directory)
+            let store = TrainingStore(directory: directory, now: { thursday })
             try store.load(profileID: UUID())
             try store.startPlanned(plan: plan(), date: friday)
             try confirm(store, row: 2)
@@ -146,8 +296,8 @@ struct TrainingTests {
                 let session = try #require(store.active)
                 #expect(session.exercises.isEmpty)
                 let result = CardioResult(seconds: duration, distance: 1.25)
-                try store.updateCardio(sessionID: session.id, result: result)
                 #expect(throws: TrainingError.self) { try store.finish(sessionID: session.id, partial: true) }
+                try store.updateCardio(sessionID: session.id, result: result)
                 try store.recordCardio(sessionID: session.id, result: result)
                 try store.recordCardio(sessionID: session.id, result: result)
                 #expect(store.progress(for: occurrence).completed == (index == 0 ? 250 : 600))
@@ -161,9 +311,9 @@ struct TrainingTests {
         try withDirectory { path in
             var fail = false
             let owner = UUID()
-            let store = TrainingStore(directory: path, beforeSave: { if fail { throw CocoaError(.fileWriteOutOfSpace) } })
+            let store = TrainingStore(directory: path, now: { thursday }, beforeSave: { if fail { throw CocoaError(.fileWriteOutOfSpace) } })
             try store.load(profileID: owner)
-            let stale = TrainingStore(directory: path)
+            let stale = TrainingStore(directory: path, now: { thursday })
             try stale.load(profileID: owner)
             fail = true
             #expect(throws: CocoaError.self) { try store.startPlanned(plan: plan(), date: friday) }
@@ -174,11 +324,11 @@ struct TrainingTests {
             #expect(throws: TrainingError.self) { try stale.startExtra(name: "Stale writer") }
             try stale.load(profileID: owner)
             #expect(stale.active?.id == store.active?.id)
-            #expect(throws: TrainingError.self) { try stale.startExtra(name: "Second active workout") }
+            let second = try stale.startExtra(name: "Second active workout")
             try store.load(profileID: UUID())
-            #expect(store.sessions.isEmpty)
+            #expect(store.sessions.isEmpty && store.active == nil && store.focusToken == nil)
             try store.load(profileID: owner)
-            #expect(store.sessions.count == 1)
+            #expect(store.sessions.count == 2 && store.active?.id == second)
         }
     }
 

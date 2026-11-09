@@ -10,6 +10,7 @@ struct WorkoutLiveActivity: ActivityAttributes {
     let owner: UUID
     let generation: String
     let sessionID: UUID
+    var focusToken: UUID?
     var isolatedRun: UUID?
 
     struct ContentState: Codable, Hashable {
@@ -35,6 +36,7 @@ struct WorkoutLiveRoute {
     let owner: UUID
     let generation: String
     let sessionID: UUID
+    let focusToken: UUID?
     let exerciseID: UUID?
     let setID: UUID?
     let review: Bool
@@ -43,6 +45,7 @@ struct WorkoutLiveRoute {
         owner = activity.owner
         generation = activity.generation
         sessionID = activity.sessionID
+        focusToken = activity.focusToken
         exerciseID = state.exerciseID
         setID = state.setID
         review = state.primary == .review
@@ -54,6 +57,7 @@ struct WorkoutLiveRoute {
         parts.host = "workout"
         parts.path = "/" + sessionID.uuidString
         var items = [URLQueryItem(name: "owner", value: owner.uuidString), URLQueryItem(name: "generation", value: generation)]
+        if let focusToken { items.append(.init(name: "focus", value: focusToken.uuidString)) }
         if let exerciseID { items.append(.init(name: "exercise", value: exerciseID.uuidString)) }
         if let setID { items.append(.init(name: "set", value: setID.uuidString)) }
         if review { items.append(.init(name: "review", value: "1")) }
@@ -69,10 +73,12 @@ struct WorkoutLiveRoute {
         func value(_ key: String) -> String? { args.first { $0.name == key }?.value }
         guard Set(args.map(\.name)).count == args.count, let owner = value("owner").flatMap(UUID.init(uuidString:)),
               let generation = value("generation"), generation == "original" || UUID(uuidString: generation) != nil else { return nil }
+        let focus = value("focus").flatMap(UUID.init(uuidString:))
+        guard !args.contains(where: { $0.name == "focus" }) || focus != nil else { return nil }
         let exercise = value("exercise").flatMap(UUID.init(uuidString:))
         let set = value("set").flatMap(UUID.init(uuidString:))
         guard value("exercise") == nil || exercise != nil, value("set") == nil || (set != nil && exercise != nil) else { return nil }
-        let activity = WorkoutLiveActivity(owner: owner, generation: generation, sessionID: session)
+        let activity = WorkoutLiveActivity(owner: owner, generation: generation, sessionID: session, focusToken: focus)
         return Self(activity, state: .init(revision: 0, privacyEpoch: "", exerciseID: exercise, setID: set,
                                            primary: value("review") == "1" ? .review : .edit))
     }

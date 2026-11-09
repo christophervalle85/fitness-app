@@ -2,15 +2,11 @@ import SwiftUI
 
 struct ActiveWorkout: View {
     let store: TrainingStore
+    let sessionID: UUID
     var planner: PlanningStore? = nil
     var route: WorkoutLiveRoute? = nil
-    var routeEvent: UUID? = nil
-    var reviewOnOpen = false
-    var switchTargetName: String? = nil
     let onClose: () -> Void
     var onFinished: ((TrainingSession) -> Void)? = nil
-    var onDiscarded: ((UUID) -> Void)? = nil
-    var onCancelSwitch: (() -> Void)? = nil
     var applyToRoutine: ((PlanExercise, PlanExercise) throws -> Void)? = nil
     var routineExercises: [PlanExercise] = []
 
@@ -19,11 +15,11 @@ struct ActiveWorkout: View {
     @State private var changedFuture: UUID?
     @State private var confirmingDiscard = false
     @State private var reviewing = false
-    @State private var didOpenSwitchReview = false
+    @State private var handledRoute = false
     @State private var chosenRow: UUID?
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    private var session: TrainingSession? { store.active }
+    private var session: TrainingSession? { store.openSessions.first { $0.id == sessionID } }
     private var exercise: TrainingExercise? {
         guard let session else { return nil }
         return session.exercises.first { $0.id == session.currentExerciseID } ?? session.exercises.first
@@ -87,7 +83,7 @@ struct ActiveWorkout: View {
                             }
                         }
                         Section("Workout notes") {
-                            TextField("Add a note", text: Binding(get: { store.active?.notes ?? "" }, set: { text in
+                            TextField("Add a note", text: Binding(get: { self.session?.notes ?? "" }, set: { text in
                                 run { try store.note(sessionID: session.id, text: text) }
                             }), axis: .vertical).lineLimit(1...5)
                         }
@@ -104,19 +100,16 @@ struct ActiveWorkout: View {
                             scroll.scrollTo(first.id, anchor: .center)
                         }
                     }
-                    .task(id: routeEvent) {
-                        if let route {
+                    .task {
+                        if let route, !handledRoute {
+                            handledRoute = true
                             panel = nil
                             reviewing = route.review
                             guard !route.review else { return }
                             chosenRow = route.setID
                             await Task.yield()
-                        } else if reviewOnOpen && !didOpenSwitchReview {
-                            didOpenSwitchReview = true
-                            reviewing = true
-                            return
                         }
-                        if let id = route?.setID ?? currentRowID { scroll.scrollTo(id, anchor: .center) }
+                        if let id = currentRowID { scroll.scrollTo(id, anchor: .center) }
                     }
                 }
                 .navigationTitle(session.name)
@@ -140,9 +133,6 @@ struct ActiveWorkout: View {
                     }.background(PlannerStyle.surface)
                 }
                 .navigationDestination(isPresented: $reviewing) { summary(session) }
-                .onChange(of: reviewing) { previous, current in
-                    if previous && !current && didOpenSwitchReview && store.active?.id == session.id { onCancelSwitch?() }
-                }
                 .sheet(item: $panel) { panel in
                     NavigationStack {
                         switch panel {
@@ -166,7 +156,8 @@ struct ActiveWorkout: View {
                     }
                 }
             } else {
-                ContentUnavailableView("Workout closed", systemImage: "checkmark.circle")
+                ContentUnavailableView("Workout closed", systemImage: "checkmark.circle",
+                                       description: Text("You can review saved workouts in Progress."))
                     .toolbar { Button("Done", action: onClose) }
             }
         }
@@ -354,16 +345,10 @@ struct ActiveWorkout: View {
         let rows = session.exercises.flatMap(\.sets)
         let occurrenceProgress = store.occurrences.first { $0.id == session.occurrenceID }.map { store.progress(for: $0) }
         let cardioComplete = session.cardio != nil && (occurrenceProgress.map { $0.completed >= $0.total } ?? true)
-        let cardioEdits = session.isCardio && session.cardioDraft != session.cardio
+        let cardioEdits = session.isCardio && session.cardio != nil && session.cardioDraft != session.cardio
         let allConfirmed = session.isCardio ? cardioComplete : rows.contains { $0.confirmedAt != nil } && rows.allSatisfy { $0.optional == true || $0.confirmedAt != nil }
-        let hasResult = session.cardio != nil || rows.contains { $0.confirmedAt != nil }
+        let hasSavedContent = session.hasSavedContent
         return List {
-            if let switchTargetName {
-                Section("Switch workouts") {
-                    Text("Finish \(session.name) before starting \(switchTargetName).")
-                    Button("Cancel switch", action: onClose).accessibilityIdentifier("cancelWorkoutSwitch")
-                }
-            }
             TrainingSummaryContent(session: session)
             if let occurrenceProgress {
                 Section("Scheduled workout") {
@@ -376,13 +361,13 @@ struct ActiveWorkout: View {
             if cardioEdits {
                 Text("Go back and confirm your activity changes before finishing.").foregroundStyle(.secondary)
             }
-            if !hasResult {
+            if !hasSavedContent {
                 Button("Discard empty workout", role: .destructive) { confirmingDiscard = true }
                     .confirmationDialog("Discard this empty workout?", isPresented: $confirmingDiscard, titleVisibility: .visible) {
                         Button("Discard workout", role: .destructive) {
                             run {
                                 try store.cancelEmpty(sessionID: session.id)
-                                if let onDiscarded { onDiscarded(session.id) } else { onClose() }
+                                onClose()
                             }
                         }
                     }
@@ -404,7 +389,7 @@ struct ActiveWorkout: View {
                     Text(allConfirmed ? "Finish workout" : "Finish as partial").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent).controlSize(.large)
-                .disabled(!hasResult || cardioEdits)
+                .disabled(!hasSavedContent || cardioEdits)
                 .accessibilityIdentifier(allConfirmed ? "finishSession" : "finishPartial")
             }
             .padding(.horizontal, 20).padding(.vertical, 8)
@@ -487,7 +472,7 @@ private struct WorkoutSetRow: View {
 
     private enum ActualField { case reps, seconds, load, rightReps, rightLoad }
     private var latest: TrainingSet? {
-        store.active?.exercises.first { $0.id == exercise.id }?.sets.first { $0.id == row.id }
+        store.openSessions.first { $0.id == sessionID }?.exercises.first { $0.id == exercise.id }?.sets.first { $0.id == row.id }
     }
     private var values: Binding<SetActual> {
         Binding(get: { correction ?? unsaved ?? latest?.actual ?? row.actual }, set: { actual in
@@ -673,8 +658,12 @@ private struct CardioLog: View {
     @State private var activityName: String?
     @State private var commandID = UUID()
 
+    private var draft: CardioResult? {
+        pending ?? store.openSessions.first { $0.id == session.id }?.cardioDraft ?? session.cardio
+    }
+
     private var values: Binding<CardioResult> {
-        Binding(get: { pending ?? store.active?.cardioDraft ?? session.cardio ?? CardioResult(seconds: 0) }, set: { result in
+        Binding(get: { draft ?? CardioResult(seconds: 0) }, set: { result in
             do {
                 try store.updateCardio(sessionID: session.id, result: result)
                 pending = nil
@@ -701,8 +690,7 @@ private struct CardioLog: View {
             }
             LabeledContent("Actual seconds") {
                 TextField("Seconds", value: Binding<Int?>(get: {
-                    let draft = pending ?? store.active?.cardioDraft ?? session.cardio
-                    return draft?.seconds
+                    draft?.seconds
                 }, set: { newValue in
                     var draft = values.wrappedValue
                     draft.seconds = newValue ?? 0

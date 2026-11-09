@@ -139,6 +139,12 @@ struct CivilTrainingDay: Codable, Equatable {
     }
 
     var mondayIndex: Int { (Self.calendar.component(.weekday, from: date) + 5) % 7 }
+
+    var nextMonday: Date {
+        let calendar = Self.calendar
+        let monday = calendar.date(byAdding: .day, value: 7 - mondayIndex, to: date)!
+        return calendar.startOfDay(for: monday)
+    }
 }
 
 struct TrainingOccurrence: Codable, Identifiable, Equatable {
@@ -181,10 +187,12 @@ struct TrainingSession: Codable, Identifiable, Equatable {
     var performedDay: CivilTrainingDay
     var finishedAt: Date?
     var partial = false
+    var closedAtWeekBoundary: Bool?
     var occurrenceID: UUID?
     var isCardio = false
     var cardioDraft: CardioResult?
     var cardio: CardioResult?
+    var cardioRecordedAt: Date?
     var cardioVersion: Int?
     var cardioReceipts: [UUID: CardioReceipt]?
     var cardioRevision: Int { cardioVersion ?? 0 }
@@ -195,6 +203,23 @@ struct TrainingSession: Codable, Identifiable, Equatable {
     var currentExerciseID: UUID?
     var receipts: [UUID: ConfirmationReceipt] = [:]
     var timerUndo: TrainingTimerUndo?
+    var workoutDetailsChanged: Bool?
+
+    var hasSavedContent: Bool {
+        if !notes.isEmpty || cardio != nil || cardioDraft != nil || workoutDetailsChanged == true || !restHistory.isEmpty {
+            return true
+        }
+        return exercises.contains { exercise in
+            exercise.replacedPrescription != nil || exercise.sets.contains {
+                $0.confirmedAt != nil || $0.revision > 0 || $0.plannedID == nil
+            }
+        }
+    }
+
+    var lastRecordedAt: Date {
+        let lastSet = exercises.flatMap(\.sets).compactMap(\.confirmedAt).max() ?? startedAt
+        return max(startedAt, lastSet, cardioRecordedAt ?? startedAt)
+    }
 }
 
 struct TrainingError: LocalizedError {

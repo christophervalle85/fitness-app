@@ -147,6 +147,19 @@ struct ProgressTests {
         #expect(Set(metrics.history.map(\.id)) == [older.id, corrected.id, partial.id, future.id])
     }
 
+    @Test func closedDraftStaysInHistoryWithoutCountingAsTraining() {
+        var draft = session([], on: monday)
+        draft.partial = true
+        draft.closedAtWeekBoundary = true
+        draft.notes = "A saved draft"
+        var manual = draft
+        manual.id = UUID()
+        manual.closedAtWeekBoundary = nil
+        let metrics = ProgressMetrics(sessions: [draft, manual], occurrences: [], asOf: monday)
+        #expect(Set(metrics.history.map(\.id)) == [draft.id, manual.id])
+        #expect(metrics.sessionCount == 0)
+    }
+
     @Test func workoutTrendUsesHeaviestWorkingSetPerSessionInWorkoutOrder() throws {
         let exercise = PlanExercise(name: "Press")
         let nextWorkout = monday.addingTimeInterval(300)
@@ -297,13 +310,14 @@ struct ProgressTests {
         defer { try? FileManager.default.removeItem(at: folder) }
         let planner = PlanningStore(directory: folder.appending(path: "plans"))
         try planner.load()
-        let store = TrainingStore(directory: folder.appending(path: "training"))
+        let store = TrainingStore(directory: folder.appending(path: "training"), now: { monday })
         var backup = try WorkoutBackup(planner, store)
         let row = TrainingSet(ordinal: Int.max, revision: Int.max - 1)
         let exercise = TrainingExercise(prescription: PlanExercise(name: "Press"), basis: .external, sets: [row])
         let workout = TrainingSession(name: "Legacy workout", startedAt: monday,
                                       performedDay: CivilTrainingDay(monday), exercises: [exercise])
         backup.sessions = [workout]
+        backup.focusedSessionID = workout.id
         // Exercise the writer independently of the incoming-file validator.
         try store.stage(backup)
         try store.load(profileID: backup.owner)

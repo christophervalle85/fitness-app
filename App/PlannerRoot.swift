@@ -18,25 +18,25 @@ enum PlannerStyle {
 
 enum PlanStartTargetError: LocalizedError {
     case changed
-    var errorDescription: String? { "The selected workout changed. Choose it again in Plan." }
+    case pastWeek
+
+    var errorDescription: String? {
+        switch self {
+        case .changed: "The selected workout changed. Choose it again in Plan."
+        case .pastWeek: "This week is read-only. Choose a current or upcoming week."
+        }
+    }
 }
 
 enum PlanStartTarget {
     case template(WeekPlan, Date)
     case occurrence(UUID)
+    case extra
+    case cardio
 
-    @MainActor func title(in training: TrainingStore) -> String {
-        switch self {
-        case .template(let plan, let date):
-            let index = CivilTrainingDay(date).mondayIndex
-            return plan.days.indices.contains(index) ? plan.days[index].name : "Selected workout"
-        case .occurrence(let id):
-            return training.occurrences.first { $0.id == id }?.name ?? "Selected workout"
-        }
-    }
-
-    @MainActor func start(planner: PlanningStore, training: TrainingStore, expectedDay: CivilTrainingDay) throws {
-        guard training.active == nil else { throw TrainingError("Finish the open workout before starting another.") }
+    @MainActor @discardableResult
+    func start(planner: PlanningStore, training: TrainingStore, expectedDay: CivilTrainingDay) throws -> UUID {
+        guard !training.isPastWeek(expectedDay.date) else { throw PlanStartTargetError.pastWeek }
         switch self {
         case .template(let snapshot, let date):
             let day = CivilTrainingDay(date)
@@ -51,22 +51,24 @@ enum PlanStartTarget {
                dated.scheduledDay != day || dated.day != snapshot.days[index] || dated.restSeconds != snapshot.restSeconds {
                 throw PlanStartTargetError.changed
             }
-            try training.startPlanned(plan: plan, date: date)
+            return try training.startPlanned(plan: plan, date: date)
         case .occurrence(let id):
             guard training.occurrences.contains(where: { $0.id == id && $0.scheduledDay == expectedDay }) else {
                 throw PlanStartTargetError.changed
             }
-            try training.startOccurrence(id)
+            return try training.startOccurrence(id)
+        case .extra:
+            return try training.startExtra(name: "Extra workout")
+        case .cardio:
+            return try training.startCardio(name: "Cardio")
         }
     }
 }
 
-private struct WorkoutSwitch {
-    let sourceID: UUID
-    let target: PlanStartTarget
-    let targetDay: CivilTrainingDay
-    let owner: UUID
-    let generation: UUID
+private struct PresentedWorkout: Identifiable {
+    let id = UUID()
+    let sessionID: UUID
+    var route: WorkoutLiveRoute? = nil
 }
 
 struct PlannerRoot: View {
@@ -74,11 +76,8 @@ struct PlannerRoot: View {
     @State private var training = TrainingStore()
     @Environment(\.scenePhase) private var scenePhase
     @State private var pendingURL: URL?
-    @State private var workoutRouteEvent = UUID()
-    @State private var workoutRoute: WorkoutLiveRoute?
-    @State private var workoutOpen = false
-    @State private var reviewingSwitch: WorkoutSwitch?
-    @State private var startAfterDismiss: WorkoutSwitch?
+    @State private var workout: PresentedWorkout?
+    @State private var weekBoundary: Date?
     @State private var agendaDate = Date.now
     @State private var planRootVisible = true
     @State private var finishPulse = 0
@@ -115,7 +114,8 @@ struct PlannerRoot: View {
                     Tab("Plan", systemImage: "calendar", value: "Plan") {
                         NavigationStack {
                             PlanScreen(plan: store.plans.first { $0.id == store.activeID },
-                                        training: training, selected: $agendaDate, finishPulse: finishPulse, openWorkout: { workoutOpen = true },
+                                        training: training, selected: $agendaDate, finishPulse: finishPulse,
+                                        isPastWeek: training.isPastWeek(agendaDate), openWorkout: resumeWorkout,
                                         showRoutines: { tab = "Routines" }, requestPlanStart: requestPlanStart,
                                         onRootVisibilityChanged: { planRootVisible = $0 })
                                 .toolbar { developerButton }
@@ -201,14 +201,13 @@ struct PlannerRoot: View {
             }
         }
         .id(restoreGeneration)
-        .fullScreenCover(isPresented: $workoutOpen, onDismiss: workoutDismissed) {
+        .fullScreenCover(item: $workout, onDismiss: workoutDismissed) { workout in
             NavigationStack {
-                ActiveWorkout(store: training, planner: store, route: workoutRoute, routeEvent: workoutRouteEvent,
-                              reviewOnOpen: reviewingSwitch != nil, switchTargetName: reviewingSwitch?.target.title(in: training),
-                              onClose: minimizeWorkout, onFinished: finishWorkout, onDiscarded: discardedWorkout,
-                              onCancelSwitch: { reviewingSwitch = nil }, applyToRoutine: futureReplacement,
+                ActiveWorkout(store: training, sessionID: workout.sessionID, planner: store, route: workout.route,
+                              onClose: minimizeWorkout, onFinished: finishWorkout,
+                              applyToRoutine: futureReplacement(for: workout.sessionID),
                               routineExercises: store.plans.first { $0.id == store.activeID }?.days.flatMap(\.exercises) ?? [])
-            }.id(workoutRouteEvent)
+            }.id(workout.id)
         }
         .preferredColorScheme(testAppearance)
         .environment(store)
@@ -221,6 +220,20 @@ struct PlannerRoot: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active, refreshTraining() {
                 Task { await WorkoutLiveCoordinator.sync(training: training, owner: store.profileID) }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            refreshTraining()
+        }
+        .task(id: weekBoundary) {
+            guard let weekBoundary else { return }
+            var checkAt = weekBoundary
+            while !Task.isCancelled, self.weekBoundary == weekBoundary {
+                do { try await Task.sleep(for: .seconds(max(0, checkAt.timeIntervalSinceNow))) }
+                catch { return }
+                guard !Task.isCancelled, self.weekBoundary == weekBoundary else { return }
+                if refreshTraining() { return }
+                checkAt = .now.addingTimeInterval(5)
             }
         }
         .onOpenURL { url in pendingURL = url; openPendingRoute() }
@@ -271,11 +284,15 @@ struct PlannerRoot: View {
         }
     }
 
-    private var futureReplacement: ((PlanExercise, PlanExercise) throws -> Void)? {
-        guard let id = training.active?.occurrenceID,
+    private func futureReplacement(for sessionID: UUID) -> ((PlanExercise, PlanExercise) throws -> Void)? {
+        guard let id = training.sessions.first(where: { $0.id == sessionID })?.occurrenceID,
               let occurrence = training.occurrences.first(where: { $0.id == id }),
               let planID = occurrence.planID, let day = occurrence.day else { return nil }
         return { original, replacement in
+            try training.reconcileExpiredSessions()
+            guard training.openSessions.contains(where: { $0.id == sessionID }) else {
+                throw TrainingError("This workout is closed. Review its results in Progress.")
+            }
             try store.replaceFutureExercise(planID: planID, dayID: day.id, original: original, replacement: replacement)
         }
     }
@@ -283,8 +300,7 @@ struct PlannerRoot: View {
     private var recoveryScreen: some View {
         RecoveryScreen(planner: store, training: training, onRestore: {
             tab = "Plan"
-            clearSwitch()
-            workoutOpen = false
+            workout = nil
             errorMessage = nil
             retry = nil
             restoreGeneration = UUID()
@@ -296,6 +312,8 @@ struct PlannerRoot: View {
         guard loaded, let owner = store.profileID else { return false }
         do {
             try training.load(profileID: owner)
+            try training.reconcileExpiredSessions()
+            weekBoundary = training.nextWeekBoundary
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -306,23 +324,22 @@ struct PlannerRoot: View {
     private func openPendingRoute() {
         guard loaded, let url = pendingURL else { return }
         pendingURL = nil
-        guard let route = WorkoutLiveRoute.parse(url),
+        guard let route = WorkoutLiveRoute.parse(url), refreshTraining(),
               WorkoutLiveCoordinator.isCurrent(route, training: training, owner: store.profileID) else { return }
         perform {
-            if let exerciseID = route.exerciseID, training.active?.currentExerciseID != exerciseID {
+            if let exerciseID = route.exerciseID,
+               training.sessions.first(where: { $0.id == route.sessionID })?.currentExerciseID != exerciseID {
                 try training.select(sessionID: route.sessionID, exerciseID: exerciseID)
             }
-            clearSwitch()
-            workoutRoute = route
-            workoutRouteEvent = UUID()
-            workoutOpen = true
+            workout = PresentedWorkout(sessionID: route.sessionID, route: route)
         }
     }
 
     private var showsWorkoutAccessory: Bool {
         guard let session = training.active else { return false }
-        guard tab == "Plan", planRootVisible, let id = session.occurrenceID,
-              let occurrence = training.occurrences.first(where: { $0.id == id }) else { return true }
+        guard tab == "Plan", planRootVisible, !training.isPastWeek(agendaDate) else { return true }
+        guard let id = session.occurrenceID else { return false }
+        guard let occurrence = training.occurrences.first(where: { $0.id == id }) else { return true }
         return !training.isScheduled(occurrence, on: agendaDate)
     }
 
@@ -331,7 +348,7 @@ struct PlannerRoot: View {
         let exercise = session.exercises.first { $0.id == session.currentExerciseID }?.prescription.name ?? session.name
         let planned = occurrence.map { "Planned " + $0.date.formatted(.dateTime.month(.abbreviated).day()) } ?? "Unscheduled"
         let started = "Started " + session.performedDay.date.formatted(.dateTime.month(.abbreviated).day())
-        return Button { workoutOpen = true } label: {
+        return Button { resumeWorkout(session.id) } label: {
             HStack(spacing: 8) {
                 Image(systemName: "figure.strengthtraining.traditional")
                 VStack(alignment: .leading, spacing: 1) {
@@ -348,87 +365,48 @@ struct PlannerRoot: View {
 
     private func requestPlanStart(_ target: PlanStartTarget) {
         guard let owner = store.profileID else { return }
-        let targetDay = CivilTrainingDay(agendaDate)
-        if let source = training.active {
-            if case .occurrence(let id) = target, id == source.occurrenceID {
-                workoutOpen = true
-                return
-            }
-            reviewForSwitch(WorkoutSwitch(sourceID: source.id, target: target, targetDay: targetDay,
-                                         owner: owner, generation: restoreGeneration))
-        } else {
-            startTarget(target, on: targetDay, owner: owner, generation: restoreGeneration)
-        }
-    }
-
-    private func reviewForSwitch(_ request: WorkoutSwitch) {
-        guard request.owner == store.profileID, request.generation == restoreGeneration,
-              request.sourceID == training.active?.id else {
-            errorMessage = "The open workout changed. Choose the workout you want to start again."
-            retry = nil
-            return
-        }
-        reviewingSwitch = request
-        workoutRoute = nil
-        workoutRouteEvent = UUID()
-        workoutOpen = true
-    }
-
-    private func startTarget(_ target: PlanStartTarget, on day: CivilTrainingDay, owner: UUID, generation: UUID) {
-        // Retry captures just the new start, never the already committed finish.
-        perform {
-            guard owner == store.profileID, generation == restoreGeneration else {
-                throw TrainingError("The profile changed. Choose a workout again.")
-            }
-            try training.load(profileID: owner)
+        let day = CivilTrainingDay(agendaDate)
+        presentWorkout(owner: owner, generation: restoreGeneration) {
             try target.start(planner: store, training: training, expectedDay: day)
-            workoutRoute = nil
-            workoutRouteEvent = UUID()
-            workoutOpen = true
+        }
+    }
+
+    private func resumeWorkout(_ sessionID: UUID) {
+        guard let owner = store.profileID else { return }
+        presentWorkout(owner: owner, generation: restoreGeneration) {
+            guard training.openSessions.contains(where: { $0.id == sessionID }) else { throw PlanStartTargetError.changed }
+            try training.focus(sessionID: sessionID)
+            return sessionID
+        }
+    }
+
+    private func presentWorkout(owner: UUID, generation: UUID, select: @escaping () throws -> UUID) {
+        perform {
+            guard owner == store.profileID, generation == restoreGeneration else { throw PlanStartTargetError.changed }
+            try training.load(profileID: owner)
+            try training.reconcileExpiredSessions()
+            weekBoundary = training.nextWeekBoundary
+            workout = PresentedWorkout(sessionID: try select())
         }
     }
 
     private func minimizeWorkout() {
-        reviewingSwitch = nil
-        workoutOpen = false
-    }
-
-    private func clearSwitch() {
-        reviewingSwitch = nil
-        startAfterDismiss = nil
+        workout = nil
     }
 
     private func workoutDismissed() {
-        workoutRoute = nil
-        reviewingSwitch = nil
-        if let request = startAfterDismiss {
-            startAfterDismiss = nil
-            pendingCelebration = false
-            startTarget(request.target, on: request.targetDay, owner: request.owner, generation: request.generation)
-        } else if pendingCelebration {
+        if pendingCelebration {
             finishPulse += 1
             pendingCelebration = false
         }
     }
 
-    private func discardedWorkout(_ id: UUID) {
-        if let request = reviewingSwitch, request.sourceID == id, !training.sessions.contains(where: { $0.id == id }) {
-            startAfterDismiss = request
-        }
-        minimizeWorkout()
-    }
-
     private func finishWorkout(_ session: TrainingSession) {
         guard session.finishedAt != nil else { return }
-        if let request = reviewingSwitch, request.sourceID == session.id {
-            startAfterDismiss = request
-            minimizeWorkout()
-            return
-        }
         let occurrence = training.occurrences.first { $0.id == session.occurrenceID }
         agendaDate = occurrence?.date ?? session.performedDay.date
         tab = "Plan"
-        workoutOpen = false
+        workout = nil
         if let occurrence, training.status(for: occurrence).hasPrefix("Done") { pendingCelebration = true }
     }
 
@@ -449,6 +427,7 @@ struct PlannerRoot: View {
     private func load() {
         loaded = false
         loadFailed = false
+        weekBoundary = nil
         perform {
             do {
                 let paths = try RecoveryPaths.current()
@@ -457,7 +436,11 @@ struct PlannerRoot: View {
                 try store.load()
             } catch { loadFailed = true; throw error }
             if let owner = store.profileID {
-                do { try training.load(profileID: owner) } catch { loadFailed = true; throw error }
+                do {
+                    try training.load(profileID: owner)
+                    try training.reconcileExpiredSessions()
+                    weekBoundary = training.nextWeekBoundary
+                } catch { loadFailed = true; throw error }
             }
             activateNewRoutine = false
             if let draft = store.draft { editing = draft }

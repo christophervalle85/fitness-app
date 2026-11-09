@@ -135,9 +135,11 @@ struct WorkoutLiveTests {
             try store.add(sessionID: initial.id, prescription: PlanExercise(name: "Second exercise", sets: 1), basis: .bodyweight)
             try store.select(sessionID: initial.id, exerciseID: initial.exercises[0].id)
             let first = try snapshot(store)
-            let attributes = WorkoutLiveActivity(owner: owner, generation: "original", sessionID: initial.id)
+            let focusToken = try #require(store.focusToken)
+            let attributes = WorkoutLiveActivity(owner: owner, generation: "original", sessionID: initial.id, focusToken: focusToken)
             let link = try #require(WorkoutLiveRoute.parse(WorkoutLiveRoute(attributes, state: first).url))
             #expect(link.sessionID == initial.id)
+            #expect(link.focusToken == focusToken)
             #expect(link.exerciseID == first.exerciseID)
             #expect(link.setID == first.setID)
             try tap(.confirm, first, on: store)
@@ -170,11 +172,67 @@ struct WorkoutLiveTests {
         }
     }
 
+    @Test func controlsWithoutAFocusTokenCannotChangeAWorkout() throws {
+        try setup { store, root, owner in
+            let session = try #require(store.active)
+            let legacy = WorkoutLiveActivity(owner: owner, generation: "original", sessionID: session.id,
+                                             isolatedRun: WorkoutLivePrivacy.isolatedRun)
+            let paths = RecoveryPaths(planning: root, training: root, previous: nil)
+            #expect(throws: TrainingError.self) {
+                try WorkoutLiveCoordinator.validateScope(legacy, paths: paths, owner: owner, training: store)
+            }
+        }
+    }
+
+    @Test func oldControlsStayInvalidAfterRefocusingTheSameSession() throws {
+        try setup { store, root, owner in
+            let session = try #require(store.active)
+            let initialToken = try #require(store.focusToken)
+            let first = WorkoutLiveActivity(owner: owner, generation: "original", sessionID: session.id,
+                                            focusToken: initialToken, isolatedRun: WorkoutLivePrivacy.isolatedRun)
+            let paths = RecoveryPaths(planning: root, training: root, previous: nil)
+            try WorkoutLiveCoordinator.validateScope(first, paths: paths, owner: owner, training: store)
+
+            try store.startExtra(name: "Second workout")
+            #expect(throws: TrainingError.self) {
+                try WorkoutLiveCoordinator.validateScope(first, paths: paths, owner: owner, training: store)
+            }
+            try store.focus(sessionID: session.id)
+            #expect(throws: TrainingError.self) {
+                try WorkoutLiveCoordinator.validateScope(first, paths: paths, owner: owner, training: store)
+            }
+            let currentToken = try #require(store.focusToken)
+            #expect(currentToken != initialToken)
+            var current = first
+            current.focusToken = currentToken
+            try WorkoutLiveCoordinator.validateScope(current, paths: paths, owner: owner, training: store)
+        }
+    }
+
+    @Test func currentControlsExpireAtTheWeekBoundary() throws {
+        var instant = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        try setup(now: { instant }) { store, root, owner in
+            let session = try #require(store.active)
+            let current = WorkoutLiveActivity(owner: owner, generation: "original", sessionID: session.id,
+                                              focusToken: try #require(store.focusToken), isolatedRun: WorkoutLivePrivacy.isolatedRun)
+            let paths = RecoveryPaths(planning: root, training: root, previous: nil)
+            let state = try snapshot(store)
+            try WorkoutLiveCoordinator.validateScope(current, paths: paths, owner: owner, training: store)
+
+            instant = store.expirationDate(for: session)
+            #expect(throws: TrainingError.self) {
+                try WorkoutLiveCoordinator.validateScope(current, paths: paths, owner: owner, training: store)
+            }
+            #expect(throws: TrainingError.self) { try tap(.confirm, state, on: store) }
+            #expect(store.sessions.first?.exercises[0].sets[0].confirmedAt == nil)
+        }
+    }
+
     @Test func storeReplacementRejectsOldIdentityEvenWithSameSessionAndRevision() throws {
         try setup { store, root, owner in
             let sessionID = try #require(store.active?.id)
             let original = WorkoutLiveActivity(owner: owner, generation: "original", sessionID: sessionID,
-                                               isolatedRun: WorkoutLivePrivacy.isolatedRun)
+                                               focusToken: try #require(store.focusToken), isolatedRun: WorkoutLivePrivacy.isolatedRun)
             let oldPaths = RecoveryPaths(planning: root, training: root, previous: nil)
             try WorkoutLiveCoordinator.validateScope(original, paths: oldPaths, owner: owner, training: store)
             var otherRun = original

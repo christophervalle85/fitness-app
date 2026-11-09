@@ -318,7 +318,7 @@ private struct ChartDayDrag: UIGestureRecognizerRepresentable {
 private func sessionLabel(_ session: TrainingSession) -> some View {
     VStack(alignment: .leading, spacing: 4) {
         Text(session.name).font(.headline)
-        Text(session.startedAt.formatted(date: .abbreviated, time: .shortened) + (session.partial ? " · Partial" : ""))
+        Text(session.startedAt.formatted(date: .abbreviated, time: .shortened) + (session.isArchivedDraft ? " · Draft" : (session.partial ? " · Partial" : "")))
             .font(.subheadline).foregroundStyle(.secondary)
     }
 }
@@ -528,7 +528,7 @@ private struct ProgressSession: View {
         List {
             if let session = store.sessions.first(where: { $0.id == id }) {
                 Section(session.name) {
-                    LabeledContent("Status", value: session.partial ? "Partial" : "Finished")
+                    LabeledContent("Status", value: session.isArchivedDraft ? "Closed draft" : (session.partial ? "Partial" : "Finished"))
                     NavigationLink {
                         SessionDateEditor(store: store, session: session)
                     } label: { LabeledContent("Performed", value: session.startedAt.formatted(date: .abbreviated, time: .shortened)) }
@@ -541,6 +541,16 @@ private struct ProgressSession: View {
                         } label: { LabeledContent("Activity duration", value: elapsedString(TimeInterval(cardio.seconds))) }
                         if let distance = cardio.distance { LabeledContent("Distance", value: "\(distance.formatted()) \(cardio.unit)") }
                         if !cardio.notes.isEmpty { Text(cardio.notes) }
+                    }
+                }
+                if (session.isArchivedDraft || session.closedAtWeekBoundary == true),
+                   let draft = session.cardioDraft, draft != session.cardio {
+                    Section("Unconfirmed cardio") {
+                        if draft.seconds > 0 {
+                            LabeledContent("Activity duration", value: elapsedString(TimeInterval(draft.seconds)))
+                        }
+                        if let distance = draft.distance { LabeledContent("Distance", value: "\(distance.formatted()) \(draft.unit)") }
+                        if !draft.notes.isEmpty { Text(draft.notes) }
                     }
                 }
                 ForEach(Array(session.exercises.enumerated()), id: \.element.id) { e, exercise in
@@ -556,6 +566,11 @@ private struct ProgressSession: View {
                                         Text(actualDescription(row.actual.converted(to: unit), basis: exercise.basis)).foregroundStyle(.secondary)
                                     }
                                 }.accessibilityIdentifier("historySet\(e)-\(i)")
+                            } else if (session.isArchivedDraft || session.closedAtWeekBoundary == true), row.revision > 0 {
+                                let result = actualDescription(row.actual.converted(to: unit), basis: exercise.basis)
+                                if !result.isEmpty {
+                                    LabeledContent("Unconfirmed set \(row.ordinal ?? i + 1)", value: result)
+                                }
                             }
                         }
                     }
