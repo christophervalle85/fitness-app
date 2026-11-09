@@ -50,6 +50,8 @@ private struct ExerciseSearch: View {
         .scrollContentBackground(.hidden).background(PlannerStyle.paper)
         .navigationTitle("Search Exercises")
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search")
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
         .task {
             do { entries = try ExerciseCatalog.bundled().entries }
             catch { issue = "The bundled catalog could not be opened. Your custom exercises are still available." }

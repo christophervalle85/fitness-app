@@ -214,6 +214,31 @@ final class DiscoverUITests: XCTestCase {
         XCTAssertFalse(secondProfile.buttons["newCustomExercise"].exists)
     }
 
+    func testExerciseSearchPreservesSingleKeyboardTaps() {
+        let app = launchWithRoutine()
+        tap(app.tabBars.buttons["Exercises"])
+        let search = app.searchFields["Search"].firstMatch
+        tap(search)
+
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+        for (key, expected) in [("c", "c"), ("h", "ch"), ("e", "che"), ("s", "ches"), ("t", "chest")] {
+            let button = keyboard.keys.matching(NSPredicate(format: "label ==[c] %@", key)).firstMatch
+            XCTAssertTrue(button.waitForExistence(timeout: 5), "Keyboard keys: \(keyboard.keys.allElementsBoundByIndex.map(\.label))")
+            button.tap()
+            XCTAssertEqual(search.value as? String, expected)
+        }
+        XCTAssertTrue(app.buttons["catalogRow-Barbell bench press"].waitForExistence(timeout: 5))
+        tap(search.buttons["Clear text"].firstMatch)
+        for (key, expected) in [("r", "r"), ("o", "ro"), ("w", "row")] {
+            let button = keyboard.keys.matching(NSPredicate(format: "label ==[c] %@", key)).firstMatch
+            XCTAssertTrue(button.waitForExistence(timeout: 5), "Keyboard keys: \(keyboard.keys.allElementsBoundByIndex.map(\.label))")
+            button.tap()
+            XCTAssertEqual(search.value as? String, expected)
+        }
+        XCTAssertTrue(app.buttons["catalogRow-Barbell row"].waitForExistence(timeout: 5))
+    }
+
     func testMuscleSearchWithAnOpenWorkout() {
         let app = launchWithRoutine()
         tap(app.buttons["weekday0"])
