@@ -180,36 +180,12 @@ final class PlanUITests: XCTestCase {
         capture("Plan with reduced motion", in: app)
     }
 
-    func testActiveWorkoutBelongsToItsSelectedDay() {
+    func testOpenWorkoutsResumeIndependentlyOnTheirPlanDays() {
         let app = launchPlan()
         tap(app.buttons["weekday0"])
         XCTAssertEqual(app.staticTexts["planWorkoutStatus"].label, "Not started")
-        XCTAssertEqual(app.buttons["startPlanned"].label, "Start")
         tap(app.buttons["startPlanned"])
-        tap(app.buttons["Close"])
-        XCTAssertTrue(app.buttons["resumeWorkout"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.staticTexts["planWorkoutStatus"].label, "In progress")
-        XCTAssertEqual(app.buttons["resumeWorkout"].label, "Resume")
-        XCTAssertFalse(app.buttons["planWorkoutOptions"].exists)
-        tap(app.buttons["weekday2"])
-        XCTAssertFalse(app.buttons["resumeWorkout"].exists)
-        XCTAssertTrue(app.buttons["startPlanned"].isHittable)
-        let accessory = app.buttons["resumeAccessory"]
-        XCTAssertTrue(accessory.waitForExistence(timeout: 5))
-        XCTAssertTrue(accessory.label.contains("Lower body"))
-        capture("Plan with another day’s workout open", in: app)
-        tap(app.buttons["startPlanned"])
-        XCTAssertTrue(app.navigationBars["Workout summary"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Finish Lower body before starting Upper body."].exists)
-        capture("Review open workout before switching", in: app)
-        tap(app.buttons["cancelWorkoutSwitch"])
-        XCTAssertTrue(accessory.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["weekday2"].isSelected)
-        tap(accessory)
         XCTAssertTrue(app.navigationBars["Lower body"].waitForExistence(timeout: 5))
-        tap(app.buttons["Close"])
-        tap(app.buttons["weekday0"])
-        tap(app.buttons["resumeWorkout"])
         let reps = app.textFields["actualReps0"]
         tap(reps)
         reps.typeText("10")
@@ -219,20 +195,59 @@ final class PlanUITests: XCTestCase {
         if app.buttons["dismissSetKeyboard"].isHittable { tap(app.buttons["dismissSetKeyboard"]) }
         tap(app.buttons["confirmSet0"])
         tap(app.buttons["Close"])
+
         tap(app.buttons["weekday2"])
+        XCTAssertTrue(app.buttons["startPlanned"].isHittable)
+        XCTAssertTrue(app.buttons["resumeAccessory"].label.contains("Lower body"))
         tap(app.buttons["startPlanned"])
-        XCTAssertTrue(app.navigationBars["Workout summary"].waitForExistence(timeout: 5))
-        tap(app.buttons["finishPartial"])
-        XCTAssertTrue(app.navigationBars["Upper body"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Upper body"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["Workout summary"].exists)
         tap(app.buttons["Close"])
+
+        tap(app.buttons["weekday0"])
+        XCTAssertEqual(app.staticTexts["planWorkoutStatus"].label, "In progress")
+        XCTAssertEqual(app.buttons["resumeWorkout"].label, "Resume Lower body")
+        XCTAssertFalse(app.buttons["planWorkoutOptions"].exists)
+        tap(app.buttons["resumeWorkout"])
+        XCTAssertTrue(app.navigationBars["Lower body"].waitForExistence(timeout: 5))
+        tap(app.buttons["reviewSession"])
+        let finish = app.buttons["finishPartial"]
+        XCTAssertTrue(finish.waitForExistence(timeout: 5))
+        XCTAssertTrue(finish.isEnabled)
+        tap(finish)
+
+        XCTAssertTrue(app.buttons["startOccurrence"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["startOccurrence"].label, "Continue Lower body")
         tap(app.buttons["weekday2"])
         XCTAssertTrue(app.buttons["resumeWorkout"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["resumeAccessory"].exists)
+        tap(app.buttons["resumeWorkout"])
+        XCTAssertTrue(app.navigationBars["Upper body"].waitForExistence(timeout: 5))
+    }
+
+    func testPastWeekHidesPlanChanges() {
+        let app = launchPlan()
         tap(app.buttons["weekday0"])
-        XCTAssertTrue(app.buttons["startOccurrence"].exists)
-        XCTAssertEqual(app.buttons["startOccurrence"].label, "Resume")
-        XCTAssertEqual(app.staticTexts["planWorkoutStatus"].label, "In progress")
-        XCTAssertTrue(app.buttons["resumeAccessory"].label.contains("Upper body"))
+        swipeWeek(forward: false, in: app)
+        XCTAssertTrue(app.staticTexts["Lower body"].waitForExistence(timeout: 5))
+        for id in ["startPlanned", "startOccurrence", "resumeWorkout", "planWorkoutOptions",
+                   "scheduleCardio", "extraWorkout", "extraCardio"] {
+            XCTAssertFalse(app.buttons[id].exists, "\(id) should be unavailable in a past week.")
+        }
+    }
+
+    func testUnscheduledWorkoutCanResumeAfterStartingAnother() {
+        let app = launchPlan()
+        tap(app.buttons["weekday3"])
+        tap(app.buttons["extraWorkout"])
+        XCTAssertTrue(app.navigationBars["Extra workout"].waitForExistence(timeout: 5))
+        tap(app.buttons["Close"])
+
+        tap(app.buttons["weekday0"])
+        tap(app.buttons["startPlanned"])
+        XCTAssertTrue(app.navigationBars["Lower body"].waitForExistence(timeout: 5))
+        tap(app.buttons["Close"])
+        tap(app.buttons["resumeUnscheduledWorkout"])
+        XCTAssertTrue(app.navigationBars["Extra workout"].waitForExistence(timeout: 5))
     }
 
     func testRescheduleBackLeavesTemplateAndConfirmMovesOneWorkout() {

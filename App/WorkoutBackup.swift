@@ -3,12 +3,13 @@ import Foundation
 struct WorkoutBackup: Codable, Equatable {
     static let byteLimit = 32 * 1024 * 1024
     var format = "Weekform"
-    var version = 2
+    var version = 3
     var library: PersonalCatalog?
     var owner: UUID
     var unit: String
     var step: String
     var activeID: UUID?
+    var focusedSessionID: UUID?
     var plans: [WeekPlan]
     var draft: WeekPlan?
     var sessions: [TrainingSession]
@@ -21,10 +22,16 @@ struct WorkoutBackup: Codable, Equatable {
         unit = planner.weightUnit
         step = planner.step
         activeID = planner.activeID
+        focusedSessionID = training.active?.id
         plans = planner.plans
         draft = planner.draft
         sessions = training.sessions.sorted { $0.id.uuidString < $1.id.uuidString }
         occurrences = training.occurrences.sorted { $0.id.uuidString < $1.id.uuidString }
+    }
+
+    var restoredFocusID: UUID? {
+        if version < 3 { return sessions.first { $0.finishedAt == nil }?.id }
+        return focusedSessionID
     }
 
     static func read(_ url: URL) throws -> Self {
@@ -60,13 +67,22 @@ struct WorkoutBackup: Codable, Equatable {
             for e in value.exercises { try exercise(e) }
             if let goal = value.cardioGoalSeconds { try check(goal > 0) }
         }
-        try check(format == "Weekform" && (1...2).contains(version) && ["kg","lb"].contains(unit))
+        try check(format == "Weekform" && (1...3).contains(version) && ["kg","lb"].contains(unit))
         try check(version == 1 || library != nil)
         try library?.validate()
         let editorSteps = ["edit", "review", "libraryEdit", "libraryReview"]
         try check((["home", "starters", "welcome"] + editorSteps).contains(step))
         try check(!editorSteps.contains(step) || draft != nil)
-        try check(unique(plans) && unique(sessions) && unique(occurrences) && sessions.filter { $0.finishedAt == nil }.count <= 1)
+        try check(unique(plans) && unique(sessions) && unique(occurrences))
+        try check(Set(sessions.map(\.id)).isDisjoint(with: occurrences.map(\.id)))
+        let open = sessions.filter { $0.finishedAt == nil }
+        let linked = open.compactMap(\.occurrenceID)
+        try check(Set(linked).count == linked.count)
+        if version < 3 {
+            try check(open.count <= 1 && focusedSessionID == nil)
+        } else if let focusedSessionID {
+            try check(open.contains { $0.id == focusedSessionID })
+        }
         try check(activeID == nil || plans.contains { $0.id == activeID && !$0.archived })
         if let draft { try check(draft.days.count == 7 && unique(draft.days) && draft.days.allSatisfy { unique($0.exercises) }) }
         for plan in plans {
@@ -103,6 +119,7 @@ struct WorkoutBackup: Codable, Equatable {
         for s in sessions {
             try check(validTimestamp(s.startedAt))
             if let end = s.finishedAt { try check(validTimestamp(end) && end >= s.startedAt) }
+            try check(s.closedAtWeekBoundary != true || s.finishedAt != nil)
             try date(s.performedDay)
             let o = s.occurrenceID.flatMap { indexed[$0] }
             try check(s.occurrenceID == nil || o != nil)
@@ -133,6 +150,9 @@ struct WorkoutBackup: Codable, Equatable {
             }
             let slots = Set(o?.plannedSets.values.flatMap { $0 } ?? [])
             if let result = s.cardio { try result.validate() }
+            if let recorded = s.cardioRecordedAt {
+                try check(s.cardio != nil && validTimestamp(recorded) && recorded >= s.startedAt && recorded <= (s.finishedAt ?? recorded))
+            }
             for e in s.exercises {
                 try exercise(e.prescription)
                 for row in e.sets {
@@ -212,8 +232,11 @@ struct RecoveryPaths {
         try p.load(); try t.load(profileID: backup.owner)
         let reopened = try WorkoutBackup(p, t)
         var normalized = backup
-        normalized.version = 2
+        normalized.version = 3
         normalized.library = backup.library ?? PersonalCatalog()
+        normalized.focusedSessionID = backup.restoredFocusID
+        normalized.sessions.sort { $0.id.uuidString < $1.id.uuidString }
+        normalized.occurrences.sort { $0.id.uuidString < $1.id.uuidString }
         guard reopened == normalized else { throw PlanningError("The restored copy could not be verified.") }
         try beforeSwitch()
         try JSONEncoder().encode(id).write(to: root.appending(path: "active"), options: .atomic)

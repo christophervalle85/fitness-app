@@ -21,12 +21,12 @@ private struct WorkoutActivityWidget: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Label(context.state.restStart == nil ? "Workout" : (context.state.restPausedAt == nil ? "Rest" : "Paused"),
-                          systemImage: context.state.restStart == nil ? "figure.strengthtraining.traditional" : "timer")
+                    Label(context.isStale || context.state.restStart == nil ? "Workout" : (context.state.restPausedAt == nil ? "Rest" : "Paused"),
+                          systemImage: context.isStale || context.state.restStart == nil ? "figure.strengthtraining.traditional" : "timer")
                         .font(.caption.bold()).foregroundStyle(.white)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    if context.state.restStart != nil {
+                    if !context.isStale, context.state.restStart != nil {
                         RestClock(state: context.state).frame(width: 68, alignment: .trailing)
                             .font(.headline).foregroundStyle(.white)
                     }
@@ -38,15 +38,15 @@ private struct WorkoutActivityWidget: Widget {
             } compactLeading: {
                 Image(systemName: "dumbbell.fill").accessibilityLabel("Workout active")
             } compactTrailing: {
-                if context.state.restStart != nil {
+                if !context.isStale, context.state.restStart != nil {
                     RestClock(state: context.state)
                         .font(.caption2.weight(.semibold)).frame(width: 41, alignment: .trailing)
                         .foregroundStyle(.white)
-                } else if let number = context.state.ordinal {
+                } else if !context.isStale, let number = context.state.ordinal {
                     Text("\(number)").monospacedDigit().accessibilityLabel("Set \(number)")
                 } else { Image(systemName: "checkmark.circle") }
             } minimal: {
-                Image(systemName: context.state.restStart == nil ? "dumbbell.fill" : "timer")
+                Image(systemName: context.isStale || context.state.restStart == nil ? "dumbbell.fill" : "timer")
             }
             .widgetURL(WorkoutLiveRoute(context.attributes, state: context.state).url)
         }
@@ -85,6 +85,16 @@ private struct WorkoutLiveControls: View {
     private var url: URL { WorkoutLiveRoute(context.attributes, state: state).url }
 
     var body: some View {
+        if context.isStale {
+            Text("Workout week ended")
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            controls
+        }
+    }
+
+    private var controls: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
                 Text(state.exerciseName ?? "Weekform workout")

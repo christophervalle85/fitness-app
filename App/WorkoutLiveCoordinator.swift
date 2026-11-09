@@ -46,7 +46,8 @@ enum WorkoutLiveCoordinator {
     static func isCurrent(_ route: WorkoutLiveRoute, training: TrainingStore, owner: UUID?) -> Bool {
         guard route.owner == owner, let paths = try? RecoveryPaths.current(), route.generation == generation(paths),
               training.isOpen(at: paths.training, owner: route.owner), let session = training.active,
-              session.id == route.sessionID else { return false }
+              session.id == route.sessionID, !training.isExpired(session),
+              let token = route.focusToken, token == training.focusToken else { return false }
         if let exerciseID = route.exerciseID {
             guard let exercise = session.exercises.first(where: { $0.id == exerciseID }) else { return false }
             if let setID = route.setID { return exercise.sets.contains { $0.id == setID } }
@@ -136,9 +137,11 @@ enum WorkoutLiveCoordinator {
         defaults.set(showLoad, forKey: WorkoutLivePrivacy.showLoadKey)
         if let opened = try? openCanonical() {
             await sync(training: opened.training, owner: opened.owner, allowStart: false)
-        } else {
-            // Withdraw previously disclosed values even when storage is inaccessible.
-            for activity in Activity<WorkoutLiveActivity>.activities where activity.attributes.isolatedRun == WorkoutLivePrivacy.isolatedRun {
+        }
+        // A store read can also fail inside the publication queue. Withdraw
+        // anything that still uses the old privacy setting after the sync.
+        for activity in Activity<WorkoutLiveActivity>.activities where activity.attributes.isolatedRun == WorkoutLivePrivacy.isolatedRun {
+            if activity.content.state.privacyEpoch != WorkoutLivePrivacy.current.epoch {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
         }
@@ -157,19 +160,27 @@ enum WorkoutLiveCoordinator {
     }
 
     private static func publish(training: TrainingStore, owner: UUID?, allowStart: Bool) async {
-        guard let paths = try? RecoveryPaths.current(), let owner, training.isOpen(at: paths.training, owner: owner) else { return }
-        let generation = generation(paths)
-        let session = training.active
+        // The foreground and intents may have separate store instances. Read the
+        // current focus after entering the publication queue before ending an activity.
+        guard let owner, let opened = try? openCanonical(), opened.owner == owner,
+              training.isOpen(at: opened.paths.training, owner: owner) else { return }
+        let generation = generation(opened.paths)
+        let current = opened.training
+        let session = current.active.flatMap { current.isExpired($0) ? nil : $0 }
+        let focusToken = current.focusToken
         var existing: Activity<WorkoutLiveActivity>?
         for activity in Activity<WorkoutLiveActivity>.activities where activity.attributes.isolatedRun == WorkoutLivePrivacy.isolatedRun {
             if activity.attributes.sessionID == session?.id, activity.attributes.owner == owner,
-               activity.attributes.generation == generation, existing == nil {
+               activity.attributes.generation == generation, let focusToken,
+               activity.attributes.focusToken == focusToken, existing == nil {
                 existing = activity
             } else { await activity.end(nil, dismissalPolicy: .immediate) }
         }
-        guard let session else { return }
-        let state = snapshot(session, revision: training.liveRevision, privacy: .current)
-        let content = ActivityContent(state: state, staleDate: nil)
+        guard let session, let focusToken, let latest = try? openCanonical(), latest.owner == owner,
+              Self.generation(latest.paths) == generation, latest.training.focusToken == focusToken,
+              let focused = latest.training.active, focused.id == session.id, !latest.training.isExpired(focused) else { return }
+        let state = snapshot(focused, revision: latest.training.liveRevision, privacy: .current)
+        let content = ActivityContent(state: state, staleDate: latest.training.expirationDate(for: focused))
         if let existing {
             // Never overwrite an externally committed intent with this foreground
             // store's older revision while the app is reloading its read model.
@@ -177,12 +188,12 @@ enum WorkoutLiveCoordinator {
                 await existing.update(content)
             }
         } else if allowStart && ActivityAuthorizationInfo().areActivitiesEnabled {
-            let key = "\(generation)/\(owner)/\(session.id)"
+            let key = "\(generation)/\(owner)/\(focusToken)"
             guard UserDefaults.standard.string(forKey: lastRequestKey) != key else { return }
             if let failedRequest, failedRequest.key == key, failedRequest.retryAfter > Date() { return }
             do {
                 _ = try Activity.request(attributes: WorkoutLiveActivity(owner: owner, generation: generation, sessionID: session.id,
-                                                                       isolatedRun: WorkoutLivePrivacy.isolatedRun), content: content)
+                                                                       focusToken: focusToken, isolatedRun: WorkoutLivePrivacy.isolatedRun), content: content)
                 UserDefaults.standard.set(key, forKey: lastRequestKey)
                 failedRequest = nil
             } catch {
@@ -219,7 +230,16 @@ enum WorkoutLiveCoordinator {
         let opened = try openCanonical()
         let attributes = activity.attributes
         let state = activity.content.state
-        do { try validateScope(attributes, paths: opened.paths, owner: opened.owner, training: opened.training) }
+        let originalRevision = opened.training.liveRevision
+        defer {
+            if opened.training.liveRevision != originalRevision {
+                NotificationCenter.default.post(name: .workoutLiveDidCommit, object: nil)
+            }
+        }
+        do {
+            try opened.training.reconcileExpiredSessions()
+            try validateScope(attributes, paths: opened.paths, owner: opened.owner, training: opened.training)
+        }
         catch {
             await sync(training: opened.training, owner: opened.owner, allowStart: false)
             throw error
@@ -236,20 +256,22 @@ enum WorkoutLiveCoordinator {
             await sync(training: opened.training, owner: opened.owner, allowStart: false)
             throw error
         }
-        NotificationCenter.default.post(name: .workoutLiveDidCommit, object: nil)
         await sync(training: opened.training, owner: opened.owner, allowStart: false)
     }
 
     static func validateScope(_ attributes: WorkoutLiveActivity, paths: RecoveryPaths, owner: UUID, training: TrainingStore) throws {
         guard attributes.isolatedRun == WorkoutLivePrivacy.isolatedRun, attributes.owner == owner, attributes.generation == generation(paths),
-              training.isOpen(at: paths.training, owner: owner), training.active?.id == attributes.sessionID else {
+              training.isOpen(at: paths.training, owner: owner), let session = training.active,
+              session.id == attributes.sessionID, !training.isExpired(session),
+              let token = attributes.focusToken, token == training.focusToken else {
             throw TrainingError("This workout has changed.")
         }
     }
 
     static func apply(_ action: WorkoutLiveAction, expected: WorkoutLiveActivity.ContentState, revision: Int,
                       epoch: String, privacy: WorkoutLivePrivacy, commandID: UUID, training: TrainingStore) throws {
-        guard let session = training.active, training.liveRevision == revision, expected.revision == revision,
+        guard let session = training.active, !training.isExpired(session),
+              training.liveRevision == revision, expected.revision == revision,
               expected.privacyEpoch == epoch, privacy.epoch == epoch,
               snapshot(session, revision: revision, privacy: privacy) == expected else { throw TrainingError("Review the updated workout.") }
         guard expected.primary == action || (action == .startSet && expected.canStartSet) else {

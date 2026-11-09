@@ -5,11 +5,11 @@ struct PlanScreen: View {
     let training: TrainingStore
     @Binding var selected: Date
     let finishPulse: Int
-    let openWorkout: () -> Void
+    let isPastWeek: Bool
+    let openWorkout: (UUID) -> Void
     let showRoutines: () -> Void
     let requestPlanStart: (PlanStartTarget) -> Void
     var onRootVisibilityChanged: (Bool) -> Void = { _ in }
-    @State private var issue: String?
     @State private var calendarOpen = false
     @State private var reviewID: UUID?
     @State private var visibleWeek: Date?
@@ -29,6 +29,9 @@ struct PlanScreen: View {
             training.isPerformed(session, on: selected) && session.finishedAt != nil && session.occurrenceID.map(displayed.contains) != true
         }.sorted { $0.startedAt > $1.startedAt }
     }
+    private var unscheduledWorkouts: [TrainingSession] {
+        training.openSessions.filter { $0.occurrenceID == nil }
+    }
     private var templateOccurrence: TrainingOccurrence? {
         guard let plan else { return nil }
         return training.occurrences.first { $0.planID == plan.id && training.isOriginal($0, on: selected) }
@@ -41,41 +44,49 @@ struct PlanScreen: View {
                 weekPager
                 VStack(alignment: .leading, spacing: 20) {
                     if let plan { Label(plan.name, systemImage: "calendar").font(.subheadline.weight(.semibold)).foregroundStyle(PlannerStyle.moss) }
-                    if let issue {
-                        Label(issue, systemImage: "exclamationmark.circle").font(.subheadline)
+                    if isPastWeek {
+                        Text("Read-only week").font(.subheadline).foregroundStyle(.secondary)
                     }
+                    if !isPastWeek && !unscheduledWorkouts.isEmpty { unscheduledWorkoutList }
                     if let plan, plan.days.count == 7, templateOccurrence == nil, plan.days[weekday].isWorkout {
                         let day = plan.days[weekday]
                         let sourceDate = selected
                         PlannedWorkoutCard(name: day.name, day: day, goal: day.cardioGoalSeconds,
-                                           status: PlanWorkoutState.notStarted.rawValue, detail: nil, canStart: true,
+                                           status: PlanWorkoutState.notStarted.rawValue, detail: nil, canStart: !isPastWeek,
                                            startTitle: "Start", primaryID: "startPlanned", selected: sourceDate,
                                            start: { requestPlanStart(.template(plan, sourceDate)) },
-                                           move: { target in
+                                           move: isPastWeek ? nil : { target in
                                                try training.move(plan: plan, date: sourceDate, to: target)
                                                selected = target
-                                           }, skip: {
+                                           }, skip: isPastWeek ? nil : {
                                                try training.skip(plan: plan, date: sourceDate)
                                            })
                     }
                     ForEach(datedWork) { entry in
                         let state = training.planState(for: entry)
-                        let available = state == .notStarted || state == .inProgress
-                        let here = training.active?.occurrenceID == entry.id
+                        let available = !isPastWeek && (state == .notStarted || state == .inProgress)
+                        let openSession = training.openSession(for: entry.id)
+                        let canChange = available && openSession == nil
+                        let hasPartialProgress = state == .inProgress && openSession == nil
+                        let startTitle = openSession != nil ? "Resume" : hasPartialProgress ? "Continue" : "Start"
                         PlannedWorkoutCard(name: entry.name, day: entry.day, goal: entry.cardioGoalSeconds,
-                                           status: state.rawValue, detail: detail(entry), credited: training.slotProgress(for: entry), canStart: available,
-                                           startTitle: state == .inProgress ? "Resume" : "Start",
-                                           primaryID: here ? "resumeWorkout" : "startOccurrence", selected: selected,
-                                           start: { if here { openWorkout() } else { requestPlanStart(.occurrence(entry.id)) } },
-                                           move: available && !here ? { date in try training.move(entry.id, to: date); selected = date } : nil,
-                                           skip: entry.planID != nil && available && !here ? { try training.skip(entry.id) } : nil,
-                                           remove: training.canRemoveAdditionalActivity(entry) ? { try training.removeAdditionalActivity(entry.id) } : nil,
+                                           status: hasPartialProgress ? "Partial" : state.rawValue,
+                                           detail: detail(entry), credited: training.slotProgress(for: entry), canStart: available,
+                                           startTitle: startTitle, primaryID: openSession != nil ? "resumeWorkout" : "startOccurrence",
+                                           selected: selected,
+                                           start: {
+                                               if let openSession { openWorkout(openSession.id) }
+                                               else { requestPlanStart(.occurrence(entry.id)) }
+                                           },
+                                           move: canChange ? { date in try training.move(entry.id, to: date); selected = date } : nil,
+                                           skip: canChange && entry.planID != nil ? { try training.skip(entry.id) } : nil,
+                                           remove: !isPastWeek && training.canRemoveAdditionalActivity(entry) ? { try training.removeAdditionalActivity(entry.id) } : nil,
                                            review: state == .finished ? { reviewID = entry.id } : nil)
                         let contributions = training.sessions.filter { $0.occurrenceID == entry.id && $0.finishedAt != nil }
                             .sorted { $0.startedAt < $1.startedAt }
                         if !contributions.isEmpty {
-                            SessionLogGroup(sessions: contributions, title: "Workout sessions (\(contributions.count))", training: training, plan: plan)
-
+                            SessionLogGroup(sessions: contributions, title: "Workout sessions (\(contributions.count))",
+                                            training: training, plan: plan, allowAssignment: !isPastWeek)
                         }
                     }
                     if let moved = templateOccurrence, !training.isScheduled(moved, on: selected) {
@@ -88,25 +99,24 @@ struct PlanScreen: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 Image(systemName: "moon.stars").font(.title2).foregroundStyle(PlannerStyle.moss)
                                 Text("Rest day").font(.system(.largeTitle, design: .serif))
-                                Text("No workout scheduled. You can still log an extra session.").foregroundStyle(.secondary)
+                                Text(isPastWeek ? "No workout scheduled." : "No workout scheduled. You can still log an extra session.")
+                                    .foregroundStyle(.secondary)
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(20)
                                 .background(PlannerStyle.moss.opacity(0.085), in: RoundedRectangle(cornerRadius: 20))
                         }
                     }
-                    NavigationLink {
-                        AddCardioScreen(selected: selected, training: training, onScheduled: { selected = $0 })
-                    } label: {
-                        Label("Add cardio", systemImage: "figure.run").frame(minHeight: 44)
-                    }.accessibilityIdentifier("scheduleCardio")
-                    if training.active == nil {
+                    if !isPastWeek {
+                        NavigationLink {
+                            AddCardioScreen(selected: selected, training: training, onScheduled: { selected = $0 })
+                        } label: {
+                            Label("Add cardio", systemImage: "figure.run").frame(minHeight: 44)
+                        }.accessibilityIdentifier("scheduleCardio")
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Train now").font(.headline)
                             HStack {
-                                Button { run { try training.startExtra(name: "Extra workout"); openWorkout() } }
-                                    label: { Label("Extra workout", systemImage: "plus") }
+                                Button { requestPlanStart(.extra) } label: { Label("Extra workout", systemImage: "plus") }
                                     .accessibilityIdentifier("extraWorkout")
-                                Button { run { try training.startCardio(name: "Cardio"); openWorkout() } }
-                                    label: { Label("Log cardio", systemImage: "figure.run") }
+                                Button { requestPlanStart(.cardio) } label: { Label("Log cardio", systemImage: "figure.run") }
                                     .accessibilityIdentifier("extraCardio")
                             }.buttonStyle(.bordered)
                         }
@@ -117,16 +127,17 @@ struct PlanScreen: View {
                             if let id = session.occurrenceID, let occurrence = training.occurrences.first(where: { $0.id == id }) {
                                 let parts = standaloneSessions.filter { $0.occurrenceID == id }
                                 if parts.first?.id == session.id {
-                                    SessionLogGroup(sessions: parts, title: "\(occurrence.name) · \(occurrence.date.formatted(date: .abbreviated, time: .omitted))", training: training, plan: plan)
+                                    SessionLogGroup(sessions: parts, title: "\(occurrence.name) · \(occurrence.date.formatted(date: .abbreviated, time: .omitted))",
+                                                    training: training, plan: plan, allowAssignment: !isPastWeek)
                                 }
                             } else {
                                 NavigationLink {
-                                    SavedWorkoutDetail(id: session.id, training: training, plan: plan)
+                                    SavedWorkoutDetail(id: session.id, training: training, plan: plan, allowAssignment: !isPastWeek)
                                 } label: {
                                     HStack {
                                         VStack(alignment: .leading) {
                                             Text(session.name).font(.headline)
-                                            Text("\(session.startedAt.formatted(date: .omitted, time: .shortened)) · \(session.partial ? "Finished partial" : "Finished")")
+                                            Text("\(session.startedAt.formatted(date: .omitted, time: .shortened)) · \(session.planSessionStatus)")
                                                 .font(.subheadline).foregroundStyle(.secondary)
                                         }
                                         Spacer()
@@ -163,11 +174,14 @@ struct PlanScreen: View {
                     Section("Workout sessions") {
                         ForEach(training.sessions.filter { $0.occurrenceID == id && $0.finishedAt != nil }.sorted { $0.startedAt < $1.startedAt }) { item in
                             NavigationLink {
-                                SavedWorkoutDetail(id: item.id, training: training, plan: plan)
+                                SavedWorkoutDetail(id: item.id, training: training, plan: plan, allowAssignment: !isPastWeek)
                             } label: {
                                 VStack(alignment: .leading) {
                                     Text(item.name).font(.headline)
                                     Text(item.startedAt.formatted(date: .abbreviated, time: .shortened)).font(.subheadline)
+                                    if item.isArchivedDraft {
+                                        Text(item.planSessionStatus).font(.subheadline).foregroundStyle(.secondary)
+                                    }
                                 }
                             }.accessibilityIdentifier("reviewedSession")
                         }
@@ -175,7 +189,32 @@ struct PlanScreen: View {
                 }.navigationTitle("Workout review")
             }
         }
-        .onChange(of: selected) { _, _ in issue = nil }
+    }
+
+    private var unscheduledWorkoutList: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Open unscheduled workouts").font(.headline).accessibilityAddTraits(.isHeader)
+            ForEach(unscheduledWorkouts) { session in
+                let started = session.startedAt.formatted(.dateTime.month(.abbreviated).day().hour().minute())
+                Button { openWorkout(session.id) } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(session.name).font(.subheadline.weight(.semibold))
+                            Text(started).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        Text("Resume").font(.subheadline.weight(.semibold))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .frame(minHeight: 44)
+                    .background(PlannerStyle.surface, in: RoundedRectangle(cornerRadius: 12))
+                    .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Resume \(session.name), started \(started)")
+                .accessibilityIdentifier("resumeUnscheduledWorkout")
+            }
+        }
     }
 
     private var calendarHeader: some View {
@@ -203,10 +242,6 @@ struct PlanScreen: View {
         let amount = "\(counts.completed) / \(counts.total) \(entry.cardioGoalSeconds == nil ? "sets" : "seconds")"
         let dates = Set(sessions.map { $0.startedAt.formatted(date: .abbreviated, time: .omitted) }).sorted()
         return dates.isEmpty ? amount : amount + " · " + dates.joined(separator: ", ")
-    }
-
-    private func run(_ action: () throws -> Void) {
-        do { try action(); issue = nil } catch { issue = error.localizedDescription }
     }
 
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -337,6 +372,7 @@ private struct SessionLogGroup: View {
     let title: String
     let training: TrainingStore
     let plan: WeekPlan?
+    let allowAssignment: Bool
     @State private var expanded = false
 
     var body: some View {
@@ -349,12 +385,15 @@ private struct SessionLogGroup: View {
                 ForEach(Array(sessions.sorted { $0.startedAt < $1.startedAt }.enumerated()), id: \.element.id) { index, item in
                     Divider()
                     NavigationLink {
-                        SavedWorkoutDetail(id: item.id, training: training, plan: plan)
+                        SavedWorkoutDetail(id: item.id, training: training, plan: plan, allowAssignment: allowAssignment)
                     } label: {
                         HStack {
                             Text("Session \(index + 1)").font(.headline)
                             Spacer()
-                            Text(item.startedAt.formatted(date: .abbreviated, time: .shortened)).font(.subheadline)
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text(item.startedAt.formatted(date: .abbreviated, time: .shortened))
+                                if item.isArchivedDraft { Text(item.planSessionStatus).foregroundStyle(.secondary) }
+                            }.font(.subheadline)
                             Image(systemName: "chevron.right").font(.caption)
                         }.padding(.vertical, 10)
                     }.accessibilityIdentifier("savedSession")
@@ -458,7 +497,8 @@ private struct PlannedWorkoutCard: View {
             if canStart {
                 Button(action: start) {
                     Label(startTitle, systemImage: "play.fill").frame(maxWidth: .infinity)
-                }.buttonStyle(.borderedProminent).controlSize(.large).padding(14).accessibilityIdentifier(primaryID)
+                }.buttonStyle(.borderedProminent).controlSize(.large).padding(14)
+                    .accessibilityLabel("\(startTitle) \(name)").accessibilityIdentifier(primaryID)
             }
             if let review {
                 Button(action: review) { Label("Review workout", systemImage: "checkmark.circle").frame(maxWidth: .infinity) }
@@ -494,13 +534,16 @@ private struct SavedWorkoutDetail: View {
     let id: UUID
     let training: TrainingStore
     let plan: WeekPlan?
+    let allowAssignment: Bool
 
     var body: some View {
         if let session = training.sessions.first(where: { $0.id == id }) {
+            let canAssign = session.isCardio ? session.cardio != nil && session.occurrenceID == nil :
+                session.exercises.flatMap(\.sets).contains { $0.confirmedAt != nil && $0.warmup != true && $0.plannedID == nil }
             List {
-                Section { LabeledContent("Status", value: session.partial ? "Finished partial" : "Finished") }
+                Section { LabeledContent("Status", value: session.planSessionStatus) }
                 TrainingSummaryContent(session: session)
-                if session.isCardio ? session.occurrenceID == nil : session.exercises.flatMap(\.sets).contains(where: { $0.confirmedAt != nil && $0.warmup != true && $0.plannedID == nil }) {
+                if allowAssignment && canAssign {
                     Section {
                         NavigationLink("Assign to planned work") {
                             AssignTrainingWork(sessionID: session.id, training: training, plan: plan)
@@ -511,5 +554,12 @@ private struct SavedWorkoutDetail: View {
             .scrollContentBackground(.hidden).background(PlannerStyle.paper)
             .navigationTitle(session.name)
         }
+    }
+}
+
+private extension TrainingSession {
+    var planSessionStatus: String {
+        if isArchivedDraft { return "Closed draft" }
+        return partial ? "Finished partial" : "Finished"
     }
 }

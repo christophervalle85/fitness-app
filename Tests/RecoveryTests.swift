@@ -3,6 +3,73 @@ import Testing
 @testable import Weekform
 
 @MainActor struct RecoveryTests {
+    @Test func backupPreservesMultipleOpenWorkoutsAndRecreatesFocusGeneration() throws {
+        let temp = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: temp) }
+        let root = temp.appending(path: "Recovery")
+        let original = try RecoveryPaths.current(at: root)
+        let planner = PlanningStore(directory: original.planning)
+        let training = TrainingStore(directory: original.training)
+        try planner.load()
+        let owner = try #require(planner.profileID)
+        try training.load(profileID: owner)
+        let first = try training.startExtra(name: "Strength")
+        try training.note(sessionID: first, text: "First draft")
+        let second = try training.startCardio(name: "Walk")
+        try training.focus(sessionID: first)
+        let priorToken = try #require(training.focusToken)
+        let backup = try WorkoutBackup(planner, training)
+        #expect(backup.version == 3)
+        #expect(backup.focusedSessionID == first)
+        var invalidFocus = backup
+        invalidFocus.focusedSessionID = UUID()
+        #expect(throws: PlanningError.self) { try invalidFocus.validate() }
+
+        try RecoveryPaths.replace(with: backup, planner: planner, training: training, at: root)
+        let restored = TrainingStore(directory: try RecoveryPaths.current(at: root).training)
+        try restored.load(profileID: owner)
+        #expect(Set(restored.openSessions.map(\.id)) == Set([first, second]))
+        #expect(restored.active?.id == first)
+        #expect(restored.active?.notes == "First draft")
+        #expect(restored.focusToken != nil && restored.focusToken != priorToken)
+
+        try restored.finish(sessionID: first, partial: true)
+        #expect(restored.openSessions.map(\.id) == [second] && restored.active == nil)
+        let withoutFocus = try WorkoutBackup(planner, restored)
+        try RecoveryPaths.replace(with: withoutFocus, planner: planner, training: restored, at: root)
+        let reopened = TrainingStore(directory: try RecoveryPaths.current(at: root).training)
+        try reopened.load(profileID: owner)
+        #expect(reopened.openSessions.map(\.id) == [second] && reopened.active == nil)
+    }
+
+    @Test func versionTwoRestoreStagesExpiredSessionsAndPreservesLegacyDetails() throws {
+        let temp = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: temp) }
+        let root = temp.appending(path: "Recovery")
+        let original = try RecoveryPaths.current(at: root)
+        let planner = PlanningStore(directory: original.planning)
+        let training = TrainingStore(directory: original.training)
+        try planner.load()
+        let owner = try #require(planner.profileID)
+        try training.load(profileID: owner)
+        var legacy = try WorkoutBackup(planner, training)
+        let past = Date(timeIntervalSince1970: 1_700_000_000)
+        let workout = TrainingSession(name: "Renamed walk", startedAt: past, performedDay: CivilTrainingDay(past), isCardio: true)
+        legacy.sessions = [workout]
+        legacy.version = 2
+        try RecoveryPaths.replace(with: legacy, planner: planner, training: training, at: root)
+
+        let restored = TrainingStore(directory: try RecoveryPaths.current(at: root).training)
+        try restored.load(profileID: owner)
+        #expect(restored.active == workout)
+        try restored.reconcileExpiredSessions()
+        #expect(restored.active == nil)
+        #expect(restored.sessions.first?.finishedAt == past)
+        #expect(restored.sessions.first?.name == "Renamed walk")
+        #expect(restored.sessions.first?.closedAtWeekBoundary == true)
+        #expect(restored.sessions.first?.cardio == nil)
+    }
+
     @Test func deletingTheLastRoutinePreservesLinkedWorkAndTheLibraryDraft() throws {
         let temp = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: temp) }
@@ -87,6 +154,7 @@ import Testing
         #expect(try WorkoutBackup.read(#require(switched.previous)) == before)
         var legacy = next
         legacy.version = 1
+        legacy.focusedSessionID = nil
         legacy.library = nil
         try RecoveryPaths.replace(with: legacy, planner: restored, training: logged, at: root)
         let legacyPath = try RecoveryPaths.current(at: root)

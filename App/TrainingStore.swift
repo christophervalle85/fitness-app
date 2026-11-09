@@ -31,11 +31,28 @@ enum TrainingSchemaV1: VersionedSchema {
     }
 }
 
+private struct TrainingFocus: Codable, Identifiable {
+    var id = UUID()
+    var sessionID: UUID?
+    var token = UUID()
+}
+
 @MainActor @Observable
 final class TrainingStore {
     private(set) var sessions: [TrainingSession] = []
     private(set) var occurrences: [TrainingOccurrence] = []
-    var active: TrainingSession? { sessions.first { $0.finishedAt == nil } }
+    private var focus: TrainingFocus?
+    var openSessions: [TrainingSession] { sessions.filter { $0.finishedAt == nil } }
+    var active: TrainingSession? {
+        // A pre-v3 store can have one open session without a focus record.
+        guard let focus else { return openSessions.first }
+        return openSessions.first { $0.id == focus.sessionID }
+    }
+    var focusToken: UUID? { active.map { focus?.token ?? $0.id } }
+
+    func openSession(for occurrenceID: UUID) -> TrainingSession? {
+        openSessions.first { $0.occurrenceID == occurrenceID }
+    }
     var knownExercises: [PlanExercise] {
         var seen = Set<UUID>()
         return sessions.reversed().flatMap(\.exercises).map(\.prescription).filter { seen.insert($0.id).inserted }
@@ -74,6 +91,7 @@ final class TrainingStore {
         if self.directory != directory {
             sessions = []
             occurrences = []
+            focus = nil
             self.directory = nil
         }
         try withDatabase(directory) { context, head in
@@ -81,14 +99,70 @@ final class TrainingStore {
             let decoder = JSONDecoder()
             let logged = try rows.filter { $0.kind == "session" }.map { try decoder.decode(TrainingSession.self, from: $0.data) }
             let planned = try rows.filter { $0.kind == "occurrence" }.map { try decoder.decode(TrainingOccurrence.self, from: $0.data) }
-            guard logged.count + planned.count == rows.count, logged.filter({ $0.finishedAt == nil }).count <= 1 else {
+            let focusRows = try rows.filter { $0.kind == "focus" }.map { try decoder.decode(TrainingFocus.self, from: $0.data) }
+            let open = logged.filter { $0.finishedAt == nil }
+            let linked = open.compactMap(\.occurrenceID)
+            guard logged.count + planned.count + focusRows.count == rows.count, focusRows.count <= 1,
+                  focusRows.first != nil || open.count <= 1, Set(linked).count == linked.count,
+                  focusRows.first?.sessionID == nil || open.contains(where: { $0.id == focusRows.first?.sessionID }) else {
                 throw TrainingError("The saved workouts could not be read.")
             }
-            sessions = logged.sorted { $0.startedAt < $1.startedAt }
+            sessions = logged.sorted { ($0.startedAt, $0.id.uuidString) < ($1.startedAt, $1.id.uuidString) }
             occurrences = planned
+            focus = focusRows.first
             revision = head.revision
             self.directory = directory
         }
+    }
+
+    var nextWeekBoundary: Date { CivilTrainingDay(now()).nextMonday }
+
+    func isPastWeek(_ date: Date) -> Bool { CivilTrainingDay(date).nextMonday <= now() }
+
+    func expirationDate(for session: TrainingSession) -> Date {
+        let startedWeekEnd = session.performedDay.nextMonday
+        guard let occurrence = occurrences.first(where: { $0.id == session.occurrenceID }) else { return startedWeekEnd }
+        return min(startedWeekEnd, occurrence.scheduledDay.nextMonday)
+    }
+
+    func isExpired(_ session: TrainingSession) -> Bool {
+        session.finishedAt == nil && expirationDate(for: session) <= now()
+    }
+
+    func reconcileExpiredSessions() throws {
+        let expired = openSessions.filter(isExpired)
+        guard !expired.isEmpty else { return }
+        // Legacy sessions did not track renames or rest configuration changes.
+        let closing = expired.filter { $0.hasSavedContent || $0.workoutDetailsChanged == nil }.map { session in
+            var saved = session
+            saved.partial = !isComplete(session)
+            saved.closedAtWeekBoundary = true
+            saved.finishedAt = session.lastRecordedAt
+            saved.rest = nil
+            saved.timerUndo = nil
+            return saved
+        }
+        let discarded = Set(expired.map(\.id)).subtracting(closing.map(\.id))
+        try commit(sessions: closing, deletingSessions: discarded, validating: {
+            guard expired.allSatisfy(isExpired) else { throw TrainingError("The local week changed. Try again.") }
+        })
+    }
+
+    func focus(sessionID: UUID) throws {
+        try reconcileExpiredSessions()
+        guard let session = openSessions.first(where: { $0.id == sessionID }) else {
+            throw TrainingError("This workout is no longer active.")
+        }
+        if active?.id == sessionID { return }
+        try commit(focusOn: sessionID, validating: { try requireOpenWeek(session) })
+    }
+
+    private func requireEditableDay(_ day: CivilTrainingDay) throws {
+        guard day.nextMonday > now() else { throw TrainingError("Workouts from past weeks are read-only in Plan.") }
+    }
+
+    private func requireOpenWeek(_ session: TrainingSession) throws {
+        guard !isExpired(session) else { throw TrainingError("This workout is from a past week.") }
     }
 
     func isScheduled(_ occurrence: TrainingOccurrence, on date: Date) -> Bool { occurrence.scheduledDay == CivilTrainingDay(date) }
@@ -122,7 +196,7 @@ final class TrainingStore {
 
     func planState(for occurrence: TrainingOccurrence) -> PlanWorkoutState {
         if occurrence.skipped { return .skipped }
-        if active?.occurrenceID == occurrence.id { return .inProgress }
+        if openSession(for: occurrence.id) != nil { return .inProgress }
         let (completed, total) = progress(for: occurrence)
         if total > 0 && completed == total { return .finished }
         return completed > 0 ? .inProgress : .notStarted
@@ -161,7 +235,10 @@ final class TrainingStore {
 
     @discardableResult func materialize(plan: WeekPlan, date: Date) throws -> UUID {
         let occurrence = try planned(plan, date)
-        if !occurrences.contains(where: { $0.id == occurrence.id }) { try commit(occurrence: occurrence) }
+        if !occurrences.contains(where: { $0.id == occurrence.id }) {
+            try requireEditableDay(occurrence.scheduledDay)
+            try commit(occurrence: occurrence, validating: { try requireEditableDay(occurrence.scheduledDay) })
+        }
         return occurrence.id
     }
 
@@ -189,8 +266,9 @@ final class TrainingStore {
               session.finishedAt != nil, session.occurrenceID == nil || session.occurrenceID == occurrence.id else {
             throw TrainingError("Choose a saved session that is available for this workout.")
         }
+        try requireEditableDay(occurrence.scheduledDay)
         guard !occurrence.skipped else { throw TrainingError("This workout was skipped.") }
-        guard active?.occurrenceID != occurrence.id else { throw TrainingError("Finish the open contribution before assigning more work.") }
+        guard openSession(for: occurrence.id) == nil else { throw TrainingError("Finish the open contribution before assigning more work.") }
         if session.isCardio {
             guard occurrence.cardioGoalSeconds != nil, session.cardio != nil, setID == nil, plannedSetID == nil else {
                 throw TrainingError("Assign a confirmed cardio activity to a scheduled cardio goal.")
@@ -218,27 +296,34 @@ final class TrainingStore {
             session.exercises[i].sets[j].revision = try increment(session.exercises[i].sets[j].revision)
         }
         session.occurrenceID = occurrence.id
-        try commit(session: session, occurrence: occurrence)
+        try commit(sessions: [session], occurrence: occurrence, validating: { try requireEditableDay(occurrence.scheduledDay) })
     }
 
-    func startPlanned(plan: WeekPlan, date: Date) throws {
+    @discardableResult func startPlanned(plan: WeekPlan, date: Date) throws -> UUID {
+        try reconcileExpiredSessions()
         let occurrence = try planned(plan, date)
         guard isScheduled(occurrence, on: date) else { throw TrainingError("This workout moved to another date.") }
-        try start(occurrence)
+        return try start(occurrence)
     }
 
-    func startOccurrence(_ id: UUID) throws {
+    @discardableResult func startOccurrence(_ id: UUID) throws -> UUID {
+        try reconcileExpiredSessions()
         guard let occurrence = occurrences.first(where: { $0.id == id }) else { throw TrainingError("Choose a scheduled workout.") }
-        try start(occurrence)
+        return try start(occurrence)
     }
 
-    private func start(_ occurrence: TrainingOccurrence) throws {
-        guard active == nil else { throw TrainingError("Resume or finish your open workout first.") }
+    private func start(_ occurrence: TrainingOccurrence) throws -> UUID {
+        try requireEditableDay(occurrence.scheduledDay)
+        if let existing = openSession(for: occurrence.id) {
+            try focus(sessionID: existing.id)
+            return existing.id
+        }
         let (completed, total) = progress(for: occurrence)
         guard !occurrence.skipped, completed < total else { throw TrainingError("This planned workout is already closed.") }
         let instant = now()
         var session = TrainingSession(name: occurrence.name, startedAt: instant, performedDay: CivilTrainingDay(instant),
-                                      occurrenceID: occurrence.id, isCardio: occurrence.cardioGoalSeconds != nil)
+                                      occurrenceID: occurrence.id, isCardio: occurrence.cardioGoalSeconds != nil,
+                                      workoutDetailsChanged: false)
         let credited = creditedIDs(in: sessions.filter { $0.occurrenceID == occurrence.id })
         for prescription in occurrence.day?.exercises ?? [] {
             let original = occurrence.plannedSets[prescription.id] ?? []
@@ -250,17 +335,23 @@ final class TrainingStore {
             }
         }
         session.currentExerciseID = session.exercises.first?.id
-        try commit(session: session, occurrence: occurrence)
+        try commit(sessions: [session], occurrence: occurrence, focusOn: session.id, validating: {
+            try requireEditableDay(occurrence.scheduledDay)
+            try requireOpenWeek(session)
+        })
+        return session.id
     }
 
-    func startExtra(name: String) throws { try startExtra(name: name, cardio: false) }
-    func startCardio(name: String) throws { try startExtra(name: name, cardio: true) }
+    @discardableResult func startExtra(name: String) throws -> UUID { try startExtra(name: name, cardio: false) }
+    @discardableResult func startCardio(name: String) throws -> UUID { try startExtra(name: name, cardio: true) }
 
-    private func startExtra(name: String, cardio: Bool) throws {
-        guard active == nil else { throw TrainingError("Resume or finish your open workout first.") }
+    private func startExtra(name: String, cardio: Bool) throws -> UUID {
+        try reconcileExpiredSessions()
         let instant = now()
-        try commit(session: TrainingSession(name: try nonempty(name), startedAt: instant, performedDay: CivilTrainingDay(instant),
-                                           isCardio: cardio))
+        let session = TrainingSession(name: try nonempty(name), startedAt: instant, performedDay: CivilTrainingDay(instant),
+                                      isCardio: cardio, workoutDetailsChanged: false)
+        try commit(sessions: [session], focusOn: session.id, validating: { try requireOpenWeek(session) })
+        return session.id
     }
 
     func scheduleCardio(name: String, date: Date, goalSeconds: Int, id: UUID = UUID()) throws {
@@ -273,7 +364,9 @@ final class TrainingStore {
             }
             return
         }
-        try commit(occurrence: TrainingOccurrence(id: id, name: name, sourceDay: day, scheduledDay: day, cardioGoalSeconds: goalSeconds))
+        try requireEditableDay(day)
+        let occurrence = TrainingOccurrence(id: id, name: name, sourceDay: day, scheduledDay: day, cardioGoalSeconds: goalSeconds)
+        try commit(occurrence: occurrence, validating: { try requireEditableDay(day) })
     }
 
     func move(plan: WeekPlan, date: Date, to destination: Date) throws {
@@ -292,13 +385,20 @@ final class TrainingStore {
     }
 
     private func move(_ original: TrainingOccurrence, to day: CivilTrainingDay) throws {
+        try requireEditableDay(original.scheduledDay)
+        try requireEditableDay(day)
         guard !original.skipped else { throw TrainingError("This workout was skipped.") }
         guard original.scheduledDay != day else { return }
+        try reconcileExpiredSessions()
+        guard openSession(for: original.id) == nil else { throw TrainingError("Finish this open workout before moving it.") }
         var occurrence = original
         occurrence.scheduledDay = day
         // For a repeating workout the first materialization and its date
         // override are one write. A failed save cannot leave a partial override.
-        try commit(occurrence: occurrence)
+        try commit(occurrence: occurrence, validating: {
+            try requireEditableDay(original.scheduledDay)
+            try requireEditableDay(day)
+        })
     }
 
     func skip(plan: WeekPlan, date: Date) throws {
@@ -313,18 +413,19 @@ final class TrainingStore {
     }
 
     private func skip(_ original: TrainingOccurrence) throws {
+        try requireEditableDay(original.scheduledDay)
         guard !original.skipped else { return }
         let progress = progress(for: original)
-        guard progress.completed < progress.total, active?.occurrenceID != original.id else {
+        guard progress.completed < progress.total, openSession(for: original.id) == nil else {
             throw TrainingError("Only an unfinished workout without an active session can be skipped.")
         }
         var occurrence = original
         occurrence.skipped = true
-        try commit(occurrence: occurrence)
+        try commit(occurrence: occurrence, validating: { try requireEditableDay(original.scheduledDay) })
     }
 
     func canRemoveAdditionalActivity(_ occurrence: TrainingOccurrence) -> Bool {
-        occurrence.planID == nil && occurrence.day == nil && occurrence.cardioGoalSeconds != nil &&
+        !isPastWeek(occurrence.date) && occurrence.planID == nil && occurrence.day == nil && occurrence.cardioGoalSeconds != nil &&
             occurrence.plannedSets.isEmpty && sessions.allSatisfy { session in
                 session.occurrenceID != occurrence.id || (session.isCardio && session.finishedAt != nil)
             }
@@ -343,7 +444,7 @@ final class TrainingStore {
             saved.occurrenceID = nil
             return (index, saved)
         }
-        try saveChanges { context in
+        try saveChanges(validating: { try requireEditableDay(occurrence.scheduledDay) }) { context in
             guard let row = try fetch(id, context), row.kind == "occurrence" else {
                 throw TrainingError("This activity is no longer on the plan.")
             }
@@ -381,11 +482,18 @@ final class TrainingStore {
     }
 
     private func withSession(_ id: UUID, allowFinished: Bool = false, _ change: (inout TrainingSession) throws -> Void) throws {
-        guard var session = sessions.first(where: { $0.id == id }), allowFinished || session.finishedAt == nil else {
+        guard let original = sessions.first(where: { $0.id == id }), allowFinished || original.finishedAt == nil else {
             throw TrainingError("This workout is no longer active.")
         }
+        if isExpired(original) {
+            try reconcileExpiredSessions()
+            throw TrainingError("This workout is from a past week.")
+        }
+        var session = original
         try change(&session)
-        try commit(session: session)
+        if session != original {
+            try commit(sessions: [session], validating: { try requireOpenWeek(original) })
+        }
     }
 
     private func location(_ set: UUID, _ session: TrainingSession) throws -> (Int, Int) {
@@ -438,6 +546,7 @@ final class TrainingStore {
             session.startedAt = startedAt
             session.performedDay = CivilTrainingDay(startedAt)
             session.finishedAt = newFinish
+            session.cardioRecordedAt = session.cardioRecordedAt?.addingTimeInterval(delta)
             for i in session.exercises.indices {
                 for j in session.exercises[i].sets.indices {
                     if let old = session.exercises[i].sets[j].confirmedAt {
@@ -605,7 +714,9 @@ final class TrainingStore {
     func renameCardio(sessionID: UUID, name: String) throws {
         try withSession(sessionID) { session in
             guard session.isCardio else { throw TrainingError("Choose a cardio workout.") }
-            session.name = try nonempty(name)
+            let normalized = try nonempty(name)
+            if session.name != normalized { session.workoutDetailsChanged = true }
+            session.name = normalized
         }
     }
 
@@ -632,6 +743,8 @@ final class TrainingStore {
         }
         try withSession(sessionID, allowFinished: true) { session in
             guard session.isCardio, revision == session.cardioRevision else { throw TrainingError("Review the latest activity.") }
+            guard session.finishedAt == nil || session.cardio != nil else { throw TrainingError("This workout has finished.") }
+            if session.finishedAt == nil { session.cardioRecordedAt = now() }
             session.cardioDraft = result
             session.cardio = result
             session.cardioVersion = try increment(revision)
@@ -641,19 +754,24 @@ final class TrainingStore {
         }
     }
 
+    private func isComplete(_ session: TrainingSession) -> Bool {
+        if session.isCardio {
+            guard session.cardio != nil else { return false }
+            guard let occurrence = occurrences.first(where: { $0.id == session.occurrenceID }) else { return true }
+            let current = progress(for: occurrence)
+            return current.completed >= current.total
+        }
+        let sets = session.exercises.flatMap(\.sets)
+        return sets.contains { $0.confirmedAt != nil } && sets.allSatisfy { $0.optional == true || $0.confirmedAt != nil }
+    }
+
     func finish(sessionID: UUID, partial: Bool) throws {
         try withSession(sessionID) { session in
-            if session.isCardio {
-                guard session.cardio != nil else { throw TrainingError("Confirm a cardio duration before finishing.") }
-                if !partial, let occurrence = occurrences.first(where: { $0.id == session.occurrenceID }) {
-                    let p = progress(for: occurrence)
-                    guard p.completed >= p.total else { throw TrainingError("Finish this shorter contribution as partial.") }
-                }
-            } else if !partial {
-                let rows = session.exercises.flatMap(\.sets)
-                guard rows.contains(where: { $0.confirmedAt != nil }), rows.allSatisfy({ $0.optional == true || $0.confirmedAt != nil }) else {
-                    throw TrainingError("Confirm the remaining sets or finish as partial.")
-                }
+            if session.isCardio && session.cardio == nil && !(partial && session.hasSavedContent) {
+                throw TrainingError("Confirm a cardio duration or save a draft before finishing.")
+            }
+            guard partial || isComplete(session) else {
+                throw TrainingError(session.isCardio ? "Finish this shorter contribution as partial." : "Confirm the remaining sets or finish as partial.")
             }
             session.partial = partial
             session.finishedAt = now()
@@ -663,11 +781,11 @@ final class TrainingStore {
     }
 
     func cancelEmpty(sessionID: UUID) throws {
-        guard let session = active, session.id == sessionID, session.cardio == nil,
-              session.exercises.flatMap(\.sets).allSatisfy({ $0.confirmedAt == nil }) else {
+        try reconcileExpiredSessions()
+        guard let session = openSessions.first(where: { $0.id == sessionID }), !session.hasSavedContent else {
             throw TrainingError("Finish a workout with saved results.")
         }
-        try commit(deletingSession: sessionID)
+        try commit(deletingSessions: [sessionID], validating: { try requireOpenWeek(session) })
     }
 
     func startSet(sessionID: UUID) throws {
@@ -713,29 +831,47 @@ final class TrainingStore {
         if let seconds, seconds < 1 { throw TrainingError("Enter a positive rest duration.") }
         try withSession(sessionID) { session in
             guard let i = session.exercises.firstIndex(where: { $0.id == exerciseID }) else { throw TrainingError("Choose an exercise.") }
+            if session.exercises[i].restSeconds != seconds { session.workoutDetailsChanged = true }
             session.exercises[i].restSeconds = seconds
         }
     }
 
-    private func saveChanges(_ changes: (ModelContext) throws -> Void) throws {
+    private func saveChanges(validating: () throws -> Void = {}, _ changes: (ModelContext) throws -> Void) throws {
         guard let directory else { throw TrainingError("Open your local profile and try again.") }
         try withDatabase(directory) { context, head in
             guard head.revision == revision else { throw TrainingError("Workout data changed. Reopen the workout before retrying.") }
             try changes(context)
             head.revision = try increment(head.revision)
             try beforeSave()
+            try validating()
             try context.save()
             revision = head.revision
         }
     }
 
-    private func commit(session: TrainingSession? = nil, occurrence: TrainingOccurrence? = nil, deletingSession: UUID? = nil) throws {
-        try saveChanges { context in
-            if let session { try write(session, kind: "session", context: context) }
-            if let occurrence { try write(occurrence, kind: "occurrence", context: context) }
-            if let deletingSession, let row = try fetch(deletingSession, context) { context.delete(row) }
+    private func commit(sessions updated: [TrainingSession] = [], occurrence: TrainingOccurrence? = nil,
+                        deletingSessions removed: Set<UUID> = [], focusOn newSessionID: UUID? = nil,
+                        validating: () throws -> Void = {}) throws {
+        let focusedID = active?.id
+        let closesFocus = focusedID.map { id in
+            removed.contains(id) || updated.contains { $0.id == id && $0.finishedAt != nil }
+        } ?? false
+        let nextFocus: TrainingFocus?
+        if newSessionID.map({ $0 != focusedID }) == true || closesFocus {
+            nextFocus = TrainingFocus(id: focus?.id ?? UUID(), sessionID: newSessionID)
+        } else {
+            nextFocus = nil
         }
-        if let session {
+
+        try saveChanges(validating: validating) { context in
+            for session in updated { try write(session, kind: "session", context: context) }
+            if let occurrence { try write(occurrence, kind: "occurrence", context: context) }
+            for id in removed {
+                if let row = try fetch(id, context) { context.delete(row) }
+            }
+            if let nextFocus { try write(nextFocus, kind: "focus", context: context) }
+        }
+        for session in updated {
             if let i = sessions.firstIndex(where: { $0.id == session.id }) { sessions[i] = session }
             else { sessions.append(session) }
         }
@@ -743,7 +879,8 @@ final class TrainingStore {
             if let i = occurrences.firstIndex(where: { $0.id == occurrence.id }) { occurrences[i] = occurrence }
             else { occurrences.append(occurrence) }
         }
-        if let deletingSession { sessions.removeAll { $0.id == deletingSession } }
+        sessions.removeAll { removed.contains($0.id) }
+        if let nextFocus { focus = nextFocus }
     }
 
     private func fetch(_ id: UUID, _ context: ModelContext) throws -> TrainingSchemaV1.Entry? {
@@ -791,6 +928,7 @@ extension TrainingStore {
             }
             for session in backup.sessions { try write(session, kind: "session", context: context) }
             for occurrence in backup.occurrences { try write(occurrence, kind: "occurrence", context: context) }
+            try write(TrainingFocus(sessionID: backup.restoredFocusID), kind: "focus", context: context)
             head.revision = 1
             try context.save()
         }

@@ -27,7 +27,7 @@ struct PlanActionsTests {
             let owner = UUID()
             var fail = true
             var writes = 0
-            let store = TrainingStore(directory: directory, beforeSave: {
+            let store = TrainingStore(directory: directory, now: { monday }, beforeSave: {
                 writes += 1
                 if fail { throw CocoaError(.fileWriteOutOfSpace) }
             })
@@ -58,9 +58,9 @@ struct PlanActionsTests {
         }
     }
 
-    @Test func moveKeepsSnapshotConfirmedCreditsAndOpenSessionOwnership() throws {
+    @Test func openWorkCannotMoveOrSkipAndFinishedWorkKeepsCreditsWhenMoved() throws {
         try withDirectory { directory in
-            let store = TrainingStore(directory: directory)
+            let store = TrainingStore(directory: directory, now: { monday })
             try store.load(profileID: UUID())
             var routine = week
             try store.startPlanned(plan: routine, date: monday)
@@ -71,6 +71,12 @@ struct PlanActionsTests {
                               revision: row.revision, commandID: UUID())
             let snapshot = try #require(store.occurrences.first)
             routine.days[0].exercises[0].sets = 5
+            let other = try store.startCardio(name: "Cycling")
+            #expect(store.active?.id == other && store.sessions.count == 2)
+            #expect(store.openSession(for: snapshot.id)?.id == session.id)
+            #expect(throws: TrainingError.self) { try store.move(plan: routine, date: monday, to: nextDay) }
+            #expect(throws: TrainingError.self) { try store.skip(snapshot.id) }
+            try store.finish(sessionID: session.id, partial: true)
             try store.move(plan: routine, date: monday, to: nextDay)
             let moved = try #require(store.occurrences.first)
             #expect(store.occurrences.count == 1)
@@ -78,13 +84,12 @@ struct PlanActionsTests {
             #expect(moved.plannedSets == snapshot.plannedSets)
             #expect(store.progress(for: moved).completed == 1)
             #expect(store.progress(for: moved).total == 2)
-            #expect(store.active?.id == session.id)
-            #expect(throws: TrainingError.self) { try store.startCardio(name: "Cycling") }
-            #expect(store.active?.id == session.id && store.sessions.count == 1)
+            #expect(store.active?.id == other && store.sessions.count == 2)
+            #expect(store.openSession(for: moved.id) == nil)
         }
     }
 
-    @Test func retryStartsOnlyTheRequestedTargetAfterTheOldSessionIsSaved() throws {
+    @Test func retryStartsOnlyTheRequestedTargetAndLeavesTheOldSessionOpen() throws {
         try withDirectory { directory in
             let planner = PlanningStore(directory: directory.appending(path: "plans"))
             try planner.load()
@@ -92,7 +97,7 @@ struct PlanActionsTests {
             try planner.begin(routine, step: "review")
             try planner.confirm(routine)
             var fail = false
-            let training = TrainingStore(directory: directory.appending(path: "training"), beforeSave: {
+            let training = TrainingStore(directory: directory.appending(path: "training"), now: { monday }, beforeSave: {
                 if fail { throw CocoaError(.fileWriteOutOfSpace) }
             })
             try training.load(profileID: try #require(planner.profileID))
@@ -100,17 +105,14 @@ struct PlanActionsTests {
             let source = try #require(training.active)
             let target = PlanStartTarget.template(routine, monday)
             let selected = CivilTrainingDay(monday)
-            #expect(throws: TrainingError.self) { try target.start(planner: planner, training: training, expectedDay: selected) }
-            #expect(training.active?.id == source.id)
-            try training.recordCardio(sessionID: source.id, result: CardioResult(seconds: 120))
-            try training.finish(sessionID: source.id, partial: false)
-            let saved = try #require(training.sessions.first)
+            let sourceFocus = training.focusToken
             fail = true
             #expect(throws: CocoaError.self) { try target.start(planner: planner, training: training, expectedDay: selected) }
-            #expect(training.sessions == [saved] && training.active == nil)
+            #expect(training.sessions == [source] && training.active == source)
+            #expect(training.focusToken == sourceFocus)
             fail = false
             try target.start(planner: planner, training: training, expectedDay: selected)
-            #expect(training.sessions.count == 2 && training.sessions[0] == saved)
+            #expect(training.openSessions.count == 2 && training.sessions[0] == source)
             #expect(training.active?.occurrenceID != nil)
         }
     }
@@ -126,7 +128,7 @@ struct PlanActionsTests {
             }
             try save(baseline)
             var fail = true
-            let training = TrainingStore(directory: directory.appending(path: "training"), beforeSave: {
+            let training = TrainingStore(directory: directory.appending(path: "training"), now: { monday }, beforeSave: {
                 if fail { throw CocoaError(.fileWriteOutOfSpace) }
             })
             try training.load(profileID: try #require(planner.profileID))
@@ -153,7 +155,7 @@ struct PlanActionsTests {
 
     @Test func cardioSchedulingIsRetrySafeAndCreatesOnlyPlannedWork() throws {
         try withDirectory { directory in
-            let store = TrainingStore(directory: directory)
+            let store = TrainingStore(directory: directory, now: { monday })
             try store.load(profileID: UUID())
             let id = UUID()
             #expect(throws: TrainingError.self) { try store.scheduleCardio(name: " ", date: monday, goalSeconds: 1200, id: id) }

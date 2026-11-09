@@ -173,6 +173,13 @@ struct RoutineExerciseProgress: Identifiable {
     let records: [ExerciseRecords]
 }
 
+extension TrainingSession {
+    var isArchivedDraft: Bool {
+        finishedAt != nil && partial && (closedAtWeekBoundary == true || hasSavedContent) && cardio == nil &&
+            !exercises.contains { $0.sets.contains { $0.confirmedAt != nil } }
+    }
+}
+
 struct ProgressMetrics {
     let history: [TrainingSession]
     let activityDays: [ProgressActivityDay]
@@ -194,7 +201,7 @@ struct ProgressMetrics {
         let today = CivilTrainingDay(asOf)
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .current
-        let sessionsByDay = Dictionary(grouping: history) { $0.performedDay.date }
+        let sessionsByDay = Dictionary(grouping: history.filter { !$0.isArchivedDraft }) { $0.performedDay.date }
         activityDays = (-6...0).compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: offset, to: today.date) else { return nil }
             let day = CivilTrainingDay(date).date
@@ -231,7 +238,7 @@ struct ProgressMetrics {
         var attempts: [RecordIdentity: (date: Date, suggestion: ProgressionSuggestion?)] = [:]
         let occurrenceByID = Dictionary(occurrences.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for session in sessions {
-            guard !session.isCardio else { continue }
+            guard !session.isCardio, !session.isArchivedDraft else { continue }
             let occurrence = session.occurrenceID.flatMap { occurrenceByID[$0] }
             for exercise in session.exercises {
                 let working = exercise.sets.filter { $0.warmup != true }
