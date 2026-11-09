@@ -111,6 +111,17 @@ final class DiscoverUITests: XCTestCase {
         for _ in 0..<4 where !credits.exists || !credits.isHittable { app.swipeUp() }
         XCTAssertTrue(credits.exists)
         screenshot("Compact illustration credits", in: app)
+        let creator = app.buttons["exerciseSourceCreator"]
+        XCTAssertTrue(creator.waitForExistence(timeout: 5))
+        XCTAssertEqual(creator.label, "Everkinetic")
+        let popup = app.descendants(matching: .any)["exerciseSourcePopup"].firstMatch
+        creator.press(forDuration: 1)
+        XCTAssertFalse(popup.exists)
+        tap(creator)
+        XCTAssertTrue(popup.waitForExistence(timeout: 5))
+        screenshot("Anchored creator credits", in: app)
+        tap(app.buttons["Done"])
+        XCTAssertTrue(popup.waitForNonExistence(timeout: 5))
         tap(app.buttons["exerciseDetailBack"])
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         XCTAssertTrue(app.tabBars.buttons["Exercises"].isHittable)

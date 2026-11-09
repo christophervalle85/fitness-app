@@ -292,8 +292,12 @@ private struct CatalogDetail: View {
     let select: ((PlanExercise) -> Void)?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.layoutDirection) private var layoutDirection
     @State private var issue: String?
-    @State private var showsSourceDetails = false
+    @State private var heldCreator: Int?
+    @State private var releasedHold: (index: Int, date: Date)?
+    @State private var openCreator: Int?
 
     var body: some View {
         ScrollView {
@@ -338,20 +342,6 @@ private struct CatalogDetail: View {
         .background(PlannerStyle.paper)
         .navigationBarBackButtonHidden(true)
         .toolbarVisibility(.hidden, for: .navigationBar, .tabBar)
-        .sheet(isPresented: $showsSourceDetails) {
-            NavigationStack {
-                ScrollView {
-                    sourceDetails.frame(maxWidth: .infinity, alignment: .leading).padding(20)
-                }
-                .scrollIndicators(.hidden)
-                .navigationTitle("Source details").navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { showsSourceDetails = false }
-                    }
-                }
-            }
-        }
     }
 
     private var detailActions: some View {
@@ -533,7 +523,7 @@ private struct CatalogDetail: View {
             CatalogThumbnail(media: candidate.media.first, onIllustrationPlate: true)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
-                .background(PlannerStyle.moss.opacity(0.10))
+                .background(PlannerStyle.moss.opacity(0.10), in: UnevenRoundedRectangle(topLeadingRadius: 14, topTrailingRadius: 14))
             VStack(alignment: .leading, spacing: 4) {
                 Text(candidate.name).font(.subheadline.weight(.semibold))
                     .lineLimit(2, reservesSpace: true)
@@ -553,59 +543,139 @@ private struct CatalogDetail: View {
     }
 
     @ViewBuilder private var sourceCredits: some View {
-        if !entry.source.isEmpty || entry.textReference != nil || !entry.media.isEmpty {
+        let credits = creatorCredits
+        if !credits.isEmpty || safeLink(entry.source) != nil {
             VStack(alignment: .leading, spacing: 1) {
-                Text(compactCredits).foregroundStyle(.secondary)
-                Button {
-                    showsSourceDetails = true
-                } label: {
-                    Text("Source details").underline()
-                        .frame(minHeight: 24, alignment: .leading)
-                        .contentShape(Rectangle())
+                if credits.isEmpty, let source = safeLink(entry.source) {
+                    Link("Exercise source", destination: source)
                 }
-                .buttonStyle(.plain).foregroundStyle(PlannerStyle.moss)
+                ForEach(Array(credits.enumerated()), id: \.offset) { index, credit in
+                    creatorCredit(credit, index: index)
+                }
             }
             .font(.caption)
+            .foregroundStyle(.secondary)
             .tint(PlannerStyle.moss)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("exerciseSourceCredits")
         }
     }
 
-    private var compactCredits: AttributedString {
+    private var creatorCredits: [CreatorCredit] {
         let media = mediaCreditGroups.compactMap(\.first).map { entry.media[$0] }
         if let reference = entry.textReference, media.count == 1, let art = media.first,
            reference.authors.joined(separator: ", ") == art.author, reference.licenseURL == art.licenseURL {
-            return creditLine("Instructions and illustrations by ", author: art.author, source: reference.source,
-                              license: reference.license, licenseURL: reference.licenseURL)
+            return [CreatorCredit(prefix: "Instructions and illustrations by", name: art.author,
+                                  license: reference.license, licenseURL: reference.licenseURL,
+                                  note: reference.modifications)]
         }
 
-        var lines: [AttributedString] = []
+        var credits: [CreatorCredit] = []
         if let reference = entry.textReference {
-            lines.append(creditLine("Instructions adapted from ", author: reference.authors.joined(separator: ", "),
-                                    source: reference.source, license: reference.license, licenseURL: reference.licenseURL))
+            credits.append(CreatorCredit(prefix: "Instructions adapted from", name: reference.authors.joined(separator: ", "),
+                                         license: reference.license, licenseURL: reference.licenseURL,
+                                         note: reference.modifications))
         }
         for art in media {
-            lines.append(creditLine("Illustrations by ", author: art.author, source: art.source,
-                                    license: art.license, licenseURL: art.licenseURL))
+            credits.append(CreatorCredit(prefix: "Illustrations by", name: art.author,
+                                         license: art.license, licenseURL: art.licenseURL,
+                                         note: art.isEverkineticLineArt ? "Displayed as tinted line art." : art.modifications))
         }
-        guard var credit = lines.first else { return linkedCredit("Exercise source", url: entry.source) }
-        for line in lines.dropFirst() {
-            credit += AttributedString("\n")
-            credit += line
-        }
-        return credit
+        return credits
     }
 
-    private func creditLine(_ prefix: String, author: String, source: String, license: String, licenseURL: String?) -> AttributedString {
-        AttributedString(prefix) + linkedCredit(author, url: source) + AttributedString(" · ")
-            + linkedCredit(license.components(separatedBy: " · ").first ?? license, url: licenseURL)
+    private func creatorCredit(_ credit: CreatorCredit, index: Int) -> some View {
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 4))
+        return layout {
+            Text(credit.prefix).fixedSize(horizontal: false, vertical: true)
+            Button {
+                // A native button can deliver its release action before or
+                // after the style reports that the press ended.
+                guard heldCreator != index else { return }
+                if let releasedHold, releasedHold.index == index, Date.now.timeIntervalSince(releasedHold.date) < 0.15 {
+                    return
+                }
+                openCreator = openCreator == index ? nil : index
+            } label: {
+                Text(credit.name).underline()
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(minHeight: 24, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(CreatorPressStyle(onPress: { pressed in
+                if pressed {
+                    releasedHold = nil
+                } else if heldCreator == index {
+                    releasedHold = (index, .now)
+                    showCreatorPreview(nil)
+                }
+            }, onHold: { showCreatorPreview(index) }))
+            .foregroundStyle(PlannerStyle.moss)
+            .accessibilityHint("Opens source credits")
+            .accessibilityIdentifier(index == 0 ? "exerciseSourceCreator" : "exerciseSourceCreator-\(index)")
+            .anchorPreference(key: CreatorBounds.self, value: .bounds) { $0 }
+            .popover(isPresented: Binding(get: { openCreator == index }, set: { presented in
+                if !presented, openCreator == index { openCreator = nil }
+            }), attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                creditPopover
+                    .presentationCompactAdaptation(.popover)
+            }
+            if !typeSize.isAccessibilitySize { Text("·").accessibilityHidden(true) }
+            licenseCredit(credit.license, url: credit.licenseURL)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlayPreferenceValue(CreatorBounds.self) { anchor in
+            GeometryReader { geometry in
+                Color.clear.overlay(alignment: .bottomLeading) {
+                    if heldCreator == index, let anchor {
+                        let bounds = geometry[anchor]
+                        let width = min(typeSize.isAccessibilitySize ? 240 : 180, geometry.size.width)
+                        let left = min(max(0, bounds.midX - width / 2), geometry.size.width - width)
+                        let offset = layoutDirection == .leftToRight ? left : left + width - geometry.size.width
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(credit.name).font(.footnote.weight(.semibold)).foregroundStyle(.primary)
+                            Text(credit.license.components(separatedBy: " · ").first ?? credit.license)
+                            if !credit.note.isEmpty { Text(credit.note).font(.caption2) }
+                        }
+                        .padding(10)
+                        .frame(width: width, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .background(PlannerStyle.surface, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(PlannerStyle.rule.opacity(0.45)) }
+                        .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
+                        .offset(x: offset, y: bounds.minY - geometry.size.height - 6)
+                        .transition(.opacity)
+                    }
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+        .zIndex(heldCreator == index ? 1 : 0)
     }
 
-    private func linkedCredit(_ text: String, url: String?) -> AttributedString {
-        var link = AttributedString(text)
-        if let destination = url.flatMap(safeLink) { link.link = destination }
-        return link
+    private func showCreatorPreview(_ index: Int?) {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) { heldCreator = index }
+    }
+
+    private var creditPopover: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Credits").font(.headline).accessibilityAddTraits(.isHeader)
+                    Spacer()
+                    Button("Done") { openCreator = nil }
+                }
+                sourceDetails
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+        }
+        .scrollIndicators(.hidden)
+        .frame(idealWidth: 280, maxWidth: 300, idealHeight: 240, maxHeight: 340)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("exerciseSourcePopup")
     }
 
     private var sourceDetails: some View {
@@ -675,6 +745,39 @@ private struct CatalogDetail: View {
     private func safeLink(_ text: String) -> URL? {
         guard let url = URL(string: text), url.scheme?.lowercased() == "https", url.host != nil else { return nil }
         return url
+    }
+
+    private struct CreatorCredit {
+        let prefix: String
+        let name: String
+        let license: String
+        let licenseURL: String?
+        let note: String
+    }
+
+    private struct CreatorBounds: PreferenceKey {
+        static var defaultValue: Anchor<CGRect>? { nil }
+
+        static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+            value = nextValue() ?? value
+        }
+    }
+
+    private struct CreatorPressStyle: ButtonStyle {
+        let onPress: (Bool) -> Void
+        let onHold: () -> Void
+
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+                .onChange(of: configuration.isPressed) { _, pressed in onPress(pressed) }
+                .task(id: configuration.isPressed) {
+                    guard configuration.isPressed else { return }
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard !Task.isCancelled else { return }
+                    onHold()
+                }
+                .onDisappear { onPress(false) }
+        }
     }
 }
 
