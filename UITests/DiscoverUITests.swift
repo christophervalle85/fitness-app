@@ -58,9 +58,9 @@ final class DiscoverUITests: XCTestCase {
             XCTAssertFalse(app.buttons[id].exists)
         }
         screenshot("Blank Exercises with native search", in: app)
-        search("bench press", in: app)
+        search("machine chest press", in: app)
         field.typeText("\n")
-        let original = "Barbell bench press"
+        let original = "Machine chest press"
         let alternative = "Pec deck fly"
         XCTAssertFalse(app.buttons["catalogRow-Barbell row"].exists)
         tap(app.buttons["catalogRow-" + original])
@@ -89,18 +89,28 @@ final class DiscoverUITests: XCTestCase {
         let cards = app.scrollViews["similarExerciseCards"].firstMatch
         for _ in 0..<8 where !cards.isHittable { app.swipeUp() }
         XCTAssertTrue(cards.waitForExistence(timeout: 5))
+        let firstCard = app.buttons["catalogAlternative-Barbell bench press"]
+        XCTAssertTrue(firstCard.waitForExistence(timeout: 5))
+        let firstCardHeight = firstCard.frame.height
+        XCTAssertGreaterThan(firstCardHeight, 0)
         let candidate = app.buttons["catalogAlternative-" + alternative]
         for _ in 0..<8 {
             if candidate.exists, !candidate.frame.isEmpty,
                cards.frame.contains(CGPoint(x: candidate.frame.midX, y: candidate.frame.midY)) { break }
             cards.swipeLeft()
         }
+        XCTAssertEqual(candidate.frame.height, firstCardHeight, accuracy: 1)
+        screenshot("Even similar exercise cards", in: app)
         tap(candidate)
         XCTAssertTrue(app.staticTexts[alternative].waitForExistence(timeout: 5))
         XCTAssertFalse(accessory.isHittable)
         screenshot("Selected comparable alternative", in: app)
         tap(app.buttons["exerciseDetailBack"])
         XCTAssertFalse(accessory.isHittable)
+        let credits = app.descendants(matching: .any)["exerciseSourceCredits"].firstMatch
+        for _ in 0..<4 where !credits.exists || !credits.isHittable { app.swipeUp() }
+        XCTAssertTrue(credits.exists)
+        screenshot("Compact illustration credits", in: app)
         tap(app.buttons["exerciseDetailBack"])
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         XCTAssertTrue(app.tabBars.buttons["Exercises"].isHittable)

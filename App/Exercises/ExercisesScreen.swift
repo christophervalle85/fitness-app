@@ -232,13 +232,16 @@ private struct CatalogBrowser: View {
 
 struct CatalogThumbnail: View {
     let media: CatalogMedia?
+    var onIllustrationPlate = false
     @State private var thumbnail: UIImage?
 
     var body: some View {
         ZStack {
             if let thumbnail {
-                Image(uiImage: thumbnail).resizable().scaledToFit().padding(5)
-                    .frame(width: 68, height: 68).background(.white, in: RoundedRectangle(cornerRadius: 9))
+                let lineArt = onIllustrationPlate && media?.isEverkineticLineArt == true
+                CatalogArtwork(image: thumbnail, lineArt: lineArt).padding(5)
+                    .frame(width: 68, height: 68)
+                    .background(lineArt ? Color.clear : .white, in: RoundedRectangle(cornerRadius: 9))
                     .accessibilityHidden(true)
             } else {
                 Image(systemName: "dumbbell").font(.title2).foregroundStyle(PlannerStyle.moss)
@@ -257,6 +260,28 @@ struct CatalogThumbnail: View {
     }
 }
 
+private extension CatalogMedia {
+    var isEverkineticLineArt: Bool { author == "Everkinetic" }
+}
+
+private struct CatalogArtwork: View {
+    let image: UIImage
+    let lineArt: Bool
+
+    var body: some View {
+        let artwork = Image(uiImage: image).resizable()
+        if lineArt {
+            // The bundled Everkinetic assets are monochrome. White becomes
+            // transparent, leaving adaptive ink over the existing plate.
+            PlannerStyle.ink
+                .mask { artwork.colorInvert().contrast(1.04).luminanceToAlpha() }
+                .aspectRatio(image.size, contentMode: .fit)
+        } else {
+            artwork.scaledToFit()
+        }
+    }
+}
+
 private struct CatalogDetail: View {
     let entry: CatalogEntry
     let catalog: ExerciseCatalog
@@ -266,6 +291,7 @@ private struct CatalogDetail: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var issue: String?
+    @State private var showsSourceDetails = false
 
     var body: some View {
         ScrollView {
@@ -301,6 +327,7 @@ private struct CatalogDetail: View {
             .padding(.top, 4)
             .padding(.bottom, 22)
         }
+        .scrollIndicators(.hidden)
         .safeAreaInset(edge: .top, spacing: 0) {
             detailActions
                 .padding(.horizontal, 20)
@@ -309,6 +336,20 @@ private struct CatalogDetail: View {
         .background(PlannerStyle.paper)
         .navigationBarBackButtonHidden(true)
         .toolbarVisibility(.hidden, for: .navigationBar, .tabBar)
+        .sheet(isPresented: $showsSourceDetails) {
+            NavigationStack {
+                ScrollView {
+                    sourceDetails.frame(maxWidth: .infinity, alignment: .leading).padding(20)
+                }
+                .scrollIndicators(.hidden)
+                .navigationTitle("Source details").navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { showsSourceDetails = false }
+                    }
+                }
+            }
+        }
     }
 
     private var detailActions: some View {
@@ -391,11 +432,14 @@ private struct CatalogDetail: View {
     }
 
     @ViewBuilder private func catalogFrame(_ index: Int, height: CGFloat) -> some View {
-        if let url = entry.media[index].localURL, let image = UIImage(contentsOfFile: url.path) {
-            Image(uiImage: image).resizable().scaledToFit().padding(4)
+        let media = entry.media[index]
+        if let url = media.localURL, let image = UIImage(contentsOfFile: url.path) {
+            CatalogArtwork(image: image, lineArt: media.isEverkineticLineArt).padding(4)
                 .frame(maxWidth: .infinity).frame(height: height)
-                .background(.white, in: RoundedRectangle(cornerRadius: 10))
+                .background(media.isEverkineticLineArt ? Color.clear : .white, in: RoundedRectangle(cornerRadius: 10))
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(entry.name) demonstration, image \(index + 1)")
+                .accessibilityAddTraits(.isImage)
                 .accessibilityIdentifier("catalogFrame\(index + 1)")
         } else {
             Label("Image unavailable offline", systemImage: "photo").font(.footnote)
@@ -461,33 +505,39 @@ private struct CatalogDetail: View {
                     ScrollView(.horizontal) {
                         LazyHStack(alignment: .top, spacing: 10) {
                             ForEach(alternatives, id: \.entry.id) { candidate in
+                                let subtitle = candidate.entry.equipment.isEmpty ? candidate.reason : candidate.entry.equipment.joined(separator: ", ")
                                 NavigationLink {
                                     CatalogDetail(entry: candidate.entry, catalog: catalog, planner: planner, training: training, select: select)
                                 } label: {
-                                    similarCard(candidate.entry, reason: candidate.reason)
+                                    similarCard(candidate.entry, subtitle: subtitle)
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityLabel(candidate.entry.name)
+                                .accessibilityValue(subtitle)
                                 .accessibilityIdentifier("catalogAlternative-" + candidate.entry.name)
                             }
                         }
                         .padding(.horizontal, 20)
                     }
+                    .scrollIndicators(.hidden)
                     .accessibilityIdentifier("similarExerciseCards")
                 }
             }
         }
     }
 
-    private func similarCard(_ candidate: CatalogEntry, reason: String) -> some View {
+    private func similarCard(_ candidate: CatalogEntry, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            CatalogThumbnail(media: candidate.media.first)
+            CatalogThumbnail(media: candidate.media.first, onIllustrationPlate: true)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
                 .background(PlannerStyle.moss.opacity(0.10))
             VStack(alignment: .leading, spacing: 4) {
                 Text(candidate.name).font(.subheadline.weight(.semibold))
-                Text(candidate.equipment.isEmpty ? reason : candidate.equipment.joined(separator: ", "))
+                    .lineLimit(2, reservesSpace: true)
+                Text(subtitle)
                     .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(2, reservesSpace: true)
             }
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -502,33 +552,88 @@ private struct CatalogDetail: View {
 
     @ViewBuilder private var sourceCredits: some View {
         if !entry.source.isEmpty || entry.textReference != nil || !entry.media.isEmpty {
-            VStack(alignment: .leading, spacing: 5) {
-                if let reference = entry.textReference {
-                    credit(title: "Instructions", author: reference.authors.joined(separator: ", "),
-                           license: reference.license, licenseURL: reference.licenseURL,
-                           changes: reference.modifications, source: reference.source)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(compactCredits).foregroundStyle(.secondary)
+                Button {
+                    showsSourceDetails = true
+                } label: {
+                    Text("Source details").underline()
+                        .frame(minHeight: 24, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
-                ForEach(mediaCreditGroups, id: \.self) { group in
-                    if let index = group.first {
-                        let media = entry.media[index]
-                        Text("Illustrations: \(media.author)")
-                        licenseCredit(media.license, url: media.licenseURL)
-                        if !media.modifications.isEmpty { Text(media.modifications) }
-                        ForEach(group, id: \.self) { index in
-                            if let source = safeLink(entry.media[index].source) {
-                                Link("Illustration \(index + 1) source", destination: source)
-                            }
+                .buttonStyle(.plain).foregroundStyle(PlannerStyle.moss)
+            }
+            .font(.caption)
+            .tint(PlannerStyle.moss)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("exerciseSourceCredits")
+        }
+    }
+
+    private var compactCredits: AttributedString {
+        let media = mediaCreditGroups.compactMap(\.first).map { entry.media[$0] }
+        if let reference = entry.textReference, media.count == 1, let art = media.first,
+           reference.authors.joined(separator: ", ") == art.author, reference.licenseURL == art.licenseURL {
+            return creditLine("Instructions and illustrations by ", author: art.author, source: reference.source,
+                              license: reference.license, licenseURL: reference.licenseURL)
+        }
+
+        var lines: [AttributedString] = []
+        if let reference = entry.textReference {
+            lines.append(creditLine("Instructions adapted from ", author: reference.authors.joined(separator: ", "),
+                                    source: reference.source, license: reference.license, licenseURL: reference.licenseURL))
+        }
+        for art in media {
+            lines.append(creditLine("Illustrations by ", author: art.author, source: art.source,
+                                    license: art.license, licenseURL: art.licenseURL))
+        }
+        guard var credit = lines.first else { return linkedCredit("Exercise source", url: entry.source) }
+        for line in lines.dropFirst() {
+            credit += AttributedString("\n")
+            credit += line
+        }
+        return credit
+    }
+
+    private func creditLine(_ prefix: String, author: String, source: String, license: String, licenseURL: String?) -> AttributedString {
+        AttributedString(prefix) + linkedCredit(author, url: source) + AttributedString(" · ")
+            + linkedCredit(license.components(separatedBy: " · ").first ?? license, url: licenseURL)
+    }
+
+    private func linkedCredit(_ text: String, url: String?) -> AttributedString {
+        var link = AttributedString(text)
+        if let destination = url.flatMap(safeLink) { link.link = destination }
+        return link
+    }
+
+    private var sourceDetails: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let reference = entry.textReference {
+                credit(title: "Instructions", author: reference.authors.joined(separator: ", "),
+                       license: reference.license, licenseURL: reference.licenseURL,
+                       changes: reference.modifications, source: reference.source)
+            }
+            ForEach(mediaCreditGroups, id: \.self) { group in
+                if let index = group.first {
+                    let media = entry.media[index]
+                    Text("Illustrations: \(media.author)")
+                    licenseCredit(media.license, url: media.licenseURL)
+                    if !media.modifications.isEmpty { Text(media.modifications) }
+                    if media.isEverkineticLineArt { Text("Displayed as tinted line art in Weekform.") }
+                    ForEach(group, id: \.self) { index in
+                        if let source = safeLink(entry.media[index].source) {
+                            Link("Illustration \(index + 1) source", destination: source)
                         }
                     }
                 }
-                if let source = safeLink(entry.source) { Link("Exercise source", destination: source) }
-                if !catalog.alternatives(to: entry).isEmpty {
-                    Text("Credits for similar exercise illustrations appear on each exercise page.")
-                }
             }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
+            if let source = safeLink(entry.source) { Link("Exercise source", destination: source) }
+            if !catalog.alternatives(to: entry).isEmpty {
+                Text("Credits for similar exercise illustrations appear on each exercise page.")
+            }
         }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
     }
 
     private var mediaCreditGroups: [[Int]] {
