@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct WorkoutSetRow<Options: View>: View {
+struct WorkoutSetRow: View {
     let sessionID: UUID
     let exercise: TrainingExercise
     let row: TrainingSet
@@ -9,11 +9,13 @@ struct WorkoutSetRow<Options: View>: View {
     let isCurrent: Bool
     let isExpanded: Bool
     let closingCorrection: Bool?
+    let isRemovalRevealed: Bool
     let target: String
     let onToggle: () -> Void
     let onCloseCorrection: () -> Void
+    let onRevealRemoval: (Bool) -> Void
+    let onRemove: () -> Void
     let onEditorHeightChange: (CGFloat) -> Void
-    @ViewBuilder let options: () -> Options
 
     @State private var correctionRevision: Int?
     @State private var correction: SetActual?
@@ -25,6 +27,8 @@ struct WorkoutSetRow<Options: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.layoutDirection) private var layoutDirection
+    @ScaledMetric(relativeTo: .subheadline) private var removeWidth = 79.0
 
     private enum ActualField { case reps, seconds, load, rightReps, rightLoad }
     private var latest: TrainingSet? {
@@ -38,6 +42,7 @@ struct WorkoutSetRow<Options: View>: View {
     private var title: String { setTitle(row, index: index) }
     private var isEditorMounted: Bool { isExpanded || closingCorrection != nil }
     private var editorIsCorrection: Bool { closingCorrection ?? isLogged }
+    private var isRemovable: Bool { !isLogged && row.optional == true && row.plannedID == nil }
 
     private var displayedActual: SetActual {
         if editorIsCorrection { return correction ?? row.actual }
@@ -65,7 +70,7 @@ struct WorkoutSetRow<Options: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            rowHeading
+            if isRemovable { swipeableHeading } else { rowHeading }
             if isEditorMounted {
                 SetEditorHeight(fraction: isExpanded ? 1 : 0) {
                     editor
@@ -103,6 +108,9 @@ struct WorkoutSetRow<Options: View>: View {
             }
         }
         .onChange(of: row.revision) { _, _ in commandID = UUID() }
+        .onChange(of: isRemovable) { _, removable in
+            if !removable, isRemovalRevealed { onRevealRemoval(false) }
+        }
         .toolbar {
             if focused != nil {
                 ToolbarItemGroup(placement: .keyboard) {
@@ -111,6 +119,38 @@ struct WorkoutSetRow<Options: View>: View {
                 }
             }
         }
+    }
+
+    private var swipeableHeading: some View {
+        ZStack(alignment: layoutDirection == .leftToRight ? .trailing : .leading) {
+            if isRemovalRevealed {
+                Button(role: .destructive, action: onRemove) {
+                    Text("Remove").font(.footnote.weight(.semibold))
+                        .frame(width: removeWidth)
+                        .frame(minHeight: 44)
+                        .foregroundStyle(colorScheme == .dark ? Color(red: 1, green: 0.83, blue: 0.81)
+                                                              : Color(red: 0.62, green: 0.16, blue: 0.16))
+                        .background(Color.red.opacity(colorScheme == .dark ? 0.24 : 0.11))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove \(title)")
+                .accessibilityIdentifier("removeSet\(index)")
+            }
+            rowHeading
+                .frame(maxWidth: .infinity)
+                .background(PlannerStyle.surface)
+                .offset(x: isRemovalRevealed ? -removeWidth : 0)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .contentShape(Rectangle())
+        .simultaneousGesture(DragGesture(minimumDistance: 18).onEnded { drag in
+            let horizontal = drag.translation.width
+            guard abs(horizontal) >= 32, abs(horizontal) > abs(drag.translation.height) else { return }
+            if horizontal < 0 || isRemovalRevealed {
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) { onRevealRemoval(horizontal < 0) }
+            }
+        })
     }
 
     private var rowHeading: some View {
@@ -146,6 +186,9 @@ struct WorkoutSetRow<Options: View>: View {
         .accessibilityIdentifier(isLogged ? "editSet\(index)" : "openSet\(index)")
         .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
         .accessibilityHint(isExpanded ? "Closes the set editor" : "Opens the set editor")
+        .accessibilityActions {
+            if isRemovable { Button("Remove \(title)", role: .destructive, action: onRemove) }
+        }
     }
 
     @ViewBuilder private var rowStatus: some View {
@@ -164,11 +207,7 @@ struct WorkoutSetRow<Options: View>: View {
     private var editor: some View {
         VStack(alignment: .leading, spacing: 7) {
             if !editorIsCorrection {
-                HStack(spacing: 8) {
-                    Text("Target \(target)").font(.subheadline).foregroundStyle(.secondary)
-                    Spacer(minLength: 0)
-                    options()
-                }
+                Text("Target \(target)").font(.caption).foregroundStyle(.secondary)
             }
             issueMessage
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8),
@@ -198,21 +237,6 @@ struct WorkoutSetRow<Options: View>: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier(editorIsCorrection ? "saveSet\(index)" : "confirmSet\(index)")
-            if editorIsCorrection {
-                HStack {
-                    Button("Cancel", action: onCloseCorrection)
-                        .frame(minHeight: 44)
-                    Spacer(minLength: 8)
-                    Button(role: .destructive, action: undo) {
-                        Label("Undo set", systemImage: "arrow.uturn.backward")
-                            .frame(minHeight: 44)
-                    }
-                    .accessibilityLabel("Undo \(title)")
-                    .accessibilityIdentifier("undoSet\(index)")
-                }
-                .font(.subheadline)
-                .buttonStyle(.borderless)
-            }
         }
         .padding(8)
         .background(PlannerStyle.moss.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
@@ -359,13 +383,6 @@ struct WorkoutSetRow<Options: View>: View {
             unsaved = nil
             issue = nil
             focused = nil
-        } catch { issue = error.localizedDescription }
-    }
-
-    private func undo() {
-        do {
-            try store.undo(sessionID: sessionID, setID: row.id, revision: row.revision)
-            onCloseCorrection()
         } catch { issue = error.localizedDescription }
     }
 }

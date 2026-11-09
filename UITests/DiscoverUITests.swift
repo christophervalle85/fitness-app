@@ -108,7 +108,10 @@ final class DiscoverUITests: XCTestCase {
         XCTAssertTrue(squatGroup.waitForExistence(timeout: 5))
         if (squatGroup.value as? String)?.hasSuffix("collapsed") == true { tap(squatGroup) }
         tap(app.buttons["editSet0"])
-        XCTAssertTrue(app.buttons["undoSet0"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["saveSet0"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["undoSet0"].exists)
+        XCTAssertFalse(app.buttons["Cancel"].exists)
+        tap(app.buttons["editSet0"])
         // End this run's Live Activity so SpringBoard can present the next workout.
         tap(app.buttons["reviewSession"])
         tap(app.buttons["finishPartial"])

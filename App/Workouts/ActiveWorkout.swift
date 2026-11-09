@@ -19,11 +19,11 @@ struct ActiveWorkout: View {
     @State private var chosenRow: UUID?
     @State private var setEditor = SetEditor.current
     @State private var closingEditor: ClosingSetEditor?
+    @State private var revealedRemoval: UUID?
     @State private var expandedGroups: [UUID: Bool] = [:]
     @State private var checklistPosition = ScrollPosition()
     @State private var checklistLayout = ChecklistLayout()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .title2) private var progressTitleSize = 24.0
 
     private var session: TrainingSession? { store.openSessions.first { $0.id == sessionID } }
@@ -99,7 +99,7 @@ struct ActiveWorkout: View {
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     VStack(spacing: 0) {
                         if let problem { Label(problem, systemImage: "exclamationmark.circle").font(.footnote).padding(8) }
-                        if !session.isCardio { actionBar(session) }
+                        if !session.isCardio { actionBar }
                     }.background(PlannerStyle.surface)
                 }
                 .navigationDestination(isPresented: $reviewing) { summary(session) }
@@ -117,23 +117,30 @@ struct ActiveWorkout: View {
                                     Button("Done") { self.panel = nil }
                                 }
                             }
-                        case .rest:
-                            if let exercise {
-                                WorkoutRestEditor(current: exercise.restSeconds) { seconds in
-                                    try store.configureRest(sessionID: session.id, exerciseID: exercise.id, seconds: seconds)
+                        case .rest(let exerciseID):
+                            if let target = session.exercises.first(where: { $0.id == exerciseID }) {
+                                WorkoutRestEditor(current: target.restSeconds) { seconds in
+                                    try store.configureRest(sessionID: session.id, exerciseID: exerciseID, seconds: seconds)
                                 }
                             }
-                        case .add, .swap:
-                            let swapping: Bool = if case .swap = panel { true } else { false }
-                            WorkoutExercisePicker(planner: planner, known: availableExercises,
-                                                  replacing: swapping ? exercise : nil) { prescription, basis in
-                                if swapping, let exercise {
-                                    try store.substitute(sessionID: session.id, exerciseID: exercise.id, prescription: prescription, basis: basis)
-                                } else {
-                                    try store.add(sessionID: session.id, prescription: prescription, basis: basis)
-                                }
-                                closingEditor = nil
-                                setEditor = .current
+                        case .tracking(let exerciseID):
+                            if let target = session.exercises.first(where: { $0.id == exerciseID }) {
+                                List { basisPicker(session: session, exercise: target).pickerStyle(.inline) }
+                                    .navigationTitle("What to track").navigationBarTitleDisplayMode(.inline)
+                                    .toolbar {
+                                        ToolbarItem(placement: .confirmationAction) { Button("Done") { self.panel = nil } }
+                                    }
+                            }
+                        case .add:
+                            exercisePicker(session)
+                        case .swap(let exerciseID):
+                            if let target = session.exercises.first(where: { $0.id == exerciseID }) {
+                                exercisePicker(session, replacing: target)
+                            } else {
+                                ContentUnavailableView("Exercise unavailable", systemImage: "exclamationmark.circle")
+                                    .toolbar {
+                                        ToolbarItem(placement: .confirmationAction) { Button("Done") { self.panel = nil } }
+                                    }
                             }
                         }
                     }
@@ -165,6 +172,25 @@ struct ActiveWorkout: View {
     }
 
     private var disclosureAnimation: Animation? { reduceMotion ? nil : .smooth(duration: 0.24) }
+
+    private func exercisePicker(_ session: TrainingSession, replacing target: TrainingExercise? = nil) -> some View {
+        WorkoutExercisePicker(planner: planner, known: availableExercises, replacing: target) { prescription, basis in
+            if let target {
+                let wasCurrent = exercise?.id == target.id
+                let replacementID = try store.substitute(sessionID: session.id, exerciseID: target.id,
+                                                         prescription: prescription, basis: basis)
+                expandedGroups[replacementID] = true
+                revealedRemoval = nil
+                guard wasCurrent else { return }
+            } else {
+                try store.add(sessionID: session.id, prescription: prescription, basis: basis)
+            }
+            closingEditor = nil
+            revealedRemoval = nil
+            chosenRow = nil
+            setEditor = .current
+        }
+    }
 
     private func strengthChecklist(_ checklist: WorkoutChecklist, session: TrainingSession) -> some View {
         let editorID = openEditorID
@@ -272,46 +298,36 @@ struct ActiveWorkout: View {
                                   beforeOpening: @escaping (UUID) -> Void) -> some View {
         let isCurrent = group.liveExercise?.id == exercise?.id && group.liveExercise != nil
         let isExpanded = expandedGroups[group.id] ?? isCurrent
-        let showsInlineOptions = isCurrent && isExpanded && editorID != nil && editorID == currentRowID
         return LazyVStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 0) {
-                Button {
-                    withAnimation(disclosureAnimation) {
-                        expandedGroups[group.id] = !isExpanded
-                        if isExpanded, let editorID, group.rows.contains(where: { $0.id == editorID }) {
-                            setEditor = .closed
-                        }
+            Button {
+                withAnimation(disclosureAnimation) {
+                    expandedGroups[group.id] = !isExpanded
+                    if isExpanded, let editorID, group.rows.contains(where: { $0.id == editorID }) {
+                        setEditor = .closed
                     }
-                } label: {
-                    HStack(spacing: 8) {
-                        Text(group.prescription.name).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: 4)
-                        Text("\(group.completed)/\(group.rows.count)")
-                            .font(.caption).monospacedDigit().foregroundStyle(.secondary).fixedSize()
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    if isExpanded, group.rows.contains(where: { $0.id == revealedRemoval }) {
+                        revealedRemoval = nil
                     }
-                    .frame(minHeight: 44)
-                    .padding(.vertical, 2)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(group.prescription.name)
-                .accessibilityValue("\(group.completed) of \(group.rows.count) sets logged, \(isExpanded ? "expanded" : "collapsed")")
-                .accessibilityIdentifier("exerciseChecklist-\(group.id.uuidString)")
-                if let live = group.liveExercise, !showsInlineOptions {
-                    exerciseOptions(session: session, exercise: live)
-                } else if group.liveExercise == nil, !group.prescription.notes.isEmpty {
-                    Button {
-                        panel = .instructions(group.prescription)
-                    } label: {
-                        Image(systemName: "info.circle").frame(width: 44, height: 44)
-                    }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel("Instructions for \(group.prescription.name)")
+            } label: {
+                HStack(spacing: 8) {
+                    Text(group.prescription.name).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 4)
+                    Text("\(group.completed)/\(group.rows.count)")
+                        .font(.caption).monospacedDigit().foregroundStyle(.secondary).fixedSize()
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 }
+                .frame(minHeight: 45)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(group.prescription.name)
+            .accessibilityValue("\(group.completed) of \(group.rows.count) sets logged, \(isExpanded ? "expanded" : "collapsed")")
+            .accessibilityIdentifier("exerciseChecklist-\(group.id.uuidString)")
+            .contextMenu { exerciseOptions(group) }
+            .accessibilityActions { exerciseOptions(group) }
             if isExpanded {
                 ForEach(group.rows) { item in
                     checklistRow(item, group: group, session: session, isCurrentExercise: isCurrent,
@@ -319,15 +335,19 @@ struct ActiveWorkout: View {
                         .id(item.id)
                         .transition(.opacity)
                 }
+                if let live = group.liveExercise {
+                    cardActions(session, exercise: live)
+                }
             }
         }
-        .padding(.horizontal, 11)
-        .padding(.bottom, isExpanded ? 4 : 0)
-        .background(PlannerStyle.surface, in: RoundedRectangle(cornerRadius: 18))
+        .padding(.horizontal, 10)
+        .background(PlannerStyle.surface, in: RoundedRectangle(cornerRadius: 17))
         .overlay {
-            RoundedRectangle(cornerRadius: 18).strokeBorder(PlannerStyle.moss.opacity(0.18))
+            RoundedRectangle(cornerRadius: 17).strokeBorder(PlannerStyle.moss.opacity(0.18))
                 .allowsHitTesting(false).accessibilityHidden(true)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("exerciseCard-\(group.id.uuidString)")
     }
 
     @ViewBuilder
@@ -357,7 +377,9 @@ struct ActiveWorkout: View {
                 WorkoutSetRow(sessionID: session.id, exercise: live, row: row, index: index, store: store,
                               isCurrent: isCurrentExercise && row.id == currentRowID, isExpanded: row.id == editorID,
                               closingCorrection: closingEditor?.rowID == row.id ? closingEditor?.isCorrection : nil,
+                              isRemovalRevealed: revealedRemoval == row.id,
                               target: targetDescription(group.prescription), onToggle: {
+                    revealedRemoval = nil
                     if row.id == editorID {
                         closeEditor(row)
                     } else if row.confirmedAt != nil {
@@ -367,12 +389,25 @@ struct ActiveWorkout: View {
                     } else {
                         selectExercise(live, session: session, rowID: row.id, beforeOpening: beforeOpening)
                     }
-                }, onCloseCorrection: { closeEditor(row) }, onEditorHeightChange: { height in
+                }, onCloseCorrection: { closeEditor(row) }, onRevealRemoval: { revealed in
+                    revealedRemoval = revealed ? row.id : nil
+                }, onRemove: {
+                    removeAddedSet(row, session: session)
+                }, onEditorHeightChange: { height in
                     checklistLayout.editor = (row.id, height)
-                }) {
-                    exerciseOptions(session: session, exercise: live)
-                }
+                })
             }
+        }
+    }
+
+    private func removeAddedSet(_ row: TrainingSet, session: TrainingSession) {
+        run {
+            let wasOpen = openEditorID == row.id
+            try store.removeAddedSet(sessionID: session.id, setID: row.id, revision: row.revision)
+            if revealedRemoval == row.id { revealedRemoval = nil }
+            if chosenRow == row.id { chosenRow = nil }
+            if closingEditor?.rowID == row.id { closingEditor = nil }
+            if wasOpen { setEditor = .closed }
         }
     }
 
@@ -407,52 +442,57 @@ struct ActiveWorkout: View {
         }
     }
 
-    private func exerciseOptions(session: TrainingSession, exercise: TrainingExercise) -> some View {
-        Menu {
-            if !exercise.prescription.notes.isEmpty {
-                Button("Instructions", systemImage: "info.circle") { panel = .instructions(exercise.prescription) }
-            }
-            basisPicker(session: session, exercise: exercise)
-        } label: {
-            Image(systemName: "ellipsis").font(.subheadline.weight(.semibold))
-                .foregroundStyle(PlannerStyle.moss).frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+    @ViewBuilder private func exerciseOptions(_ group: WorkoutChecklist.Group) -> some View {
+        if !group.prescription.notes.isEmpty {
+            Button("Instructions", systemImage: "info.circle") { panel = .instructions(group.prescription) }
         }
-        .buttonStyle(.borderless)
-        .accessibilityLabel("Options for \(exercise.prescription.name)")
+        if let live = group.liveExercise, live.sets.allSatisfy({ $0.confirmedAt == nil }) {
+            Button("What to track", systemImage: "slider.horizontal.3") { panel = .tracking(live.id) }
+        }
     }
 
-    private func actionBar(_ session: TrainingSession) -> some View {
-        let columns = typeSize.isAccessibilitySize ? 2 : 4
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: columns), spacing: 4) {
-            Button { panel = .add } label: { tool("Add exercise", "plus") }
-                .accessibilityIdentifier("addCustomExercise")
+    private func cardActions(_ session: TrainingSession, exercise: TrainingExercise) -> some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 5), GridItem(.flexible())]) {
             Menu {
-                if let exercise {
-                    Button("Add warm-up set") { run { try store.addSet(sessionID: session.id, exerciseID: exercise.id, warmup: true) } }
-                    Button("Add working set") { run { try store.addSet(sessionID: session.id, exerciseID: exercise.id, warmup: false) } }
+                Button("Working set") {
+                    run { try store.addSet(sessionID: session.id, exerciseID: exercise.id, warmup: false) }
                 }
-            } label: { tool("Add set", "square.stack") }
-                .disabled(exercise == nil).accessibilityIdentifier("addSet")
-            Button { panel = .rest } label: { tool("Rest", "timer") }
-                .disabled(exercise == nil).accessibilityIdentifier("workoutRest")
-            Button { panel = .swap } label: { tool("Swap", "arrow.triangle.2.circlepath") }
-                .disabled(exercise?.sets.contains { $0.confirmedAt == nil } != true)
-                .accessibilityLabel("Swap remaining sets").accessibilityIdentifier("swapExercise")
+                Button("Warm-up") {
+                    run { try store.addSet(sessionID: session.id, exerciseID: exercise.id, warmup: true) }
+                }
+            } label: { tool("Add set", "plus") }
+            .accessibilityLabel("Add set to \(exercise.prescription.name)")
+            .accessibilityIdentifier("addSet")
+            Button { panel = .swap(exercise.id) } label: { tool("Swap", "arrow.left.arrow.right") }
+                .disabled(!exercise.sets.contains { $0.confirmedAt == nil })
+                .accessibilityLabel("Swap remaining sets for \(exercise.prescription.name)")
+                .accessibilityIdentifier("swapExercise")
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 10).padding(.top, 7).padding(.bottom, 4)
+        .padding(.vertical, 4)
+        .overlay(alignment: .top) { Rectangle().fill(PlannerStyle.moss.opacity(0.18)).frame(height: 1) }
+    }
+
+    private var actionBar: some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 7), GridItem(.flexible())]) {
+            Button { panel = .add } label: { tool("Add exercise", "plus", tinted: true) }
+                .accessibilityIdentifier("addCustomExercise")
+            Button {
+                if let exercise { panel = .rest(exercise.id) }
+            } label: { tool("Rest", "timer", tinted: true) }
+                .disabled(exercise == nil).accessibilityIdentifier("workoutRest")
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 10).padding(.top, 7).padding(.bottom, 2)
         .overlay(alignment: .top) { Rectangle().fill(PlannerStyle.rule).frame(height: 1) }
     }
 
-    private func tool(_ label: String, _ systemImage: String) -> some View {
-        VStack(spacing: 2) {
-            Image(systemName: systemImage).font(.subheadline.weight(.medium))
-            Text(label).font(.caption2.weight(.semibold)).multilineTextAlignment(.center)
-        }
-        .foregroundStyle(PlannerStyle.moss).frame(maxWidth: .infinity, minHeight: 47)
-        .background(PlannerStyle.moss.opacity(0.11), in: RoundedRectangle(cornerRadius: 10))
-        .contentShape(Rectangle())
+    private func tool(_ label: String, _ systemImage: String, tinted: Bool = false) -> some View {
+        Label(label, systemImage: systemImage)
+            .font(.footnote.weight(.semibold)).multilineTextAlignment(.center)
+            .foregroundStyle(PlannerStyle.moss).frame(maxWidth: .infinity, minHeight: 44)
+            .background(tinted ? PlannerStyle.moss.opacity(0.11) : .clear, in: RoundedRectangle(cornerRadius: 10))
+            .contentShape(Rectangle())
     }
 
     private func basisPicker(session: TrainingSession, exercise: TrainingExercise) -> some View {
@@ -497,7 +537,7 @@ struct ActiveWorkout: View {
             }
             .buttonStyle(.bordered)
         }
-        Button { panel = .rest } label: {
+        Button { panel = .rest(exercise.id) } label: {
             LabeledContent("Rest between sets", value: exercise.restSeconds.map { "\($0) sec" } ?? "Off")
         }
     }
@@ -589,14 +629,16 @@ private struct ClosingSetEditor: Equatable {
 }
 
 private enum WorkoutPanel: Identifiable {
-    case add, swap, rest
+    case add
+    case swap(UUID), tracking(UUID), rest(UUID)
     case instructions(PlanExercise)
 
     var id: String {
         switch self {
         case .add: "add"
-        case .swap: "swap"
-        case .rest: "rest"
+        case .swap(let id): "swap-\(id.uuidString)"
+        case .tracking(let id): "tracking-\(id.uuidString)"
+        case .rest(let id): "rest-\(id.uuidString)"
         case .instructions(let prescription): prescription.id.uuidString
         }
     }

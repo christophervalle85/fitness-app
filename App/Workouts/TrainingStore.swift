@@ -644,7 +644,8 @@ final class TrainingStore {
         try withSession(sessionID) { session in
             guard let i = session.exercises.firstIndex(where: { $0.id == exerciseID }) else { throw TrainingError("Choose an exercise.") }
             let exercise = session.exercises[i]
-            var set = TrainingSet(ordinal: try increment(exercise.sets.compactMap(\.ordinal).max() ?? 0),
+            let lastOrdinal = exercise.sets.enumerated().map { $0.element.ordinal ?? ($0.offset + 1) }.max() ?? 0
+            var set = TrainingSet(ordinal: try increment(lastOrdinal),
                                   warmup: warmup, optional: true, actual: SetActual(unit: exercise.prescription.loadUnit))
             if !warmup {
                 let suggested = makeExercise(exercise.prescription, basis: exercise.basis, slots: [nil], rest: exercise.restSeconds)
@@ -657,20 +658,47 @@ final class TrainingStore {
         }
     }
 
-    func substitute(sessionID: UUID, exerciseID: UUID, prescription: PlanExercise, basis: LoadBasis) throws {
+    func removeAddedSet(sessionID: UUID, setID: UUID, revision: Int) throws {
+        try withSession(sessionID) { session in
+            let (i, j) = try location(setID, session)
+            let row = session.exercises[i].sets[j]
+            guard row.revision == revision else { throw TrainingError("Review the latest set before removing it.") }
+            guard row.optional == true, row.plannedID == nil, row.confirmedAt == nil else {
+                throw TrainingError("Only unlogged sets you added can be removed.")
+            }
+            session.exercises[i].sets.remove(at: j)
+            clearTimerReferences(to: [setID], in: &session)
+        }
+    }
+
+    private func clearTimerReferences(to removedSets: Set<UUID>, in session: inout TrainingSession) {
+        if let rest = session.rest, removedSets.contains(rest.sourceSetID) { session.rest = nil }
+        if let undo = session.timerUndo, removedSets.contains(undo.setID) {
+            session.timerUndo = nil
+        } else if let previous = session.timerUndo?.previous, removedSets.contains(previous.sourceSetID) {
+            session.timerUndo?.previous = nil
+        }
+    }
+
+    @discardableResult
+    func substitute(sessionID: UUID, exerciseID: UUID, prescription: PlanExercise, basis: LoadBasis) throws -> UUID {
         try validate(prescription)
         guard (basis == .timed) == prescription.timed else { throw TrainingError("Choose a target that matches the recording method.") }
+        let replacementID = UUID()
         try withSession(sessionID) { session in
             guard let i = session.exercises.firstIndex(where: { $0.id == exerciseID }) else { throw TrainingError("Choose the exercise to replace.") }
             let old = session.exercises[i]
-            let remaining = old.sets.filter { $0.confirmedAt == nil }
+            let wasCurrent = (session.currentExerciseID ?? session.exercises.first?.id) == old.id
+            let remaining = old.sets.enumerated().filter { $0.element.confirmedAt == nil }
             guard !remaining.isEmpty else { throw TrainingError("All sets for this exercise are confirmed.") }
-            var replacement = makeExercise(prescription, basis: basis, slots: remaining.map(\.plannedID), rest: old.restSeconds,
-                                           ordinals: remaining.enumerated().map { $0.element.ordinal ?? $0.offset + 1 })
-            for j in remaining.indices {
-                replacement.sets[j].warmup = remaining[j].warmup
-                replacement.sets[j].optional = remaining[j].optional
-                if remaining[j].warmup == true {
+            var replacement = makeExercise(prescription, basis: basis, slots: remaining.map { $0.element.plannedID },
+                                           rest: old.restSeconds, ordinals: remaining.map { $0.element.ordinal ?? ($0.offset + 1) })
+            replacement.id = replacementID
+            for (j, item) in remaining.enumerated() {
+                let row = item.element
+                replacement.sets[j].warmup = row.warmup
+                replacement.sets[j].optional = row.optional
+                if row.warmup == true {
                     replacement.sets[j].actual = SetActual(unit: prescription.loadUnit)
                     replacement.sets[j].previousAt = nil
                 }
@@ -678,12 +706,22 @@ final class TrainingStore {
             replacement.replacedPrescription = old.replacedPrescription ?? old.prescription
             replacement.prescription.sets = remaining.count
             session.exercises[i].sets.removeAll { $0.confirmedAt == nil }
-            if session.exercises[i].sets.isEmpty { session.exercises[i] = replacement }
+            let replacesOriginal = session.exercises[i].sets.isEmpty
+            if replacesOriginal { session.exercises[i] = replacement }
             else { session.exercises.insert(replacement, at: i + 1) }
-            session.currentExerciseID = replacement.id
-            session.rest = nil
-            session.timerUndo = nil
+            if wasCurrent {
+                session.currentExerciseID = replacementID
+                session.rest = nil
+                session.timerUndo = nil
+            } else {
+                clearTimerReferences(to: Set(remaining.map { $0.element.id }), in: &session)
+                if replacesOriginal, let undo = session.timerUndo, undo.previousExerciseID == old.id {
+                    session.timerUndo = TrainingTimerUndo(setID: undo.setID, previous: undo.previous,
+                                                          previousExerciseID: replacementID, measurementID: undo.measurementID)
+                }
+            }
         }
+        return replacementID
     }
 
     func setBasis(sessionID: UUID, exerciseID: UUID, basis: LoadBasis) throws {

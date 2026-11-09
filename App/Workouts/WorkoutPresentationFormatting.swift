@@ -10,7 +10,7 @@ func elapsedString(_ interval: TimeInterval) -> String {
 func setTitle(_ row: TrainingSet, index: Int) -> String {
     let ordinal = row.ordinal ?? (index + 1)
     if row.warmup == true { return "Warm-up · Set \(ordinal)" }
-    return row.optional == true ? "Extra working set \(ordinal)" : "Set \(ordinal)"
+    return "Set \(ordinal)"
 }
 
 func basisTitle(_ basis: LoadBasis) -> String {

@@ -299,6 +299,36 @@ struct TrainingTests {
         }
     }
 
+    @Test func swappingAnotherExercisePreservesTheActiveRestAndUndo() throws {
+        try withDirectory { path in
+            let store = TrainingStore(directory: path, now: { thursday })
+            try store.load(profileID: UUID())
+            var template = plan()
+            template.days[4].exercises.append(PlanExercise(name: "Press", sets: 2))
+            let sessionID = try store.startPlanned(plan: template, date: friday)
+            let exercises = try #require(store.active?.exercises)
+            try store.select(sessionID: sessionID, exerciseID: exercises[1].id)
+            try confirm(store)
+            let rest = try #require(store.active?.rest)
+            let undo = try #require(store.active?.timerUndo)
+
+            let replacementID = try store.substitute(sessionID: sessionID, exerciseID: exercises[1].id,
+                                                     prescription: PlanExercise(name: "Replacement", sets: 2), basis: .bodyweight)
+
+            let swapped = try #require(store.active)
+            let replacement = swapped.exercises[1]
+            #expect(replacement.id == replacementID)
+            #expect(swapped.currentExerciseID == exercises[0].id)
+            #expect(swapped.rest == rest)
+            #expect(swapped.timerUndo == TrainingTimerUndo(setID: undo.setID, previous: undo.previous,
+                                                           previousExerciseID: replacement.id, measurementID: undo.measurementID))
+            #expect(replacement.sets.map(\.plannedID) == exercises[1].sets.map(\.plannedID))
+            let confirmed = swapped.exercises[0].sets[0]
+            try store.undo(sessionID: sessionID, setID: confirmed.id, revision: confirmed.revision)
+            #expect(store.active?.currentExerciseID == replacement.id)
+        }
+    }
+
     @Test func explicitCardioContributionsSeparateExtraActivity() throws {
         try withDirectory { path in
             let store = TrainingStore(directory: path, now: { thursday })
@@ -475,6 +505,78 @@ struct TrainingTests {
                 try store.assign(sessionID: extraID, plan: template, date: next, setID: warmupID, exerciseID: p.id, slot: 0)
             }
             #expect(store.occurrences.count == 1)
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func removingAnAddedSetPreservesPlannedRowsAndUnrelatedRest(warmup: Bool) throws {
+        try withDirectory { path in
+            let owner = UUID()
+            var fail = false
+            let store = TrainingStore(directory: path, now: { thursday }, beforeSave: {
+                if fail { throw CocoaError(.fileWriteOutOfSpace) }
+            })
+            try store.load(profileID: owner)
+            let sessionID = try store.startPlanned(plan: plan(), date: friday)
+            try confirm(store)
+            let original = try #require(store.active)
+            let exercise = original.exercises[0]
+            let planned = exercise.sets[1]
+            try store.addSet(sessionID: sessionID, exerciseID: exercise.id, warmup: warmup)
+            let added = try #require(store.active?.exercises[0].sets.last)
+            #expect(added.ordinal == 4 && added.warmup == warmup)
+            #expect(throws: TrainingError.self) {
+                try store.removeAddedSet(sessionID: sessionID, setID: planned.id, revision: planned.revision)
+            }
+
+            try store.edit(sessionID: sessionID, setID: added.id, actual: SetActual(reps: 5), revision: added.revision)
+            let edited = try #require(store.active?.exercises[0].sets.last)
+            #expect(throws: TrainingError.self) {
+                try store.removeAddedSet(sessionID: sessionID, setID: added.id, revision: added.revision)
+            }
+            fail = true
+            #expect(throws: CocoaError.self) {
+                try store.removeAddedSet(sessionID: sessionID, setID: edited.id, revision: edited.revision)
+            }
+            #expect(store.active?.exercises[0].sets.last == edited)
+            fail = false
+
+            try store.removeAddedSet(sessionID: sessionID, setID: edited.id, revision: edited.revision)
+            #expect(store.active == original)
+            let reopened = TrainingStore(directory: path, now: { thursday })
+            try reopened.load(profileID: owner)
+            #expect(reopened.active == original)
+        }
+    }
+
+    @Test func removalProtectsOriginalAndLoggedSetsAndKeepsValidRestReferences() throws {
+        try withDirectory { path in
+            let planner = PlanningStore(directory: path.appending(path: "Planning"))
+            try planner.load()
+            let store = TrainingStore(directory: path.appending(path: "Training"), now: { thursday })
+            try store.load(profileID: try #require(planner.profileID))
+            let sessionID = try store.startExtra(name: "Ad hoc workout")
+            try store.add(sessionID: sessionID, prescription: PlanExercise(name: "Row", sets: 2), basis: .external)
+            let exercise = try #require(store.active?.exercises.first)
+            let original = exercise.sets[0]
+            #expect(throws: TrainingError.self) {
+                try store.removeAddedSet(sessionID: sessionID, setID: original.id, revision: original.revision)
+            }
+            try store.configureRest(sessionID: sessionID, exerciseID: exercise.id, seconds: 90)
+            try store.addSet(sessionID: sessionID, exerciseID: exercise.id, warmup: false)
+            try confirm(store, row: 2)
+            let logged = try #require(store.active?.exercises[0].sets[2])
+            #expect(throws: TrainingError.self) {
+                try store.removeAddedSet(sessionID: sessionID, setID: logged.id, revision: logged.revision)
+            }
+            try store.pauseRest(sessionID: sessionID)
+            try store.undo(sessionID: sessionID, setID: logged.id, revision: logged.revision)
+            #expect(store.active?.rest?.sourceSetID == logged.id)
+            let pending = try #require(store.active?.exercises[0].sets[2])
+            try store.removeAddedSet(sessionID: sessionID, setID: pending.id, revision: pending.revision)
+            #expect(store.active?.rest == nil)
+            #expect(store.active?.exercises[0].sets == exercise.sets)
+            try WorkoutBackup(planner, store).validate()
         }
     }
 

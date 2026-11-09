@@ -163,6 +163,44 @@ final class TrainUITests: XCTestCase {
         capture("Progress after two partial sessions", in: app)
     }
 
+    func testExerciseFooterAddsAndRemovesOnlyItsAddedSet() {
+        let app = startWithRoutine()
+        tap(app.buttons["weekday0"])
+        tap(app.buttons["startPlanned"])
+        XCTAssertTrue(app.buttons["confirmSet0"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Options for Squat"].exists)
+        tap(app.buttons["openSet0"])
+
+        let progress = app.descendants(matching: .any)["workoutSetProgress"]
+        XCTAssertTrue((progress.value as? String)?.contains("0 of 6") == true)
+        tap(app.buttons["addSet"])
+        tap(app.buttons["Working set"])
+        let addedSet = app.buttons["openSet3"]
+        XCTAssertTrue(addedSet.waitForExistence(timeout: 5))
+        XCTAssertEqual(addedSet.label, "Set 4")
+        XCTAssertTrue((progress.value as? String)?.contains("0 of 7") == true)
+        capture("Exercise footer with Set 4", in: app)
+
+        func swipeRow(_ title: XCUIElement) {
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            let y = title.frame.midY - app.frame.minY
+            let start = origin.withOffset(CGVector(dx: app.frame.width * 0.8, dy: y))
+            let end = origin.withOffset(CGVector(dx: app.frame.width * 0.2, dy: y))
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
+
+        swipeRow(app.buttons["openSet2"])
+        XCTAssertFalse(app.buttons["removeSet2"].exists)
+        swipeRow(addedSet)
+        let remove = app.buttons["removeSet3"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 5))
+        XCTAssertTrue(addedSet.exists)
+        capture("Swipe reveals Remove", in: app)
+        tap(remove)
+        XCTAssertTrue(addedSet.waitForNonExistence(timeout: 5))
+        XCTAssertTrue((progress.value as? String)?.contains("0 of 6") == true)
+    }
+
     func testAssignSavedExtraCardioToScheduledGoal() {
         let app = startWithRoutine()
         tap(app.buttons["scheduleCardio"])
