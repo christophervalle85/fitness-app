@@ -490,6 +490,7 @@ struct CatalogWorkoutTrend: View {
 
     @ScaledMetric(relativeTo: .caption2) private var chartHeight: CGFloat = 104
     @ScaledMetric(relativeTo: .caption2) private var monthLabelWidth: CGFloat = 25
+    @ScaledMetric(relativeTo: .caption2) private var monthLabelHeight: CGFloat = 20
     @State private var selectedID: UUID?
 
     private struct Point: Identifiable {
@@ -538,6 +539,8 @@ struct CatalogWorkoutTrend: View {
             GeometryReader { geometry in
                 let plotWidth = max(0, geometry.size.width - Self.scaleGutter)
                 chart(visible, scale: scale, yearStart: start, ticks: monthTicks(width: plotWidth), calendar: calendar)
+                    .frame(height: chartHeight - monthLabelHeight)
+                    .padding(.bottom, monthLabelHeight)
                     .accessibilityLabel("Workout trend")
                     .accessibilityIdentifier("exerciseWorkoutTrend")
             }
@@ -572,17 +575,7 @@ struct CatalogWorkoutTrend: View {
         }
         .chartXScale(domain: 0.0...12.0, range: .plotDimension(padding: 4))
         .chartYScale(domain: baseline...scale[3], range: .plotDimension(padding: 4))
-        .chartXAxis {
-            AxisMarks(values: ticks) { tick in
-                if let position = tick.as(Double.self),
-                   let month = calendar.date(byAdding: .month, value: Int(position), to: yearStart) {
-                    AxisValueLabel(centered: false, anchor: .top, offsetsMarks: false) {
-                        Text(month, format: monthFormat)
-                            .font(.caption2.monospaced()).foregroundStyle(PlannerStyle.ink.opacity(0.65))
-                    }
-                }
-            }
-        }
+        .chartXAxis(.hidden)
         .chartYAxis {
             AxisMarks(position: .leading, values: scale) { tick in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 1))
@@ -599,6 +592,17 @@ struct CatalogWorkoutTrend: View {
             GeometryReader { geometry in
                 if let anchor = proxy.plotFrame {
                     let frame = geometry[anchor]
+                    ForEach(ticks, id: \.self) { position in
+                        if let x = proxy.position(forX: position),
+                           let month = calendar.date(byAdding: .month, value: Int(position), to: yearStart) {
+                            Text(month, format: monthFormat)
+                                .font(.caption2.monospaced()).foregroundStyle(PlannerStyle.ink.opacity(0.65))
+                                .fixedSize()
+                                .position(x: frame.minX + x, y: frame.maxY + monthLabelHeight / 2)
+                                .allowsHitTesting(false)
+                                .accessibilityHidden(true)
+                        }
+                    }
                     let centers = points.reduce(into: [UUID: CGPoint]()) { centers, point in
                         if let x = proxy.position(forX: point.monthPosition), let y = proxy.position(forY: point.value) {
                             centers[point.id] = CGPoint(x: frame.minX + x, y: frame.minY + y)
