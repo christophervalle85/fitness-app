@@ -338,12 +338,12 @@ private func weightNumber(_ kg: Double, _ unit: String) -> String {
 
 private func recordContext(_ record: ExerciseRecords) -> String {
     let name: String = switch record.basis {
-    case .external: "External load"
+    case .external: "Weight"
     case .barbell: "Total barbell weight"
     case .dumbbell: "Per dumbbell"
     case .machine: "Machine setting"
     case .bodyweight: "Bodyweight"
-    case .added: "Added load"
+    case .added: "Added weight"
     case .assisted: "Assistance"
     case .unilateral: "Per side"
     case .timed: "Duration"
@@ -648,13 +648,18 @@ private struct SetCorrection: View {
                     CorrectionField(exercise.basis == .unilateral ? "Left reps" : "Reps") { TextField("Reps", value: $actual.reps, format: .number).keyboardType(.numberPad).accessibilityIdentifier("correctReps") }
                 }
                 if exercise.basis != .bodyweight {
-                    CorrectionField(exercise.basis == .assisted ? "Assistance (\(actual.unit))" : "Load (\(actual.unit))") {
-                        TextField("Load", value: $actual.load, format: .number).keyboardType(.decimalPad).accessibilityIdentifier("correctLoad")
+                    let weightLabel = switch exercise.basis {
+                    case .assisted: "Assistance"
+                    case .unilateral: "Left weight"
+                    default: "Weight"
+                    }
+                    CorrectionField("\(weightLabel) (\(actual.unit))") {
+                        TextField(weightLabel, value: $actual.load, format: .number).keyboardType(.decimalPad).accessibilityIdentifier("correctLoad")
                     }
                 }
                 if exercise.basis == .unilateral {
                     CorrectionField("Right reps") { TextField("Right reps", value: $actual.rightReps, format: .number).keyboardType(.numberPad) }
-                    CorrectionField("Right load (\(actual.unit))") { TextField("Right load", value: $actual.rightLoad, format: .number).keyboardType(.decimalPad) }
+                    CorrectionField("Right weight (\(actual.unit))") { TextField("Right weight", value: $actual.rightLoad, format: .number).keyboardType(.decimalPad) }
                 }
                 DatePicker("Performed", selection: $date, in: sessionBounds)
             }

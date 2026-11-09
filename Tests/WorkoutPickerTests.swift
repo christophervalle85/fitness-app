@@ -25,6 +25,13 @@ struct WorkoutPickerTests {
         #expect(exercise.startingLoad == nil)
     }
 
+    @Test func resultWeightExplainsSpecialMeasurements() {
+        let actual = SetActual(reps: 10, load: 25)
+        #expect(actualDescription(actual, basis: .external) == "10 reps × 25 lb")
+        #expect(actualDescription(actual, basis: .dumbbell) == "10 reps × 25 lb · per dumbbell")
+        #expect(actualDescription(actual, basis: .assisted) == "10 reps × 25 lb · assistance")
+    }
+
     @Test func elapsedDurationAvoidsIntegerOverflow() {
         #expect(elapsedString(90.9) == "1:30")
         #expect(elapsedString(-1) == "0:00")

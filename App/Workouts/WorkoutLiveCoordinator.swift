@@ -107,15 +107,15 @@ enum WorkoutLiveCoordinator {
         case .bodyweight:
             text = "\(actual.reps!) reps · bodyweight"
         default:
-            let basisLabel: String = switch basis {
-            case .assisted: "assistance"
-            case .added: "added"
-            case .barbell: "total"
-            case .dumbbell: "each"
-            case .machine: "machine"
-            default: "external"
+            let weightQualifier: String = switch basis {
+            case .assisted: " assistance"
+            case .added: " added"
+            case .barbell: " total"
+            case .dumbbell: " each"
+            case .machine: " machine"
+            default: ""
             }
-            text = "\(actual.reps!) reps · \(weight(actual.load)) \(basisLabel)"
+            text = "\(actual.reps!) reps · \(weight(actual.load))\(weightQualifier)"
         }
         // A lengthy or custom machine convention needs the full in-app editor.
         if basis == .machine && !convention.isEmpty && !["machine setting", "machine"].contains(convention.lowercased()) { return nil }

@@ -18,6 +18,7 @@ struct ActiveWorkout: View {
     @State private var handledRoute = false
     @State private var chosenRow: UUID?
     @State private var setEditor = SetEditor.current
+    @State private var closingEditor: ClosingSetEditor?
     @State private var expandedGroups: [UUID: Bool] = [:]
     @State private var checklistPosition = ScrollPosition()
     @State private var checklistLayout = ChecklistLayout()
@@ -131,6 +132,7 @@ struct ActiveWorkout: View {
                                 } else {
                                     try store.add(sessionID: session.id, prescription: prescription, basis: basis)
                                 }
+                                closingEditor = nil
                                 setEditor = .current
                             }
                         }
@@ -354,23 +356,39 @@ struct ActiveWorkout: View {
             if let live = group.liveExercise {
                 WorkoutSetRow(sessionID: session.id, exercise: live, row: row, index: index, store: store,
                               isCurrent: isCurrentExercise && row.id == currentRowID, isExpanded: row.id == editorID,
+                              closingCorrection: closingEditor?.rowID == row.id ? closingEditor?.isCorrection : nil,
                               target: targetDescription(group.prescription), onToggle: {
                     if row.id == editorID {
-                        setEditor = .closed
+                        closeEditor(row)
                     } else if row.confirmedAt != nil {
                         beforeOpening(row.id)
+                        closingEditor = nil
                         setEditor = .correction(row.id)
                     } else {
                         selectExercise(live, session: session, rowID: row.id, beforeOpening: beforeOpening)
                     }
-                }, onCloseCorrection: {
-                    setEditor = .closed
-                }, onEditorHeightChange: { height in
+                }, onCloseCorrection: { closeEditor(row) }, onEditorHeightChange: { height in
                     checklistLayout.editor = (row.id, height)
                 }) {
                     exerciseOptions(session: session, exercise: live)
                 }
             }
+        }
+    }
+
+    private func closeEditor(_ row: TrainingSet) {
+        guard setEditor != .closed else { return }
+        if reduceMotion {
+            closingEditor = nil
+            setEditor = .closed
+            return
+        }
+        let closing = ClosingSetEditor(rowID: row.id, isCorrection: row.confirmedAt != nil)
+        withAnimation(.easeOut(duration: 0.20), completionCriteria: .removed) {
+            closingEditor = closing
+            setEditor = .closed
+        } completion: {
+            if closingEditor == closing { closingEditor = nil }
         }
     }
 
@@ -382,6 +400,7 @@ struct ActiveWorkout: View {
                 if rowID != nil, expandedGroups[previous] == nil { expandedGroups[previous] = true }
             }
             if let rowID { beforeOpening(rowID) }
+            closingEditor = nil
             expandedGroups[exercise.id] = true
             chosenRow = rowID
             setEditor = .current
@@ -438,7 +457,7 @@ struct ActiveWorkout: View {
 
     private func basisPicker(session: TrainingSession, exercise: TrainingExercise) -> some View {
         let options = LoadBasis.allCases.filter { ($0 == .timed) == exercise.prescription.timed }
-        return Picker("Recording method", selection: Binding(get: { exercise.basis }, set: { basis in
+        return Picker("What to track", selection: Binding(get: { exercise.basis }, set: { basis in
             run { try store.setBasis(sessionID: session.id, exerciseID: exercise.id, basis: basis) }
         })) {
             ForEach(options, id: \.self) { Text(basisTitle($0)).tag($0) }
@@ -561,6 +580,12 @@ private final class ChecklistLayout {
 private enum SetEditor: Equatable {
     case current, closed
     case correction(UUID)
+}
+
+private struct ClosingSetEditor: Equatable {
+    let token = UUID()
+    let rowID: UUID
+    let isCorrection: Bool
 }
 
 private enum WorkoutPanel: Identifiable {

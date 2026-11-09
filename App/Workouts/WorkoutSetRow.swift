@@ -8,6 +8,7 @@ struct WorkoutSetRow<Options: View>: View {
     let store: TrainingStore
     let isCurrent: Bool
     let isExpanded: Bool
+    let closingCorrection: Bool?
     let target: String
     let onToggle: () -> Void
     let onCloseCorrection: () -> Void
@@ -35,15 +36,17 @@ struct WorkoutSetRow<Options: View>: View {
 
     private var isLogged: Bool { row.confirmedAt != nil }
     private var title: String { setTitle(row, index: index) }
+    private var isEditorMounted: Bool { isExpanded || closingCorrection != nil }
+    private var editorIsCorrection: Bool { closingCorrection ?? isLogged }
 
     private var displayedActual: SetActual {
-        if isLogged { return correction ?? row.actual }
+        if editorIsCorrection { return correction ?? row.actual }
         return unsaved ?? suggestion ?? latest?.actual ?? row.actual
     }
 
     private var values: Binding<SetActual> {
         Binding(get: { displayedActual }, set: { actual in
-            if isLogged {
+            if editorIsCorrection {
                 correction = actual
                 return
             }
@@ -63,28 +66,37 @@ struct WorkoutSetRow<Options: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             rowHeading
-            if isExpanded {
-                editor
-                    .padding(.top, 4)
-                    .mask {
-                        Rectangle().scaleEffect(x: 1, y: editorRevealed ? 1 : 0, anchor: .top)
-                    }
-                    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
-                        onEditorHeightChange(height)
-                    }
-                    .task {
-                        guard !editorRevealed else { return }
-                        // Commit the new layout before revealing only the panel.
-                        await Task.yield()
-                        guard !Task.isCancelled else { return }
-                        withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) { editorRevealed = true }
-                    }
+            if isEditorMounted {
+                SetEditorHeight(fraction: isExpanded ? 1 : 0) {
+                    editor
+                        .padding(.top, 4)
+                        .mask {
+                            Rectangle().scaleEffect(x: 1, y: editorRevealed ? 1 : 0, anchor: .top)
+                        }
+                        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
+                            if isExpanded { onEditorHeightChange(height) }
+                        }
+                }
+                .clipped()
+                .allowsHitTesting(isExpanded)
+                .accessibilityHidden(!isExpanded)
+                .task(id: isExpanded) {
+                    guard isExpanded, !editorRevealed else { return }
+                    // Commit the new layout before revealing only the panel.
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) { editorRevealed = true }
+                }
             }
         }
         .onChange(of: isExpanded) { _, expanded in
             if !expanded {
                 focused = nil
                 editorRevealed = true
+            }
+        }
+        .onChange(of: isEditorMounted) { _, mounted in
+            if !mounted {
                 correction = nil
                 correctionRevision = nil
                 if unsaved == nil { issue = nil }
@@ -151,7 +163,7 @@ struct WorkoutSetRow<Options: View>: View {
 
     private var editor: some View {
         VStack(alignment: .leading, spacing: 7) {
-            if isCurrent {
+            if !editorIsCorrection {
                 HStack(spacing: 8) {
                     Text("Target \(target)").font(.subheadline).foregroundStyle(.secondary)
                     Spacer(minLength: 0)
@@ -163,7 +175,7 @@ struct WorkoutSetRow<Options: View>: View {
                                       count: typeSize.isAccessibilitySize ? 1 : 2), spacing: 8) {
                 inputs
             }
-            if !isLogged, unsaved == nil {
+            if !editorIsCorrection, unsaved == nil {
                 if suggestion != nil {
                     Text("Suggested from the last matching set")
                         .font(.caption).foregroundStyle(.secondary)
@@ -176,7 +188,7 @@ struct WorkoutSetRow<Options: View>: View {
                 }
             }
             Button(action: submit) {
-                Label(isLogged ? "Save correction" : "Confirm set", systemImage: "checkmark")
+                Label(editorIsCorrection ? "Save correction" : "Confirm set", systemImage: "checkmark")
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .padding(.horizontal, 8)
@@ -185,8 +197,8 @@ struct WorkoutSetRow<Options: View>: View {
                     .contentShape(RoundedRectangle(cornerRadius: 12))
             }
             .buttonStyle(.plain)
-            .accessibilityIdentifier(isLogged ? "saveSet\(index)" : "confirmSet\(index)")
-            if isLogged {
+            .accessibilityIdentifier(editorIsCorrection ? "saveSet\(index)" : "confirmSet\(index)")
+            if editorIsCorrection {
                 HStack {
                     Button("Cancel", action: onCloseCorrection)
                         .frame(minHeight: 44)
@@ -224,20 +236,20 @@ struct WorkoutSetRow<Options: View>: View {
         }
         if exercise.basis != .bodyweight {
             let loadTitle = switch exercise.basis {
-            case .unilateral: "Left load"
+            case .unilateral: "Left weight"
             case .assisted: "Assistance"
-            case .added: "Added load"
+            case .added: "Added weight"
             case .dumbbell: "Per dumbbell"
             case .barbell: "Total incl. bar"
             case .machine: "Machine setting"
-            case .timed: "Load (optional)"
+            case .timed: "Weight (optional)"
             default: "Weight"
             }
             loadInput("\(loadTitle) (\(values.wrappedValue.unit))", value: values.load, kind: .load, id: "actualLoad")
         }
         if left {
             input("Right reps", value: values.rightReps, kind: .rightReps, id: "actualRightReps")
-            loadInput("Right load (\(values.wrappedValue.unit))", value: values.rightLoad, kind: .rightLoad, id: "actualRightLoad")
+            loadInput("Right weight (\(values.wrappedValue.unit))", value: values.rightLoad, kind: .rightLoad, id: "actualRightLoad")
         }
     }
 
@@ -326,13 +338,13 @@ struct WorkoutSetRow<Options: View>: View {
             guard let reps = actual.reps, reps > 0 else { issue = "Enter the reps you completed."; focused = .reps; return }
         }
         if exercise.basis != .bodyweight && exercise.basis != .timed && actual.load == nil {
-            issue = exercise.basis == .assisted ? "Enter the assistance used." : "Enter the load you used."
+            issue = exercise.basis == .assisted ? "Enter the assistance used." : "Enter the weight you used."
             focused = .load
             return
         }
         if exercise.basis == .unilateral {
             guard let reps = actual.rightReps, reps > 0 else { issue = "Enter right-side reps."; focused = .rightReps; return }
-            guard actual.rightLoad != nil else { issue = "Enter the right-side load."; focused = .rightLoad; return }
+            guard actual.rightLoad != nil else { issue = "Enter the right-side weight."; focused = .rightLoad; return }
         }
         guard let latest else { issue = "This set is no longer available."; return }
         guard isLogged == (latest.confirmedAt != nil) else { return }
@@ -355,5 +367,25 @@ struct WorkoutSetRow<Options: View>: View {
             try store.undo(sessionID: sessionID, setID: row.id, revision: row.revision)
             onCloseCorrection()
         } catch { issue = error.localizedDescription }
+    }
+}
+
+private struct SetEditorHeight: Layout {
+    var fraction: CGFloat
+
+    var animatableData: CGFloat {
+        get { fraction }
+        set { fraction = newValue }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let editor = subviews.first else { return .zero }
+        let fullSize = editor.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        return CGSize(width: fullSize.width, height: fullSize.height * min(1, max(0, fraction)))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading,
+                              proposal: ProposedViewSize(width: bounds.width, height: nil))
     }
 }

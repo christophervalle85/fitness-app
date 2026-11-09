@@ -12,7 +12,7 @@ extension PlanExercise {
     mutating func changeWorkoutBasis(from previous: LoadBasis, to next: LoadBasis) {
         guard previous != next else { return }
         startingLoad = nil
-        convention = basisTitle(next)
+        convention = basisConvention(next)
         timed = next == .timed
     }
 }
@@ -70,14 +70,14 @@ struct WorkoutExercisePicker: View {
                     TextField("Exercise name", text: $selected.name)
                         .focused($focused).accessibilityIdentifier("customName")
                 }
-                Picker("Recording method", selection: Binding(get: { basis }, set: { newBasis in
+                Picker("What to track", selection: Binding(get: { basis }, set: { newBasis in
                     selected.changeWorkoutBasis(from: basis, to: newBasis)
                     basis = newBasis
                 })) {
                     ForEach(LoadBasis.allCases, id: \.self) { Text(basisTitle($0)).tag($0) }
                 }
                 if basis != .bodyweight {
-                    Picker("Load unit", selection: Binding(get: { selected.loadUnit }, set: { unit in
+                    Picker("Weight unit", selection: Binding(get: { selected.loadUnit }, set: { unit in
                         selected.selectWorkoutLoadUnit(unit)
                     })) {
                         Text("Pounds").tag("lb")
@@ -140,7 +140,7 @@ struct WorkoutExercisePicker: View {
         }
         var prescription = selected
         prescription.timed = basis == .timed
-        if !pickedExisting || LoadBasis(selected) != basis { prescription.convention = basisTitle(basis) }
+        if !pickedExisting || LoadBasis(selected) != basis { prescription.convention = basisConvention(basis) }
         if let replacing { prescription.sets = replacing.sets.filter { $0.confirmedAt == nil }.count }
         do { try save(prescription, basis); dismiss() } catch { issue = error.localizedDescription }
     }
