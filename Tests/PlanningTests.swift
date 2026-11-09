@@ -233,6 +233,69 @@ struct PlanningTests {
         }
     }
 
+    @Test func failedPreferenceWriteKeepsSavedUnitAndAllowsOtherWrites() throws {
+        try withDirectory { directory in
+            var failNext = false
+            let store = PlanningStore(directory: directory) {
+                if failNext { throw CocoaError(.fileWriteOutOfSpace) }
+            }
+            try store.load()
+            let plan = routine()
+            try store.begin(plan, step: "review")
+            try store.confirm(plan)
+
+            failNext = true
+            #expect(throws: CocoaError.self) { try store.setWeightUnit("kg") }
+            #expect(store.weightUnit == "lb")
+            failNext = false
+            try store.duplicate(plan.id)
+            #expect(store.weightUnit == "lb")
+            #expect(store.activeID == plan.id)
+            try store.setWeightUnit("kg")
+
+            let reopened = PlanningStore(directory: directory)
+            try reopened.load()
+            #expect(reopened.weightUnit == "kg")
+            #expect(reopened.activeID == plan.id)
+            #expect(reopened.plans.count == 2)
+        }
+    }
+
+    @Test func failedRebindKeepsPublishedStateUntilSavedRoutinesCanBeMatched() throws {
+        try withDirectory { directory in
+            var failNext = false
+            let store = PlanningStore(directory: directory) {
+                if failNext { throw CocoaError(.fileWriteOutOfSpace) }
+            }
+            try store.load()
+            let plan = routine()
+            try store.begin(plan, step: "review")
+            try store.confirm(plan)
+            try store.setWeightUnit("kg")
+
+            failNext = true
+            #expect(throws: CocoaError.self) { try store.deleteRoutine(plan.id) }
+            failNext = false
+
+            let other = PlanningStore(directory: directory)
+            try other.load()
+            try other.duplicate(plan.id)
+            let copy = try #require(other.plans.last)
+            #expect(throws: PlanningError.self) { try store.setWeightUnit("lb") }
+            #expect(store.plans == [plan] && store.activeID == plan.id && store.weightUnit == "kg")
+            let savedBeforeRetry = PlanningStore(directory: directory)
+            try savedBeforeRetry.load()
+            #expect(savedBeforeRetry.weightUnit == "kg" && savedBeforeRetry.activeID == plan.id)
+            #expect(Set(savedBeforeRetry.plans.map(\.id)) == Set([plan.id, copy.id]))
+
+            try other.deleteRoutine(copy.id)
+            try store.setWeightUnit("lb")
+            let reopened = PlanningStore(directory: directory)
+            try reopened.load()
+            #expect(reopened.plans == [plan] && reopened.activeID == plan.id && reopened.weightUnit == "lb")
+        }
+    }
+
     @Test func failedDeletionKeepsTheRoutineAndActivationUntilRetry() throws {
         try withDirectory { directory in
             var failNext = false

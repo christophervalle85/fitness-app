@@ -45,7 +45,7 @@ struct PlanningError: LocalizedError {
 final class PlanningStore {
     private(set) var favoriteExerciseIDs = Set<UUID>()
     private(set) var customExercises = [PlanExercise]()
-    private var unitRevision = 0
+    private(set) var weightUnit = "lb"
     private(set) var plans: [WeekPlan] = []
     private(set) var activeID: UUID?
     private(set) var draft: WeekPlan?
@@ -158,7 +158,7 @@ final class PlanningStore {
         guard !plan.archived else { throw PlanningError("Choose an available routine to confirm.") }
 
         let bytes = try JSONEncoder().encode(plan)
-        let index = routines.firstIndex { $0.id == plan.id }
+        let index = plans.firstIndex { $0.id == plan.id }
         var inserted: PlanningSchemaV1.Routine?
         try save { context, profile in
             if let index {
@@ -276,32 +276,57 @@ final class PlanningStore {
     // Keep the profile, draft and saved routine in one explicit commit. Publish
     // only after it succeeds so a failed confirmation can be retried in place.
     private func save(_ change: (ModelContext, PlanningSchemaV1.Profile) throws -> Void) throws {
-        guard let context, let profile else { throw PlanningError("Open your local profile and try again.") }
+        let (context, profile) = try writeBindings()
         do {
             try change(context, profile)
             try beforeSave()
             try context.save()
         } catch {
             context.rollback()
+            // SwiftData can retain changed values on models even after rollback.
+            self.context = nil
+            self.profile = nil
+            routines = []
             throw error
         }
         publishProfile(profile)
+    }
+
+    private func writeBindings() throws -> (ModelContext, PlanningSchemaV1.Profile) {
+        if let context, let profile { return (context, profile) }
+        guard let container, let profileID else { throw PlanningError("Open your local profile and try again.") }
+
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let profiles = try context.fetch(FetchDescriptor<PlanningSchemaV1.Profile>())
+        guard profiles.count == 1, let profile = profiles.first, profile.id == profileID else {
+            throw PlanningError("Open your local profile and try again.")
+        }
+        let rows = try context.fetch(FetchDescriptor<PlanningSchemaV1.Routine>())
+        let byID = Dictionary(grouping: rows, by: \.id)
+        let planIDs = plans.map(\.id)
+        guard byID.count == rows.count, planIDs.count == rows.count, Set(planIDs) == Set(byID.keys) else {
+            throw PlanningError("Reopen Routines to load your saved plans.")
+        }
+
+        self.context = context
+        self.profile = profile
+        self.routines = planIDs.compactMap { byID[$0]?.first }
+        return (context, profile)
     }
 
     private func publishProfile(_ profile: PlanningSchemaV1.Profile) {
         profileID = profile.id
         activeID = profile.activeID
         step = profile.step
+        weightUnit = profile.displayUnit ?? "lb"
     }
 }
 
 extension PlanningStore {
-    var weightUnit: String { _ = unitRevision; return profile?.displayUnit ?? "lb" }
-
     func setWeightUnit(_ raw: String) throws {
         guard ["kg", "lb"].contains(raw) else { throw PlanningError("Choose kilograms or pounds.") }
         try save { _, profile in profile.displayUnit = raw }
-        unitRevision += 1
     }
 
     func stage(_ backup: WorkoutBackup) throws {
